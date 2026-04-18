@@ -7,9 +7,10 @@ $host = "localhost";
 $user = "root";
 $pass = "";
 $db   = "mutiarac_db_purchase_system_dummy";
+$port = 3306;
 
 // Melakukan koneksi
-$koneksi = mysqli_connect($host, $user, $pass, $db);
+$koneksi = mysqli_connect($host, $user, $pass, $db, $port);
 
 // Cek koneksi
 if (!$koneksi) {

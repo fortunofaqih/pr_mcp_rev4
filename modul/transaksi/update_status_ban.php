@@ -44,14 +44,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     mysqli_begin_transaction($koneksi);
     try {
-        if ($aksi === 'beli') {
-            // Tandai item sudah dibeli
-            $sql = "UPDATE tr_request_detail SET
-                        is_dibeli   = 1,
-                        tgl_dibeli  = '$today',
-                        dibeli_oleh = '$nama_esc'
-                    WHERE id_detail = '$id_detail' AND is_dibeli = 0";
-            if (!mysqli_query($koneksi, $sql)) throw new Exception("Gagal update beli: ".mysqli_error($koneksi));
+       if ($aksi === 'beli') {
+        // 1. CEK DULU: Apakah item ini sudah ada di tabel pembelian?
+        // Kita cek berdasarkan id_detail (id_request_detail di tabel pembelian)
+        $cek_pembelian = mysqli_query($koneksi, "SELECT id_pembelian FROM pembelian WHERE id_request_detail = '$id_detail' LIMIT 1");
+        
+        if (mysqli_num_rows($cek_pembelian) == 0) {
+            // Jika tidak ada di tabel pembelian, lempar error agar masuk ke catch block
+            throw new Exception("Barang belum diinput ke database Pembelian. Silakan input nota pembelian terlebih dahulu.");
+        }
+
+        // 2. Jika lolos pengecekan, baru update status tr_request_detail
+        $sql = "UPDATE tr_request_detail SET
+                    is_dibeli   = 1,
+                    tgl_dibeli  = '$today',
+                    dibeli_oleh = '$nama_esc'
+                WHERE id_detail = '$id_detail' AND is_dibeli = 0";
+                
+        if (!mysqli_query($koneksi, $sql)) throw new Exception("Gagal update beli: ".mysqli_error($koneksi));
 
         } elseif ($aksi === 'pasang') {
             // Tandai ban sudah terpasang (hanya jika is_ban=1 dan sudah dibeli)
