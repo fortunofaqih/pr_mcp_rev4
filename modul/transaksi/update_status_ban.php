@@ -492,6 +492,10 @@ body{background:#f4f6f9;font-size:.875rem;}
                                 $is_ban    = (int)$d['is_ban'];
                                 $is_dibeli = (int)$d['is_dibeli'];
                                 $status_pasang = $d['status_pasang'] ?? null;
+                                $id_det = $d['id_detail']; // Ambil ID Detail
+                                // Cek apakah item ini sudah diinput di nota pembelian
+                                $q_cek_nota = mysqli_query($koneksi, "SELECT id_pembelian FROM pembelian WHERE id_request_detail = '$id_det' LIMIT 1");
+                                $sudah_ada_nota = (mysqli_num_rows($q_cek_nota) > 0);
                             ?>
                             <tr class="<?= $is_ban ? 'row-ban' : '' ?>">
                                 <td class="text-center text-muted"><?= $no++ ?></td>
@@ -540,6 +544,7 @@ body{background:#f4f6f9;font-size:.875rem;}
                                 <td class="text-center">
                                     <div class="d-flex flex-column gap-1">
                                     <?php if (!$is_dibeli): ?>
+                                    <?php if ($sudah_ada_nota): ?>
                                         <form method="POST" style="display:inline;" onsubmit="return konfirmBeli(event, '<?= htmlspecialchars(strtoupper($nama), ENT_QUOTES) ?>')">
                                             <input type="hidden" name="id_detail"  value="<?= $d['id_detail'] ?>">
                                             <input type="hidden" name="id_po"      value="<?= $id_po_filter ?>">
@@ -549,7 +554,14 @@ body{background:#f4f6f9;font-size:.875rem;}
                                                 <i class="fas fa-shopping-bag me-1"></i>DONE
                                             </button>
                                         </form>
+                                    <?php else: ?>
+                                        <div class="p-1 border rounded bg-light">
+                                            <span class="text-danger fw-bold" style="font-size:.65rem;">
+                                                <i class="fas fa-exclamation-triangle me-1"></i>NOTA BELUM DIINPUT
+                                            </span>
+                                        </div>
                                     <?php endif; ?>
+                                <?php endif; ?>
                                     <?php if ($is_ban && $is_dibeli && $status_pasang === 'BELUM_TERPASANG'): ?>
                                         <form method="POST" style="display:inline;" onsubmit="return konfirmPasang(event, '<?= htmlspecialchars(strtoupper($nama), ENT_QUOTES) ?>', '<?= htmlspecialchars($unit, ENT_QUOTES) ?>')">
                                             <input type="hidden" name="id_detail"  value="<?= $d['id_detail'] ?>">
