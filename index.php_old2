@@ -1,0 +1,346 @@
+<?php
+session_start();
+include 'config/koneksi.php';
+include 'auth/check_session.php'; 
+
+$role  = $_SESSION['role'];  
+$nama  = $_SESSION['nama'];
+
+$tahun_pilihan = isset($_GET['tahun_filter']) ? $_GET['tahun_filter'] : date('Y');
+
+// Hitung notif approval
+$jumlah_notif = 0;
+if ($role == 'administrator' || $role == 'manager') {
+    $q_notif = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM tr_request WHERE kategori_pr = 'BESAR' AND status_approval = 'MENUNGGU APPROVAL'");
+    $d_notif = mysqli_fetch_assoc($q_notif);
+    $jumlah_notif = $d_notif['total'];
+}
+
+$is_gudang_access = ($role == 'admin_gudang' || $role == 'administrator');
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - MCP System</title>
+    <link rel="icon" type="image/png" href="assets/img/logo_mcp.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --mcp-blue: #0000FF; --mcp-dark: #00008B; }
+        body { background-color: #f4f7f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow-x: hidden; }
+        
+        /* Sidebar Styling */
+        #sidebar {
+            min-width: 260px;
+            max-width: 260px;
+            background: var(--mcp-blue);
+            color: #fff;
+            transition: all 0.3s;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            z-index: 1040;
+        }
+        #sidebar.active { margin-left: -260px; }
+        
+        .sidebar-header { padding: 20px; background: rgba(0,0,0,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-scroll { flex-grow: 1; overflow-y: auto; overflow-x: hidden; }
+        
+        .nav-link { color: rgba(255,255,255,0.8); font-size: 0.75rem; padding: 10px 20px; font-weight: 500; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .nav-link:hover, .nav-link.active { background: var(--mcp-dark); color: #fff; }
+        
+        .nav-category { padding: 15px 20px 5px; font-size: 0.7rem; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 5px; }
+
+        /* Main Content Styling */
+        #content { width: 100%; min-height: 100vh; transition: all 0.3s; display: flex; flex-direction: column; }
+        .topbar { background: #fff; border-bottom: 1px solid #e3e6f0; padding: 10px 20px; position: sticky; top: 0; z-index: 1030; }
+        
+        /* Mobile Overlay */
+        @media (max-width: 992px) {
+            #sidebar { margin-left: -260px; position: fixed; }
+            #sidebar.active { margin-left: 0; }
+            .overlay { display: none; position: fixed; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 1035; }
+            .overlay.active { display: block; }
+        }
+
+       /* Pastikan Wrapper memenuhi layar */
+.wrapper {
+    display: flex;
+    width: 100%;
+    align-items: stretch;
+    height: 100vh; /* KUNCI: Wrapper harus setinggi layar */
+    overflow: hidden;
+}
+
+/* Sidebar Styling */
+#sidebar {
+    min-width: 260px;
+    max-width: 260px;
+    background: var(--mcp-blue);
+    color: #fff;
+    transition: all 0.3s;
+    height: 100vh; /* KUNCI: Sidebar setinggi layar */
+    display: flex;
+    flex-direction: column;
+    z-index: 1040;
+}
+
+/* Area Scroll Sidebar */
+.sidebar-scroll {
+    flex: 1; /* Mengambil sisa ruang yang ada */
+    overflow-y: auto; /* Memunculkan scrollbar jika menu banyak */
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch; /* Halus di iPhone/Android */
+}
+
+/* Tambahkan ini agar scrollbar terlihat (opsional tapi disarankan) */
+.sidebar-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+/* Content Area juga harus bisa scroll sendiri */
+#content {
+    flex: 1;
+    height: 100vh;
+    overflow-y: auto; 
+    background-color: #f4f7f6;
+    display: flex;
+    flex-direction: column;
+}
+
+        .card { border: none; border-radius: 8px; box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1); }
+        .heart { display: inline-block; animation: pulse 1.5s infinite; color: #ff4d4d; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+<div class="overlay" id="overlay"></div>
+
+<div class="wrapper">
+    <nav id="sidebar">
+        <div class="sidebar-header text-center">
+            <div class="d-flex align-items-center justify-content-center gap-2">
+                <img src="assets/img/logo_mcp.png" alt="Logo" style="width: 32px;">
+                <h6 class="fw-bold m-0 text-white">MCP SYSTEM</h6>
+            </div>
+            <small class="opacity-50 text-white small">INVENTORY & PR</small>
+        </div>
+
+        <div class="sidebar-scroll">
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a href="index.php" class="nav-link active"><i class="fas fa-home me-2"></i> Dashboard</a>
+                </li>
+
+                <?php if ($role == 'administrator' || $role == 'manager') : ?>
+                    <div class="nav-category text-warning">Panel Pimpinan</div>
+                    <li class="nav-item">
+                        <a href="modul/pimpinan/approval_pimpinan.php" class="nav-link">
+                            <i class="fas fa-circle-check me-2"></i> Approval PR Besar
+                            <?php if ($jumlah_notif > 0): ?>
+                                <span class="badge rounded-pill bg-danger float-end"><?= $jumlah_notif ?></span>
+                            <?php endif; ?>
+                        </a>
+                    </li>
+                <?php endif; ?>
+
+                <?php if ($is_gudang_access) : ?>
+                    <div class="nav-category">-- Master Data --</div>
+                    <li class="nav-item"><a href="modul/master/data_barang.php" class="nav-link text-warning fw-bold"><i class="fas fa-boxes me-2"></i> Master Barang</a></li>
+                    <li class="nav-item"><a href="modul/master/data_mobil.php" class="nav-link text-warning fw-bold"><i class="fas fa-truck me-2"></i> Master Mobil</a></li>
+                    <li class="nav-item"><a href="modul/master/data_supplier.php" class="nav-link text-warning fw-bold"><i class="fa-brands fa-shopify me-2"></i> Master Supplier</a></li>
+                    
+                    <div class="nav-category">-- Transaksi Gudang --</div>
+                    <li class="nav-item"><a href="modul/transaksi/tambah_request.php" class="nav-link text-warning fw-bold"><i class="fas fa-file-invoice me-2"></i> Form PR (Kecil)</a></li>
+                    <li class="nav-item"><a href="modul/transaksi/tambah_request_besar.php" class="nav-link text-warning fw-bold"><i class="fas fa-cart-plus me-2"></i> Form PR (Besar)</a></li>
+                    <li class="nav-item"><a href="modul/transaksi/pr.php" class="nav-link text-warning fw-bold"><i class="fa-solid fa-bars-progress me-2"></i> Progress PR</a></li>
+                    <li class="nav-item"><a href="modul/transaksi/verifikasi_pembelian.php" class="nav-link text-warning fw-bold"><i class="fas fa-check-double me-2"></i> Verifikasi Pembelian</a></li>
+                    <li class="nav-item"><a href="modul/transaksi/pengambilan.php" class="nav-link text-warning fw-bold"><i class="fas fa-dolly me-2"></i> Bon Pengambilan</a></li>
+                    <li class="nav-item"><a href="modul/transaksi/retur.php" class="nav-link text-warning fw-bold"><i class="fas fa-undo me-2"></i> Retur Barang</a></li>
+
+                    <div class="nav-category">-- Penyesuaian --</div>
+                    <li class="nav-item"><a href="modul/transaksi/koreksi.php" class="nav-link text-warning fw-bold"><i class="fas fa-sync me-2"></i> Koreksi Stok</a></li>
+                    <li class="nav-item"><a href="modul/transaksi/pemusnahan.php" class="nav-link text-warning fw-bold"><i class="fas fa-trash-alt me-2"></i> Pemusnahan</a></li>
+
+                    <div class="nav-category">-- Laporan & Analisa --</div>
+                    <li class="nav-item"><a href="modul/laporan/data_stock.php" class="nav-link text-warning fw-bold"><i class="fas fa-book me-2"></i> Buku Stok Barang</a></li>
+                    <li class="nav-item"><a href="modul/laporan/data_pembelian.php" class="nav-link text-warning fw-bold"><i class="fas fa-book me-2"></i> Buku Pembelian</a></li>
+                    <li class="nav-item"><a href="modul/laporan/laporan_mutasi_cepat.php" class="nav-link text-warning fw-bold"><i class="fas fa-file-invoice-dollar me-2"></i> Summary Stok</a></li>
+                    <li class="nav-item"><a href="modul/laporan/laporan_mobil.php" class="nav-link text-warning fw-bold"><i class="fas fa-file-invoice-dollar me-2"></i> Laporan Mobil</a></li>
+                    <li class="nav-item"><a href="modul/laporan/laporan_barang_kecil.php" class="nav-link text-warning fw-bold"><i class="fas fa-file-invoice-dollar me-2"></i> Lap. Barang Kecil</a></li>
+                    <li class="nav-item"><a href="modul/laporan/laporan_barang_besar.php" class="nav-link text-warning fw-bold"><i class="fas fa-file-invoice-dollar me-2"></i> Lap. Barang Besar</a></li>
+                    <li class="nav-item"><a href="modul/laporan/laporan_stok_bulanan.php" class="nav-link text-warning fw-bold"><i class="fas fa-layer-group me-2"></i> Stok Bulanan</a></li>
+                    <li class="nav-item"><a href="modul/laporan/riwayat_retur.php" class="nav-link text-warning fw-bold"><i class="fas fa-clock-rotate-left me-2"></i> Riwayat Retur</a></li>
+                    <li class="nav-item"><a href="modul/laporan/kategori.php" class="nav-link text-warning fw-bold"><i class="fas fa-chart-line me-2"></i> Analisis Kategori</a></li>
+                <?php endif; ?>
+
+                <?php if ($role == 'bagian_pembelian') : ?>
+                    <div class="nav-category">Pembelian</div>
+                    <li class="nav-item"><a href="modul/pembelian/index.php" class="nav-link"><i class="fas fa-shopping-cart me-2"></i> Antrean Pembelian</a></li>
+                <?php endif; ?>
+            </ul>
+        </div>
+
+        <div class="p-3 border-top border-white-50">
+            <a href="ganti_password.php" class="btn btn-sm btn-outline-light w-100 mb-2 fw-bold" style="font-size:0.7rem;">
+                <i class="fas fa-key me-1"></i> GANTI PASSWORD
+            </a>
+            <div class="text-center opacity-50 small" style="font-size: 0.6rem;">
+                &copy; <?= date("Y") ?> MCP System
+            </div>
+        </div>
+    </nav>
+
+   <div id="content">
+    <header class="topbar d-flex justify-content-between align-items-center shadow-sm">
+        <button type="button" id="sidebarCollapse" class="btn btn-primary d-lg-none">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <div class="fw-bold text-uppercase d-none d-sm-block" style="color: var(--mcp-blue); font-size: 0.85rem;">
+            <i class="fas fa-user-circle me-1"></i>Selamat Datang, <?= $nama ?>
+            <span class="badge bg-success ms-1 small"><?= strtoupper($role) ?></span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <span class="small text-muted fw-bold d-none d-md-block me-2"><?= date('d F Y') ?></span>
+            
+            <a href="ganti_password.php" class="btn btn-warning btn-sm fw-bold shadow-sm" title="Ganti Password">
+                <i class="fas fa-key me-1"></i> <span class="d-none d-md-inline">PASSWORD</span>
+            </a>
+
+            <a href="auth/logout.php" class="btn btn-danger btn-sm fw-bold shadow-sm">
+                <i class="fas fa-power-off me-1"></i> <span class="d-none d-md-inline">KELUAR</span>
+            </a>
+        </div>
+    </header>
+
+        <div class="container-fluid p-3 p-md-4">
+            
+            <?php if ($role == 'manager' && $jumlah_notif > 0) : ?>
+                <div class="alert alert-primary border-0 shadow-sm d-flex flex-column flex-md-row align-items-center justify-content-between p-3 mb-4">
+                    <div class="mb-2 mb-md-0 text-center text-md-start">
+                        <h6 class="fw-bold mb-1"><i class="fas fa-bell me-2"></i> Perhatian Pimpinan</h6>
+                        <span class="small">Ada <strong><?= $jumlah_notif ?></strong> PR Besar menunggu persetujuan.</span>
+                    </div>
+                    <a href="modul/pimpinan/approval_pimpinan.php" class="btn btn-warning btn-sm fw-bold shadow-sm">PROSES SEKARANG</a>
+                </div>
+            <?php endif; ?>
+
+            <div class="row align-items-center mb-4">
+                <div class="col-12 col-md-6 mb-3 mb-md-0">
+                    <h4 class="fw-bold text-uppercase m-0">Ringkasan Sistem</h4>
+                </div>
+                <div class="col-12 col-md-6 text-md-end">
+                    <form action="" method="GET" class="d-inline-flex bg-white p-2 rounded shadow-sm border align-items-center">
+                        <label class="small fw-bold me-2 mb-0 text-muted">TAHUN:</label>
+                        <select name="tahun_filter" class="form-select form-select-sm border-0 fw-bold text-primary" onchange="this.form.submit()" style="width:100px;">
+                            <?php for ($x = date('Y'); $x >= 2024; $x--) : ?>
+                                <option value="<?= $x ?>" <?= ($x == $tahun_pilihan) ? "selected" : "" ?>><?= $x ?></option>
+                            <?php endfor; ?>
+                        </select>
+                    </form>
+                </div>
+            </div>
+
+            <?php if ($is_gudang_access) : ?>
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h6 class="m-0 fw-bold text-primary text-uppercase"><i class="fas fa-chart-bar me-2"></i> Statistik Aktivitas Bulanan</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle m-0">
+                            <thead class="table-light small text-uppercase">
+                                <tr>
+                                    <th class="ps-4">Bulan</th>
+                                    <th class="text-center">Item</th>
+                                    <th>Total Biaya</th>
+                                    <th class="text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                $query_bulanan = mysqli_query($koneksi, "
+                                    SELECT m.bulan, COALESCE(pb.jml_beli, 0) as jml_beli, COALESCE(pb.total_biaya, 0) as total_biaya
+                                    FROM (SELECT 1 AS bulan UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 
+                                          UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11 UNION SELECT 12) m
+                                    LEFT JOIN (
+                                        SELECT MONTH(tgl_beli_barang) as bln, COUNT(*) as jml_beli, SUM(qty * harga) as total_biaya
+                                        FROM pembelian WHERE YEAR(tgl_beli_barang) = '$tahun_pilihan'
+                                        GROUP BY MONTH(tgl_beli_barang)
+                                    ) pb ON m.bulan = pb.bln
+                                    WHERE pb.jml_beli > 0 ORDER BY m.bulan DESC");
+
+                                $grand_item = 0; $grand_biaya = 0;
+                                if (mysqli_num_rows($query_bulanan) > 0) :
+                                    while ($r = mysqli_fetch_array($query_bulanan)) :
+                                        $nama_bulan = date("F", mktime(0,0,0,$r['bulan'],10));
+                                        $grand_item += $r['jml_beli']; $grand_biaya += $r['total_biaya'];
+                                ?>
+                                    <tr>
+                                        <td class="ps-4 fw-bold"><?= strtoupper($nama_bulan) ?></td>
+                                        <td class="text-center"><span class="badge bg-secondary rounded-pill"><?= $r['jml_beli'] ?></span></td>
+                                        <td class="text-danger fw-bold">Rp <?= number_format($r['total_biaya'], 0, ',', '.') ?></td>
+                                        <td class="text-center">
+                                            <a href="modul/laporan/detail_bulan.php?bulan=<?= $r['bulan'] ?>&tahun=<?= $tahun_pilihan ?>" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
+                                                Detail
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php endwhile; ?>
+                                    <tr class="table-secondary fw-bold">
+                                        <td class="ps-4">TOTAL</td>
+                                        <td class="text-center"><?= number_format($grand_item) ?></td>
+                                        <td class="text-danger">Rp <?= number_format($grand_biaya, 0, ',', '.') ?></td>
+                                        <td></td>
+                                    </tr>
+                                <?php else : ?>
+                                    <tr><td colspan="4" class="text-center py-5 text-muted">TIDAK ADA AKTIVITAS DI TAHUN <?= $tahun_pilihan ?></td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <div class="alert alert-info border-0 shadow-sm small">
+                <i class="fas fa-info-circle me-2"></i> Selamat Datang kembali, <strong><?= $nama ?></strong>. Selamat bekerja!
+            </div>
+
+            <footer class="mt-auto py-4 text-center text-muted small">
+                &copy; <?= date("Y") ?> PT Mutiara Cahaya Plastindo | Made with <span class="heart">❤️</span> by Team IT
+            </footer>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        const btn = document.getElementById('sidebarCollapse');
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+
+        btn.addEventListener('click', toggleSidebar);
+        overlay.addEventListener('click', toggleSidebar);
+    });
+</script>
+</body>
+</html>

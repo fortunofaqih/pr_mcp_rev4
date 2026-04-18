@@ -1,0 +1,7 @@
+[31-Jan-2026 09:24:17 Asia/Jakarta] PHP Notice:  Undefined variable: merk in /home/mutiarac/public_html/pr_mcp/modul/master/proses_barang.php on line 25
+[31-Jan-2026 09:24:17 Asia/Jakarta] PHP Notice:  Undefined variable: kategori in /home/mutiarac/public_html/pr_mcp/modul/master/proses_barang.php on line 25
+[31-Jan-2026 09:24:17 Asia/Jakarta] PHP Notice:  Undefined variable: satuan in /home/mutiarac/public_html/pr_mcp/modul/master/proses_barang.php on line 25
+[31-Jan-2026 09:24:17 Asia/Jakarta] PHP Notice:  Undefined variable: stok_input in /home/mutiarac/public_html/pr_mcp/modul/master/proses_barang.php on line 25
+[31-Jan-2026 09:24:17 Asia/Jakarta] PHP Notice:  Undefined variable: lokasi_rak in /home/mutiarac/public_html/pr_mcp/modul/master/proses_barang.php on line 25
+[31-Jan-2026 09:24:17 Asia/Jakarta] PHP Notice:  Undefined variable: status in /home/mutiarac/public_html/pr_mcp/modul/master/proses_barang.php on line 25
+[25-Feb-2026 08:04:46 Asia/Jakarta] PHP Warning:  A non-numeric value encountered in /home/mutiarac/public_html/pr_mcp/modul/master/update_barang.php on line 47

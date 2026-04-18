@@ -1,0 +1,56 @@
+[09-Feb-2026 16:23:56 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mutasi_cepat.php on line 23
+[09-Feb-2026 16:23:56 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mutasi_cepat.php on line 71
+[09-Feb-2026 16:23:58 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mutasi_cepat.php on line 23
+[09-Feb-2026 16:23:58 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mutasi_cepat.php on line 71
+[10-Feb-2026 17:41:07 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 173
+[10-Feb-2026 17:41:15 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 173
+[10-Feb-2026 17:41:45 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 173
+[10-Feb-2026 17:45:26 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 159
+[11-Feb-2026 09:16:05 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 134
+[11-Feb-2026 09:19:45 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 206
+[11-Feb-2026 09:23:44 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 207
+[11-Feb-2026 09:23:46 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 207
+[11-Feb-2026 09:23:46 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 207
+[11-Feb-2026 09:23:46 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 207
+[11-Feb-2026 09:23:46 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 207
+[11-Feb-2026 09:23:46 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 207
+[11-Feb-2026 09:23:46 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 207
+[11-Feb-2026 09:23:47 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 207
+[11-Feb-2026 09:44:07 Asia/Jakarta] PHP Warning:  Invalid argument supplied for foreach() in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 102
+[11-Feb-2026 10:00:26 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 157
+[11-Feb-2026 10:00:27 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 157
+[11-Feb-2026 10:00:27 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 157
+[11-Feb-2026 10:00:27 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 157
+[11-Feb-2026 10:00:28 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 157
+[11-Feb-2026 10:00:28 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 157
+[11-Feb-2026 10:00:28 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 157
+[11-Feb-2026 10:00:32 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 157
+[11-Feb-2026 10:00:35 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 157
+[11-Feb-2026 10:00:36 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 157
+[11-Feb-2026 10:00:39 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 157
+[12-Feb-2026 08:26:41 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 182
+[12-Feb-2026 08:27:05 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 182
+[12-Feb-2026 08:27:13 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 182
+[12-Feb-2026 08:27:19 Asia/Jakarta] PHP Warning:  mysqli_num_rows() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 182
+[16-Feb-2026 08:37:42 Asia/Jakarta] PHP Warning:  mysqli_query(): (HY000/1): Can't create/write to file '/tmp/#sql_2601d6_0.MYI' (Errcode: 28 - No space left on device) in /home/mutiarac/public_html/pr_mcp/modul/laporan/data_pembelian.php on line 38
+[16-Feb-2026 08:37:42 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/data_pembelian.php on line 42
+[16-Feb-2026 08:37:54 Asia/Jakarta] PHP Warning:  mysqli_query(): (HY000/1): Can't create/write to file '/tmp/#sql_2601d6_0.MYI' (Errcode: 28 - No space left on device) in /home/mutiarac/public_html/pr_mcp/modul/laporan/data_pembelian.php on line 38
+[16-Feb-2026 08:37:54 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/data_pembelian.php on line 42
+[16-Feb-2026 08:37:59 Asia/Jakarta] PHP Warning:  mysqli_query(): (HY000/1): Can't create/write to file '/tmp/#sql_2601d6_0.MYI' (Errcode: 28 - No space left on device) in /home/mutiarac/public_html/pr_mcp/modul/laporan/data_pembelian.php on line 38
+[16-Feb-2026 08:37:59 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/data_pembelian.php on line 42
+[16-Feb-2026 08:38:02 Asia/Jakarta] PHP Warning:  mysqli_query(): (HY000/1): Can't create/write to file '/tmp/#sql_2601d6_3.MYI' (Errcode: 28 - No space left on device) in /home/mutiarac/public_html/pr_mcp/modul/laporan/data_pembelian.php on line 38
+[16-Feb-2026 08:38:02 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/data_pembelian.php on line 42
+[16-Feb-2026 08:38:03 Asia/Jakarta] PHP Warning:  mysqli_query(): (HY000/1): Can't create/write to file '/tmp/#sql_2601d6_0.MYI' (Errcode: 28 - No space left on device) in /home/mutiarac/public_html/pr_mcp/modul/laporan/data_pembelian.php on line 38
+[16-Feb-2026 08:38:03 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/data_pembelian.php on line 42
+[16-Feb-2026 08:38:17 Asia/Jakarta] PHP Warning:  mysqli_query(): (HY000/1): Can't create/write to file '/tmp/#sql_2601d6_0.MYI' (Errcode: 28 - No space left on device) in /home/mutiarac/public_html/pr_mcp/modul/laporan/data_pembelian.php on line 38
+[16-Feb-2026 08:38:17 Asia/Jakarta] PHP Warning:  mysqli_fetch_assoc() expects parameter 1 to be mysqli_result, bool given in /home/mutiarac/public_html/pr_mcp/modul/laporan/data_pembelian.php on line 42
+[03-Mar-2026 03:10:56 UTC] PHP Parse error:  syntax error, unexpected 'rd' (T_STRING) in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 23
+[03-Mar-2026 03:10:59 UTC] PHP Parse error:  syntax error, unexpected 'rd' (T_STRING) in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 23
+[03-Mar-2026 03:11:02 UTC] PHP Parse error:  syntax error, unexpected 'rd' (T_STRING) in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 23
+[03-Mar-2026 03:11:05 UTC] PHP Parse error:  syntax error, unexpected 'rd' (T_STRING) in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 23
+[03-Mar-2026 03:11:10 UTC] PHP Parse error:  syntax error, unexpected 'rd' (T_STRING) in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 23
+[03-Mar-2026 03:11:16 UTC] PHP Parse error:  syntax error, unexpected 'rd' (T_STRING) in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 23
+[03-Mar-2026 03:11:19 UTC] PHP Parse error:  syntax error, unexpected 'rd' (T_STRING) in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 23
+[03-Mar-2026 03:11:20 UTC] PHP Parse error:  syntax error, unexpected 'rd' (T_STRING) in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 23
+[03-Mar-2026 03:11:21 UTC] PHP Parse error:  syntax error, unexpected 'rd' (T_STRING) in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 23
+[03-Mar-2026 03:11:22 UTC] PHP Parse error:  syntax error, unexpected 'rd' (T_STRING) in /home/mutiarac/public_html/pr_mcp/modul/laporan/laporan_mobil.php on line 23

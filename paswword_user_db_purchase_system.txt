@@ -1,0 +1,23 @@
+password : 
+
+No	Nama Lengkap		Role			Username		Password (Case Sensitive)
+1	ADMIN GUDANG 1		admin_gudang		gudang1			GudangSatu!@
+2	ADMIN GUDANG 2		admin_gudang		gudang2			GudangDua#$
+3	ADMIN GUDANG 3		admin_gudang		gudang3			GudangTiga%^
+4	ADMIN GUDANG 4		admin_gudang		gudang4			GudangEmpat&*
+5	PETUGAS PEMBELIAN 1	bagian_pembelian	beli1			BeliSatu123
+6	PETUGAS PEMBELIAN 2	bagian_pembelian	beli2			BeliDua456
+
+
+UPDATE!!
+$users = [
+    'gudang1' => 'Gudang123',
+    'gudang2' => 'Gudang123',
+    'gudang3' => 'Gudang123',
+    'gudang4' => 'Gudang123',
+    'beli1'   => 'Beli123',
+    'beli2'   => 'Beli123'
+
+superadmin | SuperAdmin_MCP123
+
+manager_mcp | Manager_Mutiara_2026

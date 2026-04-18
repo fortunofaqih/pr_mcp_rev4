@@ -1,0 +1,90 @@
+<?php
+session_start();
+include '../../config/koneksi.php';
+include '../../auth/check_session.php';
+
+$id_pembelian    = (int)$_POST['id_pembelian'];
+$qty_baru        = (float)$_POST['qty'];
+$harga_satuan    = (float)$_POST['harga'];
+$alokasi_stok    = $_POST['alokasi_stok']; 
+$nama_barang     = strtoupper(mysqli_real_escape_string($koneksi, $_POST['nama_barang']));
+$tgl_beli_barang = mysqli_real_escape_string($koneksi, $_POST['tgl_beli_barang']);
+
+// 1. AMBIL DATA LAMA (Sangat krusial untuk menetralkan stok)
+$sql_old = "SELECT qty, alokasi_stok, nama_barang_beli, id_request_detail 
+            FROM pembelian WHERE id_pembelian = $id_pembelian LIMIT 1";
+$res_old = mysqli_query($koneksi, $sql_old);
+$data_old = mysqli_fetch_assoc($res_old);
+
+$qty_lama         = (float)$data_old['qty'];
+$alokasi_lama     = $data_old['alokasi_stok'];
+$nama_barang_lama = $data_old['nama_barang_beli'];
+$id_req_detail    = (int)$data_old['id_request_detail'];
+
+mysqli_begin_transaction($koneksi);
+
+try {
+    // --- STEP A: KURANGI STOK LAMA (NETRALISASI) ---
+    $q_m_old = mysqli_query($koneksi, "SELECT id_barang FROM master_barang WHERE nama_barang = '$nama_barang_lama' LIMIT 1");
+    if ($row_m_old = mysqli_fetch_assoc($q_m_old)) {
+        $id_b_old = $row_m_old['id_barang'];
+        
+        if ($alokasi_lama == 'MASUK STOK') {
+            // 1. Kurangi saldo stok_akhir di master_barang
+            mysqli_query($koneksi, "UPDATE master_barang SET stok_akhir = stok_akhir - $qty_lama WHERE id_barang = $id_b_old");
+            
+            // 2. HAPUS LOG LAMA (Agar kartu stok tidak double)
+            // Kita cari log yang id_barang, qty, dan tanggalnya mirip dengan data lama
+            $sql_del_log = "DELETE FROM tr_stok_log 
+                            WHERE id_barang = '$id_b_old' 
+                            AND qty = '$qty_lama' 
+                            AND (keterangan LIKE '%PEMBELIAN%' OR keterangan LIKE '%ID-BELI%')
+                            LIMIT 1"; 
+            mysqli_query($koneksi, $sql_del_log);
+        }
+    }
+
+    // --- STEP B: UPDATE DATA PEMBELIAN & REQUEST DETAIL ---
+    $sql_update_beli = "UPDATE pembelian SET
+                            tgl_beli_barang = '$tgl_beli_barang',
+                            nama_barang_beli = '$nama_barang',
+                            qty = $qty_baru,
+                            harga = $harga_satuan,
+                            alokasi_stok = '$alokasi_stok'
+                        WHERE id_pembelian = $id_pembelian";
+    mysqli_query($koneksi, $sql_update_beli);
+
+    if ($id_req_detail > 0) {
+        $subtotal = $qty_baru * $harga_satuan;
+        mysqli_query($koneksi, "UPDATE tr_request_detail SET 
+                                    nama_barang_manual = '$nama_barang',
+                                    jumlah = $qty_baru,
+                                    subtotal_estimasi = $subtotal
+                                WHERE id_detail = $id_req_detail");
+    }
+
+    // --- STEP C: TAMBAH STOK BARU (REKAYASA ULANG) ---
+    if ($alokasi_stok == 'MASUK STOK') {
+        $q_m_new = mysqli_query($koneksi, "SELECT id_barang FROM master_barang WHERE nama_barang = '$nama_barang' LIMIT 1");
+        if ($row_m_new = mysqli_fetch_assoc($q_m_new)) {
+            $id_b_new = $row_m_new['id_barang'];
+
+            // 1. Tambah saldo stok_akhir di master
+            mysqli_query($koneksi, "UPDATE master_barang SET stok_akhir = stok_akhir + $qty_baru WHERE id_barang = $id_b_new");
+            
+            // 2. Masukkan log baru dengan tanda unik ID-BELI
+            $ket_log_baru = "MASUK DARI PEMBELIAN (EDIT) | ID-BELI: $id_pembelian";
+            $sql_ins_log = "INSERT INTO tr_stok_log (id_barang, tgl_log, qty, tipe_transaksi, keterangan) 
+                            VALUES ($id_b_new, '$tgl_beli_barang " . date('H:i:s') . "', $qty_baru, 'MASUK', '$ket_log_baru')";
+            mysqli_query($koneksi, $sql_ins_log);
+        }
+    }
+
+    mysqli_commit($koneksi);
+    header("location:data_pembelian.php?pesan=edit_sukses");
+
+} catch (Exception $e) {
+    mysqli_rollback($koneksi);
+    header("location:data_pembelian.php?pesan=edit_gagal&error=" . urlencode($e->getMessage()));
+}
+?>

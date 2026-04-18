@@ -1,0 +1,69 @@
+<?php
+session_start();
+include '../../config/koneksi.php';
+include '../../auth/check_session.php';
+
+// ... (Pengecekan login sama seperti sebelumnya)
+
+// Tangkap input
+$id_pembelian    = (int)$_POST['id_pembelian'];
+$tgl_beli_barang = mysqli_real_escape_string($koneksi, $_POST['tgl_beli_barang']);
+$nama_barang     = strtoupper(mysqli_real_escape_string($koneksi, $_POST['nama_barang']));
+$merk_beli       = strtoupper(mysqli_real_escape_string($koneksi, $_POST['merk_beli']));
+$supplier        = strtoupper(mysqli_real_escape_string($koneksi, $_POST['supplier']));
+$qty             = (float)$_POST['qty'];
+$harga           = (float)$_POST['harga']; 
+$id_mobil        = (int)$_POST['id_mobil'];
+$plat_nomor      = strtoupper(mysqli_real_escape_string($koneksi, $_POST['plat_nomor']));
+$driver          = strtoupper(mysqli_real_escape_string($koneksi, $_POST['driver']));
+$keterangan      = strtoupper(mysqli_real_escape_string($koneksi, $_POST['keterangan']));
+
+// 1. Ambil info lama (id_request_detail)
+$sql_get = "SELECT id_request_detail FROM pembelian WHERE id_pembelian = $id_pembelian LIMIT 1";
+$res_get = mysqli_query($koneksi, $sql_get);
+$row_get = mysqli_fetch_assoc($res_get);
+$id_request_detail = (int)($row_get['id_request_detail'] ?? 0);
+
+mysqli_begin_transaction($koneksi);
+
+try {
+    // 2. Update tabel PEMBELIAN
+    $sql_beli = "UPDATE pembelian SET
+        tgl_beli_barang  = '$tgl_beli_barang',
+        nama_barang_beli = '$nama_barang',
+        merk_beli        = '$merk_beli',
+        supplier         = '$supplier',
+        qty              = $qty,
+        harga            = $harga,
+        driver           = '$driver',
+        plat_nomor       = '$plat_nomor',
+        id_mobil         = $id_mobil,
+        keterangan       = '$keterangan'
+        WHERE id_pembelian = $id_pembelian";
+
+    mysqli_query($koneksi, $sql_beli);
+
+    // 3. Update TR_REQUEST_DETAIL (Kunci Sinkronisasi Laporan Mobil)
+    if ($id_request_detail > 0) {
+        // subtotal_estimasi diupdate agar jika ada report lain yang pakai kolom ini angkanya benar
+        $subtotal_baru = $qty * $harga;
+
+        $sql_detail = "UPDATE tr_request_detail SET 
+                       id_mobil = $id_mobil,
+                       nama_barang_manual = '$nama_barang',
+                       jumlah = $qty,
+                       harga_satuan_estimasi = $harga,
+                       subtotal_estimasi = $subtotal_baru
+                       WHERE id_detail = $id_request_detail";
+
+        mysqli_query($koneksi, $sql_detail);
+    }
+
+    mysqli_commit($koneksi);
+    header("location:data_pembelian.php?pesan=edit_sukses");
+
+} catch (Exception $e) {
+    mysqli_rollback($koneksi);
+    header("location:data_pembelian.php?pesan=edit_gagal&error=" . urlencode($e->getMessage()));
+}
+?>
