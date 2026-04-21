@@ -117,6 +117,13 @@ if (isset($_SESSION['status']) && $_SESSION['status'] == 'login') {
                 </div>
             <?php endif; ?>
 
+            <?php if (isset($_GET['pesan']) && $_GET['pesan'] == 'timeout'): ?>
+            <div class="alert alert-warning text-center small py-2">
+                <i class="fas fa-clock me-1"></i>
+                SESI BERAKHIR. Keluar otomatis karena idle selama 15 menit.
+            </div>
+        <?php endif; ?>
+
             <?php if (isset($_GET['pesan']) && $_GET['pesan'] == 'akses_ditolak'): ?>
                 <div class="alert alert-danger text-center small py-2">
                     <i class="fas fa-lock me-1"></i> ANDA TIDAK MEMILIKI AKSES UNTUK ROLE TERSEBUT.
