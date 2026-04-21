@@ -2,6 +2,7 @@
 session_start();
 include '../../config/koneksi.php';
 include '../../auth/check_session.php';
+include '../../auth/keep_alive.php';
 
 if ($_SESSION['status'] != "login") {
     header("location:../../login.php?pesan=belum_login");
