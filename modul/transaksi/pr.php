@@ -525,5 +525,68 @@ $(document).ready(function () {
         }
     });
 </script>
+<script>
+    let idleTime = 0;
+    const maxIdleMinutes = 15; // Samakan dengan server
+    let lastServerUpdate = Date.now();
+    let sessionValid = true;
+
+    // Fungsi reset timer saat ada gerakan
+    function resetTimer() {
+        idleTime = 0;
+        let now = Date.now();
+
+        // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
+        if (now - lastServerUpdate > 300000) {
+            fetch('/pr_mcp_rev4/auth/keep_alive.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status !== 'success') {
+                        sessionValid = false;
+                        forceLogout();
+                    }
+                })
+                .catch(err => {
+                    console.error("Koneksi ke server terputus");
+                });
+            lastServerUpdate = now;
+        }
+    }
+
+    // Fungsi paksa logout
+    function forceLogout() {
+        alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
+        // Redirect ke logout.php agar session server juga dihancurkan
+        window.location.href = "/pr_mcp_rev4/auth/logout.php?pesan=timeout";
+    }
+
+    // Pantau aktivitas user
+    window.onload = resetTimer;
+    document.onmousemove = resetTimer;
+    document.onkeypress = resetTimer;
+    document.onmousedown = resetTimer;
+    document.onclick = resetTimer;
+    document.onscroll = resetTimer;
+
+    // Cek status idle setiap 1 menit
+    setInterval(function() {
+        idleTime++;
+        // Cek session ke server juga
+        fetch('/pr_mcp_rev4/auth/keep_alive.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status !== 'success') {
+                    sessionValid = false;
+                    forceLogout();
+                }
+            })
+            .catch(err => {
+                // Jika error koneksi, biarkan user tetap di halaman
+            });
+        if (idleTime >= maxIdleMinutes && sessionValid) {
+            forceLogout();
+        }
+    }, 60000);
+</script>
 </body>
 </html>

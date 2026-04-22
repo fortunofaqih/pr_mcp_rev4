@@ -10,7 +10,7 @@
 session_start();
 include '../../config/koneksi.php';
 include '../../auth/check_session.php';
-include '../../auth/keep_alive.php';
+
 
 if ($_SESSION['status'] !== 'login') {
     header('Location: ../../login.php?pesan=belum_login');
@@ -1173,29 +1173,40 @@ function lockTombolPR(idRequest, jumlahMenunggu) {
 </script>
 <script>
     let idleTime = 0;
-    const maxIdleMinutes = 15;
+    const maxIdleMinutes = 15; // Samakan dengan server
     let lastServerUpdate = Date.now();
+    let sessionValid = true;
 
-    // Fungsi untuk mereset timer idle
+    // Fungsi reset timer saat ada gerakan
     function resetTimer() {
         idleTime = 0;
-        
         let now = Date.now();
-        // Kirim sinyal "Keep Alive" ke server setiap 5 menit sekali jika user aktif
-        // Ini mencegah session PHP mati saat user sedang asyik mengetik/input
-        if (now - lastServerUpdate > 300000) { // 300.000 ms = 5 menit
-            const depth = window.location.pathname.split('/').length - 2;
-            const prefix = "../".repeat(Math.max(0, depth - 1));
-            
-            fetch(prefix + 'auth/keep_alive.php')
-                .then(response => console.log("Sesi diperbarui secara background"))
-                .catch(err => console.error("Gagal memperbarui sesi", err));
-            
+
+        // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
+        if (now - lastServerUpdate > 300000) {
+            fetch('/pr_mcp_rev4/auth/keep_alive.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status !== 'success') {
+                        sessionValid = false;
+                        forceLogout();
+                    }
+                })
+                .catch(err => {
+                    console.error("Koneksi ke server terputus");
+                });
             lastServerUpdate = now;
         }
     }
 
-    // Deteksi interaksi user
+    // Fungsi paksa logout
+    function forceLogout() {
+        alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
+        // Redirect ke logout.php agar session server juga dihancurkan
+        window.location.href = "/pr_mcp_rev4/auth/logout.php?pesan=timeout";
+    }
+
+    // Pantau aktivitas user
     window.onload = resetTimer;
     document.onmousemove = resetTimer;
     document.onkeypress = resetTimer;
@@ -1203,16 +1214,25 @@ function lockTombolPR(idRequest, jumlahMenunggu) {
     document.onclick = resetTimer;
     document.onscroll = resetTimer;
 
-    // Interval cek setiap 1 menit
+    // Cek status idle setiap 1 menit
     setInterval(function() {
         idleTime++;
-        if (idleTime >= maxIdleMinutes) {
-            alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
-            const depth = window.location.pathname.split('/').length - 2;
-            const prefix = "../".repeat(Math.max(0, depth - 1));
-            window.location.href = prefix + "login.php?pesan=timeout";
+        // Cek session ke server juga
+        fetch('/pr_mcp_rev4/auth/keep_alive.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status !== 'success') {
+                    sessionValid = false;
+                    forceLogout();
+                }
+            })
+            .catch(err => {
+                // Jika error koneksi, biarkan user tetap di halaman
+            });
+        if (idleTime >= maxIdleMinutes && sessionValid) {
+            forceLogout();
         }
-    }, 60000); // Cek setiap 60 detik
+    }, 60000);
 </script>
 </body>
 </html>

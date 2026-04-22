@@ -43,5 +43,6 @@ function formatAngka($angka) {
         <tr><th>Alasan</th><td><?= $d['alasan_pemusnahan'] ?></td></tr>
         <tr><th>Petugas</th><td><?= $d['nama_lengkap'] ?></td></tr>
     </table>
+    
 </body>
 </html>

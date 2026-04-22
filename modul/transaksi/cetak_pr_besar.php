@@ -428,7 +428,5 @@ $ttd_cols = [
     </tr>
 </table>
 
-
-
 </body>
 </html>
