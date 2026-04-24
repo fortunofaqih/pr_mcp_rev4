@@ -41,20 +41,21 @@ mysqli_begin_transaction($koneksi);
 
 try {
     // --- STEP A: NETRALISASI STOK LAMA ---
-    // Jika dulu alokasinya masuk stok, maka stok barang lama harus dikembalikan dulu
-    if ($alokasi_lama == 'MASUK STOK') {
-        $q_m_old = mysqli_query($koneksi, "SELECT id_barang FROM master_barang WHERE nama_barang = '$nama_barang_lama' LIMIT 1");
-        if ($row_m_old = mysqli_fetch_assoc($q_m_old)) {
-            $id_b_old = $row_m_old['id_barang'];
-            
-            // Kurangi stok karena data lama dibatalkan/diedit
-            mysqli_query($koneksi, "UPDATE master_barang SET stok_akhir = stok_akhir - $qty_lama WHERE id_barang = $id_b_old");
-            
-            // Hapus log lama terkait pembelian ini
-            $sql_del_log = "DELETE FROM tr_stok_log WHERE id_barang = '$id_b_old' AND (keterangan LIKE '%ID-BELI: $id_pembelian%') LIMIT 1"; 
-            mysqli_query($koneksi, $sql_del_log);
-        }
-    }
+   
+	if ($alokasi_lama == 'MASUK STOK') {
+		$q_m_old = mysqli_query($koneksi, "SELECT id_barang FROM master_barang WHERE nama_barang = '$nama_barang_lama' LIMIT 1");
+		if ($row_m_old = mysqli_fetch_assoc($q_m_old)) {
+			$id_b_old = $row_m_old['id_barang'];
+        
+        // 1. Kembalikan angka stok di master
+			mysqli_query($koneksi, "UPDATE master_barang SET stok_akhir = stok_akhir - $qty_lama WHERE id_barang = $id_b_old");
+        
+        // 2. PERBAIKAN: Hapus log lama dengan kriteria yang lebih luas (mencakup ID: xxx atau ID-BELI: xxx)
+        // Kita gunakan wildcard %ID%id_pembelian% agar semua format kena
+			$sql_del_log = "DELETE FROM tr_stok_log WHERE id_barang = '$id_b_old' AND keterangan LIKE '%ID% $id_pembelian%'"; 
+			mysqli_query($koneksi, $sql_del_log);
+		}
+	}
 
     // --- Cari id_mobil berdasarkan plat_nomor terbaru ---
     $q_cari_id = mysqli_query($koneksi, "SELECT id_mobil FROM master_mobil WHERE plat_nomor = '$plat_nomor' LIMIT 1");
@@ -104,21 +105,20 @@ try {
 
     // --- STEP D: REKAYASA ULANG STOK BARU ---
     // Jika alokasi baru adalah MASUK STOK, maka tambahkan ke master_barang terbaru
-    if ($alokasi_stok == 'MASUK STOK') {
-        $q_m_new = mysqli_query($koneksi, "SELECT id_barang FROM master_barang WHERE nama_barang = '$nama_barang' LIMIT 1");
-        if ($row_m_new = mysqli_fetch_assoc($q_m_new)) {
-            $id_b_new = $row_m_new['id_barang'];
-            
-            // Tambah stok akhir
-            mysqli_query($koneksi, "UPDATE master_barang SET stok_akhir = stok_akhir + $qty_baru WHERE id_barang = $id_b_new");
-            
-            // Catat log baru
-            $ket_log_baru = "MASUK DARI PEMBELIAN (EDIT) | ID-BELI: $id_pembelian";
-            $sql_ins_log = "INSERT INTO tr_stok_log (id_barang, tgl_log, qty, tipe_transaksi, keterangan) 
-                            VALUES ($id_b_new, '$tgl_beli_barang " . date('H:i:s') . "', $qty_baru, 'MASUK', '$ket_log_baru')";
-            mysqli_query($koneksi, $sql_ins_log);
-        }
-    }
+	if ($alokasi_stok == 'MASUK STOK') {
+		$q_m_new = mysqli_query($koneksi, "SELECT id_barang FROM master_barang WHERE nama_barang = '$nama_barang' LIMIT 1");
+		if ($row_m_new = mysqli_fetch_assoc($q_m_new)) {
+			$id_b_new = $row_m_new['id_barang'];
+        
+			mysqli_query($koneksi, "UPDATE master_barang SET stok_akhir = stok_akhir + $qty_baru WHERE id_barang = $id_b_new");
+        
+        // Gunakan format keterangan yang konsisten agar mudah dihapus di kemudian hari
+        $ket_log_baru = "MASUK DARI PEMBELIAN (EDIT) | ID-BELI: $id_pembelian";
+        $sql_ins_log = "INSERT INTO tr_stok_log (id_barang, tgl_log, qty, tipe_transaksi, keterangan) 
+                        VALUES ($id_b_new, '$tgl_beli_barang " . date('H:i:s') . "', $qty_baru, 'MASUK', '$ket_log_baru')";
+			mysqli_query($koneksi, $sql_ins_log);
+		}
+	}
 
     // Jika semua OK, simpan permanen
     mysqli_commit($koneksi);
