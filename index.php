@@ -1200,118 +1200,128 @@ function fin_rp(float $n): string {
 <?php endif; ?>
 
 
-            <!-- DASHBOARD ADMIN GUDANG -->
-            <?php if ($is_gudang_access) : ?>
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h3 class="fw-bold m-0 text-uppercase">Ringkasan Sistem</h3>
-                    <form action="" method="GET" class="bg-white p-2 rounded shadow-sm border d-flex align-items-center">
-                        <label class="small fw-bold me-2 mb-0 text-muted">TAHUN:</label>
-                        <select name="tahun_filter" class="form-select form-select-sm border-0 fw-bold text-primary" onchange="this.form.submit()" style="width:100px;">
-                            <?php for ($x = date('Y')+1; $x >= 2024; $x--) {
-                                $sel = ($x == $tahun_pilihan) ? "selected" : "";
-                                echo "<option value='$x' $sel>$x</option>";
-                            } ?>
-                        </select>
-                    </form>
-                </div>
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card shadow-sm">
-                            <div class="card-header bg-white py-3">
-                                <h6 class="m-0 fw-bold text-primary text-uppercase"><i class="fas fa-chart-line me-2"></i> Tren Pengeluaran & Volume Barang</h6>
-                            </div>
-                            <div class="card-body">
-                                <div style="height: 300px;">
-                                    <canvas id="canvasStats"></canvas>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white py-3 border-bottom">
-                        <h6 class="m-0 fw-bold text-primary text-uppercase"><i class="fas fa-chart-bar me-2"></i> Statistik Aktivitas Bulanan</h6>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle m-0">
-                                <thead class="table-light text-secondary small text-uppercase">
-                                    <tr>
-                                        <th class="ps-4">Bulan</th>
-                                        <th class="text-center">Item Dibeli</th>
-                                        <th>Total Pengeluaran</th>
-                                        <th class="text-center">Aksi</th>
-                                    </tr>
-                                </thead>
-                               <tbody>
-                                    <?php
-                                    // 1. Eksekusi Query (Urutan ASC agar grafik rapi dari Jan-Des)
-                                    $query_bulanan = mysqli_query($koneksi, "
-                                        SELECT m.bulan,
-                                            COALESCE(pb.jml_beli, 0) as jml_beli,
-                                            COALESCE(pb.total_biaya, 0) as total_biaya
-                                        FROM (SELECT 1 AS bulan UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6
-                                            UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11 UNION SELECT 12) m
-                                        LEFT JOIN (
-                                            SELECT MONTH(tgl_beli_barang) as bln, COUNT(*) as jml_beli, SUM(qty * harga) as total_biaya
-                                            FROM pembelian WHERE YEAR(tgl_beli_barang) = '$tahun_pilihan'
-                                            GROUP BY MONTH(tgl_beli_barang)
-                                        ) pb ON m.bulan = pb.bln
-                                        ORDER BY m.bulan ASC");
+<?php if ($is_gudang_access) : ?>
+    <?php
+    // --- LANGKAH 1: HITUNG SEMUA DATA DULU ---
+    $query_bulanan = mysqli_query($koneksi, "
+        SELECT m.bulan,
+               COALESCE(pb.jml_beli, 0) as jml_beli,
+               COALESCE(pb.total_biaya, 0) as total_biaya
+        FROM (SELECT 1 AS bulan UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6
+              UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11 UNION SELECT 12) m
+        LEFT JOIN (
+            SELECT MONTH(tgl_beli_barang) as bln, COUNT(*) as jml_beli, SUM(qty * harga) as total_biaya
+            FROM pembelian WHERE YEAR(tgl_beli_barang) = '$tahun_pilihan'
+            GROUP BY MONTH(tgl_beli_barang)
+        ) pb ON m.bulan = pb.bln
+        ORDER BY m.bulan ASC");
 
-                                    $grand_total_item = 0;
-                                    $grand_total_biaya = 0;
-                                    
-                                    // Antrian data untuk Grafik
-                                    $labels = [];
-                                    $data_biaya = [];
-                                    $data_qty = [];
+    $grand_total_item = 0;
+    $grand_total_biaya = 0;
+    $labels = [];
+    $data_biaya = [];
+    $data_qty = [];
+    $data_rows = []; 
 
-                                    if (mysqli_num_rows($query_bulanan) > 0) {
-                                        while ($r = mysqli_fetch_array($query_bulanan)) {
-                                            $nama_bulan = date("F", mktime(0,0,0,$r['bulan'],10));
-                                            
-                                            // Simpan data ke array untuk Grafik (tetap simpan meski 0 agar chart lengkap 12 bulan)
-                                            $labels[] = date("M", mktime(0,0,0,$r['bulan'],10));
-                                            $data_biaya[] = (int)$r['total_biaya'];
-                                            $data_qty[] = (int)$r['jml_beli'];
+    while ($r = mysqli_fetch_array($query_bulanan)) {
+        $data_rows[] = $r; 
+        
+        // Gunakan (float) atau (int) untuk memastikan presisi angka
+        $grand_total_item  += (int)$r['jml_beli'];
+        $grand_total_biaya += (float)$r['total_biaya'];
+        
+        $labels[] = date("M", mktime(0,0,0,$r['bulan'],10));
+        $data_biaya[] = (float)$r['total_biaya'];
+        $data_qty[] = (int)$r['jml_beli'];
+    }
+    ?>
 
-                                            // Hanya tampilkan di tabel jika ada aktivitas (sesuai logika asli Anda)
-                                            if ($r['jml_beli'] > 0) {
-                                                $grand_total_item  += $r['jml_beli'];
-                                                $grand_total_biaya += $r['total_biaya'];
-                                                ?>
-                                                <tr>
-                                                    <td class="fw-bold ps-4 text-dark"><?= strtoupper($nama_bulan) ?></td>
-                                                    <td class="text-center"><span class="badge rounded-pill bg-secondary shadow-sm"><?= $r['jml_beli'] ?> Item</span></td>
-                                                    <td class="text-danger fw-bold">Rp <?= number_format($r['total_biaya'], 0, ',', '.') ?></td>
-                                                    <td class="text-center">
-                                                        <a href="modul/laporan/detail_bulan.php?bulan=<?= $r['bulan'] ?>&tahun=<?= $tahun_pilihan ?>" class="btn btn-sm btn-outline-primary py-1 px-3 rounded-pill fw-bold">
-                                                            <i class="fas fa-eye me-1"></i> Details
-                                                        </a>
-                                                    </td>
-                                                </tr>
-                                                <?php
-                                            }
-                                        }
-                                        ?>
-                                        <tr class="table-secondary border-top border-dark">
-                                            <td class="ps-4 fw-bold text-uppercase">Total (<?= $tahun_pilihan ?>)</td>
-                                            <td class="text-center fw-bold"><?= number_format($grand_total_item) ?> Item</td>
-                                            <td class="text-danger fw-bold" style="font-size:1.1rem;">Rp <?= number_format($grand_total_biaya, 0, ',', '.') ?></td>
-                                            <td></td>
-                                        </tr>
-                                        <?php
-                                    } else {
-                                        echo "<tr><td colspan='4' class='text-center py-5 text-muted'>TIDAK ADA AKTIVITAS DI TAHUN $tahun_pilihan</td></tr>";
-                                    }
-                                    ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold m-0 text-uppercase">Ringkasan Sistem</h3>
+        <form action="" method="GET" class="bg-white p-2 rounded shadow-sm border d-flex align-items-center">
+            <label class="small fw-bold me-2 mb-0 text-muted">TAHUN:</label>
+            <select name="tahun_filter" class="form-select form-select-sm border-0 fw-bold text-primary" onchange="this.form.submit()" style="width:100px;">
+                <?php for ($x = date('Y')+1; $x >= 2024; $x--) {
+                    $sel = ($x == $tahun_pilihan) ? "selected" : "";
+                    echo "<option value='$x' $sel>$x</option>";
+                } ?>
+            </select>
+        </form>
+    </div>
+
+    <div class="row mb-4 ">
+        <div class="col-md-6 mb-3">
+            <div class="card bg-primary text-white shadow-sm border-0">
+                <div class="card-body">
+                    <div class="small text-white-50 text-uppercase fw-bold">Total Pengeluaran Tahun <?= $tahun_pilihan ?></div>
+                    <div class="h3 fw-bold mt-1">Rp <?= number_format($grand_total_biaya, 0, ',', '.') ?></div>
+                    <div class="small mt-2"><i class="fas fa-shopping-cart me-1"></i> <?= number_format($grand_total_item) ?> Transaksi Terdaftar</div>
                 </div>
-            <?php endif; ?>
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="card bg-success text-white shadow-sm border-0">
+                <div class="card-body">
+                    <div class="small text-white-50 text-uppercase fw-bold">Rata-rata Pengeluaran / Bulan</div>
+                    <div class="h3 fw-bold mt-1">Rp <?= number_format($grand_total_biaya / 12, 0, ',', '.') ?></div>
+                    <div class="small mt-2"><i class="fas fa-chart-line me-1"></i> Estimasi Operasional</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+            <h6 class="m-0 fw-bold text-primary text-uppercase"><i class="fas fa-chart-line me-2"></i> Grafik Tren</h6>
+        </div>
+        <div class="card-body">
+            <div style="height: 300px;">
+                <canvas id="canvasStats"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle m-0">
+                    <thead class="table-light text-secondary small text-uppercase">
+                        <tr>
+                            <th class="ps-4">Bulan</th>
+                            <th class="text-center">Item Dibeli</th>
+                            <th>Total Pengeluaran</th>
+                            <th class="text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($data_rows as $row) : 
+                            if ($row['jml_beli'] > 0) : 
+                                $nama_bulan = date("F", mktime(0,0,0,$row['bulan'],10)); ?>
+                                <tr>
+                                    <td class="ps-4 fw-bold text-dark"><?= strtoupper($nama_bulan) ?></td>
+                                    <td class="text-center">
+                                        <span class="badge rounded-pill bg-secondary shadow-sm"><?= $row['jml_beli'] ?> Item</span>
+                                    </td>
+                                    <td class="text-danger fw-bold">Rp <?= number_format($row['total_biaya'], 0, ',', '.') ?></td>
+                                    <td class="text-center">
+                                        <a href="modul/laporan/detail_bulan.php?bulan=<?= $row['bulan'] ?>&tahun=<?= $tahun_pilihan ?>" class="btn btn-sm btn-outline-primary py-1 px-3 rounded-pill fw-bold">
+                                            <i class="fas fa-eye me-1"></i> Details
+                                        </a>
+                                    </td>
+                                </tr>
+                        <?php endif; endforeach; ?>
+                        <tr class="table-secondary border-top border-dark">
+                            <td class="ps-4 fw-bold text-uppercase">Total (<?= $tahun_pilihan ?>)</td>
+                            <td class="text-center fw-bold"><?= number_format($grand_total_item) ?> Item</td>
+                            <td class="text-danger fw-bold" style="font-size:1.1rem;">Rp <?= number_format($grand_total_biaya, 0, ',', '.') ?></td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
 
             <div class="alert alert-info border-0 shadow-sm small">
                 <i class="fas fa-info-circle me-2"></i> Selamat Datang kembali, <strong><?= $nama ?></strong>. Selamat bekerja!
