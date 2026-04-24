@@ -1214,6 +1214,20 @@ function fin_rp(float $n): string {
                         </select>
                     </form>
                 </div>
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-white py-3">
+                                <h6 class="m-0 fw-bold text-primary text-uppercase"><i class="fas fa-chart-line me-2"></i> Tren Pengeluaran & Volume Barang</h6>
+                            </div>
+                            <div class="card-body">
+                                <div style="height: 300px;">
+                                    <canvas id="canvasStats"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="card shadow-sm">
                     <div class="card-header bg-white py-3 border-bottom">
                         <h6 class="m-0 fw-bold text-primary text-uppercase"><i class="fas fa-chart-bar me-2"></i> Statistik Aktivitas Bulanan</h6>
@@ -1229,42 +1243,56 @@ function fin_rp(float $n): string {
                                         <th class="text-center">Aksi</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                               <tbody>
                                     <?php
+                                    // 1. Eksekusi Query (Urutan ASC agar grafik rapi dari Jan-Des)
                                     $query_bulanan = mysqli_query($koneksi, "
                                         SELECT m.bulan,
-                                               COALESCE(pb.jml_beli, 0) as jml_beli,
-                                               COALESCE(pb.total_biaya, 0) as total_biaya
+                                            COALESCE(pb.jml_beli, 0) as jml_beli,
+                                            COALESCE(pb.total_biaya, 0) as total_biaya
                                         FROM (SELECT 1 AS bulan UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6
-                                              UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11 UNION SELECT 12) m
+                                            UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11 UNION SELECT 12) m
                                         LEFT JOIN (
                                             SELECT MONTH(tgl_beli_barang) as bln, COUNT(*) as jml_beli, SUM(qty * harga) as total_biaya
                                             FROM pembelian WHERE YEAR(tgl_beli_barang) = '$tahun_pilihan'
                                             GROUP BY MONTH(tgl_beli_barang)
                                         ) pb ON m.bulan = pb.bln
-                                        WHERE pb.jml_beli > 0
-                                        ORDER BY m.bulan DESC");
+                                        ORDER BY m.bulan ASC");
 
                                     $grand_total_item = 0;
                                     $grand_total_biaya = 0;
+                                    
+                                    // Antrian data untuk Grafik
+                                    $labels = [];
+                                    $data_biaya = [];
+                                    $data_qty = [];
 
                                     if (mysqli_num_rows($query_bulanan) > 0) {
                                         while ($r = mysqli_fetch_array($query_bulanan)) {
                                             $nama_bulan = date("F", mktime(0,0,0,$r['bulan'],10));
-                                            $grand_total_item  += $r['jml_beli'];
-                                            $grand_total_biaya += $r['total_biaya'];
-                                            ?>
-                                            <tr>
-                                                <td class="fw-bold ps-4 text-dark"><?= strtoupper($nama_bulan) ?></td>
-                                                <td class="text-center"><span class="badge rounded-pill bg-secondary shadow-sm"><?= $r['jml_beli'] ?> Item</span></td>
-                                                <td class="text-danger fw-bold">Rp <?= number_format($r['total_biaya'], 0, ',', '.') ?></td>
-                                                <td class="text-center">
-                                                    <a href="modul/laporan/detail_bulan.php?bulan=<?= $r['bulan'] ?>&tahun=<?= $tahun_pilihan ?>" class="btn btn-sm btn-outline-primary py-1 px-3 rounded-pill fw-bold">
-                                                        <i class="fas fa-eye me-1"></i> Details
-                                                    </a>
-                                                </td>
-                                            </tr>
-                                            <?php
+                                            
+                                            // Simpan data ke array untuk Grafik (tetap simpan meski 0 agar chart lengkap 12 bulan)
+                                            $labels[] = date("M", mktime(0,0,0,$r['bulan'],10));
+                                            $data_biaya[] = (int)$r['total_biaya'];
+                                            $data_qty[] = (int)$r['jml_beli'];
+
+                                            // Hanya tampilkan di tabel jika ada aktivitas (sesuai logika asli Anda)
+                                            if ($r['jml_beli'] > 0) {
+                                                $grand_total_item  += $r['jml_beli'];
+                                                $grand_total_biaya += $r['total_biaya'];
+                                                ?>
+                                                <tr>
+                                                    <td class="fw-bold ps-4 text-dark"><?= strtoupper($nama_bulan) ?></td>
+                                                    <td class="text-center"><span class="badge rounded-pill bg-secondary shadow-sm"><?= $r['jml_beli'] ?> Item</span></td>
+                                                    <td class="text-danger fw-bold">Rp <?= number_format($r['total_biaya'], 0, ',', '.') ?></td>
+                                                    <td class="text-center">
+                                                        <a href="modul/laporan/detail_bulan.php?bulan=<?= $r['bulan'] ?>&tahun=<?= $tahun_pilihan ?>" class="btn btn-sm btn-outline-primary py-1 px-3 rounded-pill fw-bold">
+                                                            <i class="fas fa-eye me-1"></i> Details
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                                <?php
+                                            }
                                         }
                                         ?>
                                         <tr class="table-secondary border-top border-dark">
@@ -1297,6 +1325,7 @@ function fin_rp(float $n): string {
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         const sidebar = document.getElementById('sidebar');
@@ -1374,6 +1403,76 @@ function fin_rp(float $n): string {
             forceLogout();
         }
     }, 60000);
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const ctx = document.getElementById('canvasStats').getContext('2d');
+    
+    // Data dari PHP
+    const labels = <?php echo json_encode($labels); ?>;
+    const dataBiaya = <?php echo json_encode($data_biaya); ?>;
+    const dataQty = <?php echo json_encode($data_qty); ?>;
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Total Pengeluaran (Rp)',
+                    data: dataBiaya,
+                    borderColor: '#4e73df',
+                    backgroundColor: 'rgba(78, 115, 223, 0.05)',
+                    fill: true,
+                    tension: 0.3,
+                    yAxisID: 'y',
+                },
+                {
+                    label: 'Jumlah Item',
+                    data: dataQty,
+                    borderColor: '#1cc88a',
+                    backgroundColor: 'transparent',
+                    borderDash: [5, 5],
+                    type: 'bar', // Campuran bar dan line agar informatif
+                    yAxisID: 'y1',
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label.includes('Pengeluaran')) {
+                                return label + ': Rp ' + new Intl.NumberFormat('id-ID').format(context.parsed.y);
+                            }
+                            return label + ': ' + context.parsed.y + ' Item';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: { display: true, text: 'Nilai (Rupiah)' }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    title: { display: true, text: 'Volume (Qty)' }
+                }
+            }
+        }
+    });
+});
 </script>
 </body>
 </html>

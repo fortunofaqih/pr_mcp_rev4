@@ -515,12 +515,14 @@ foreach ($data_tampil as $row) {
         $ket_final = $row['alokasi_stok'] ?? '-';
     }
 
+    $satuan_print = !empty($row['satuan_master']) ? strtoupper($row['satuan_master']) : 'PCS';
     $print_rows[] = [
         'tgl'      => $tgl_format,
         'supplier' => strtoupper(substr($row['supplier'] ?? '-', 0, 20)),
         'barang'   => strtoupper($row['nama_barang_beli']),
         'merk'     => strtoupper($row['merk_beli'] ?? ''),
         'qty'      => number_format((float)$row['qty'], 2, ',', '.'),
+        'satuan'   => $satuan_print,
         'harga'    => number_format((float)$row['harga'], 0, ',', '.'),
         'total'    => number_format($total_bayar, 0, ',', '.'),
         'ket'      => strtoupper($ket_final), // <--- Menggunakan hasil potongan yang bersih
@@ -721,7 +723,7 @@ function cetakLaporan() {
                 + '<td><strong>' + r.barang + '</strong>'
                   + (r.merk ? '<br><span style="font-size:6.5pt;color:#555;">' + r.merk + '</span>' : '')
                   + '</td>'
-                + '<td style="text-align:center;">' + r.qty + '</td>'
+                + '<td style="text-align:center;">' + r.qty + ' ' + r.satuan + '</td>'
                 + '<td style="text-align:right;">' + r.harga + '</td>'
                 + '<td style="text-align:right;font-weight:bold;">' + r.total + '</td>'
                 + '<td style="font-size:6.5pt;">' + r.ket + '</td>'
