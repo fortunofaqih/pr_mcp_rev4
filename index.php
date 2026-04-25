@@ -1,8 +1,7 @@
 <?php
 session_start();
 include 'config/koneksi.php';
-include 'auth/check_session.php';
-//include 'auth/keep_alive.php';
+include 'auth/check_session.php'; 
 
 $role  = $_SESSION['role'];  
 $nama  = $_SESSION['nama'];
@@ -1200,9 +1199,13 @@ function fin_rp(float $n): string {
 <?php endif; ?>
 
 
+<!-- DASHBOARD ADMIN GUDANG -->
 <?php if ($is_gudang_access) : ?>
     <?php
     // --- LANGKAH 1: HITUNG SEMUA DATA DULU ---
+	$labels = []; 
+	$data_biaya = []; 
+	$data_qty = [];
     $query_bulanan = mysqli_query($koneksi, "
         SELECT m.bulan,
                COALESCE(pb.jml_beli, 0) as jml_beli,
@@ -1218,9 +1221,9 @@ function fin_rp(float $n): string {
 
     $grand_total_item = 0;
     $grand_total_biaya = 0;
-    $labels = [];
-    $data_biaya = [];
-    $data_qty = [];
+   
+  
+    
     $data_rows = []; 
 
     while ($r = mysqli_fetch_array($query_bulanan)) {
@@ -1249,7 +1252,7 @@ function fin_rp(float $n): string {
         </form>
     </div>
 
-    <div class="row mb-4 ">
+    <div class="row mb-4">
         <div class="col-md-6 mb-3">
             <div class="card bg-primary text-white shadow-sm border-0">
                 <div class="card-body">
@@ -1364,7 +1367,7 @@ function fin_rp(float $n): string {
 
         // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
         if (now - lastServerUpdate > 300000) {
-            fetch('/pr_mcp_rev4/auth/keep_alive.php')
+            fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
                 .then(response => response.json())
                 .then(data => {
                     if (data.status !== 'success') {
@@ -1383,7 +1386,7 @@ function fin_rp(float $n): string {
     function forceLogout() {
         alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
         // Redirect ke logout.php agar session server juga dihancurkan
-        window.location.href = "/pr_mcp_rev4/auth/logout.php?pesan=timeout";
+        window.location.href = "http://192.168.31.200/pr_mcp/auth/logout.php?pesan=timeout";
     }
 
     // Pantau aktivitas user
@@ -1398,7 +1401,7 @@ function fin_rp(float $n): string {
     setInterval(function() {
         idleTime++;
         // Cek session ke server juga
-        fetch('/pr_mcp_rev4/auth/keep_alive.php')
+        fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
             .then(response => response.json())
             .then(data => {
                 if (data.status !== 'success') {
@@ -1416,12 +1419,23 @@ function fin_rp(float $n): string {
 </script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    const ctx = document.getElementById('canvasStats').getContext('2d');
+    // 1. Cek dulu apakah elemen canvasStats ada di halaman ini
+    // (Karena jika bukan admin gudang, elemen ini biasanya tidak dirender)
+    const chartElement = document.getElementById('canvasStats');
+    if (!chartElement) return; 
+
+    const ctx = chartElement.getContext('2d');
     
-    // Data dari PHP
-    const labels = <?php echo json_encode($labels); ?>;
-    const dataBiaya = <?php echo json_encode($data_biaya); ?>;
-    const dataQty = <?php echo json_encode($data_qty); ?>;
+    // 2. Gunakan operator ?? [] agar jika variabel tidak ada, data otomatis jadi array kosong
+    const labels = <?php echo json_encode($labels ?? []); ?>;
+    const dataBiaya = <?php echo json_encode($data_biaya ?? []); ?>;
+    const dataQty = <?php echo json_encode($data_qty ?? []); ?>;
+
+    // 3. Pastikan chart hanya muncul jika ada datanya
+    if (labels.length === 0) {
+        console.log("Data grafik kosong atau user tidak memiliki akses.");
+        return;
+    }
 
     new Chart(ctx, {
         type: 'line',
@@ -1441,9 +1455,8 @@ document.addEventListener("DOMContentLoaded", function() {
                     label: 'Jumlah Item',
                     data: dataQty,
                     borderColor: '#1cc88a',
-                    backgroundColor: 'transparent',
-                    borderDash: [5, 5],
-                    type: 'bar', // Campuran bar dan line agar informatif
+                    backgroundColor: 'rgba(28, 200, 138, 0.2)', // Beri sedikit warna agar Bar terlihat bagus
+                    type: 'bar', 
                     yAxisID: 'y1',
                 }
             ]
@@ -1470,7 +1483,12 @@ document.addEventListener("DOMContentLoaded", function() {
                     type: 'linear',
                     display: true,
                     position: 'left',
-                    title: { display: true, text: 'Nilai (Rupiah)' }
+                    title: { display: true, text: 'Nilai (Rupiah)' },
+                    ticks: {
+                        callback: function(value) {
+                            return 'Rp ' + value.toLocaleString('id-ID');
+                        }
+                    }
                 },
                 y1: {
                     type: 'linear',
