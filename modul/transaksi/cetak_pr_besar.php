@@ -154,13 +154,15 @@ $need_m3        = (int)($h['need_approve3'] ?? 0);
         }
 
         /* ── Lebar Kolom ── */
-        .c-no   { width: 22px; text-align: center; }
-        .c-tgl  { width: 60px; text-align: center; }
-        .c-unit { width: 70px; text-align: center; }
-        .c-tipe { width: 60px; text-align: center; }
-        .c-qty  { width: 60px; text-align: center; }
-        .c-ket  { }
-        .c-ttd  { width: 50px; text-align: center; }
+ 
+		.c-no     { width: 22px; text-align: center; }
+		.c-tgl    { width: 55px; text-align: center; }
+		.c-unit   { width: 65px; text-align: center; }
+		.c-tipe   { width: 60px; text-align: center; }
+		.c-qty    { width: 45px; text-align: center; }
+		.c-harga  { width: 80px; text-align: right; } /* Kolom Baru */
+		.c-sub    { width: 85px; text-align: right; } /* Kolom Baru */
+		.c-ket    { width: auto; }
 
         /* ── Blok TTD di bawah tabel ── */
         .ttd-section {
@@ -302,40 +304,56 @@ $need_m3        = (int)($h['need_approve3'] ?? 0);
             <th class="c-unit">UNIT / MOBIL</th>
             <th class="c-tipe">TIPE</th>
             <th class="c-qty">QTY</th>
+            <th class="c-harga">EST. HARGA</th>
+            <th class="c-sub">SUBTOTAL</th>
             <th class="c-ket">KETERANGAN</th>
-            
         </tr>
     </thead>
     <tbody>
-        <?php foreach ($items as $i => $d):
+        <?php 
+        $grand_total = 0;
+        foreach ($items as $i => $d):
             $nama = !empty($d['nama_barang_manual']) ? $d['nama_barang_manual'] : $d['nama_barang_master'];
+            $harga = (float)($d['harga_satuan_estimasi'] ?? 0);
+            $subtotal = (float)($d['subtotal_estimasi'] ?? 0);
+            $grand_total += $subtotal;
         ?>
         <tr>
             <td style="text-align:center;"><?= $i + 1 ?></td>
             <td style="font-weight:bold;"><?= strtoupper(htmlspecialchars($nama)) ?></td>
-          
-			<td style="text-align:center;">
-			<?php if (!empty($d['tgl_beli_barang']) && $d['tgl_beli_barang'] != '0000-00-00'): ?>
-				<span style="font-weight:bold; color:#166534;">
-					<?= date('d/m/y', strtotime($d['tgl_beli_barang'])) ?>
-				</span>
-			<?php else: ?>
-				<span style="color:#cbd5e1;">—</span>
-			<?php endif; ?>
-		</td>
+            <td style="text-align:center;">
+                <?php if (!empty($d['tgl_beli_barang']) && $d['tgl_beli_barang'] != '0000-00-00'): ?>
+                    <span style="font-weight:bold; color:#166534;">
+                        <?= date('d/m/y', strtotime($d['tgl_beli_barang'])) ?>
+                    </span>
+                <?php else: ?>
+                    <span style="color:#cbd5e1;">—</span>
+                <?php endif; ?>
+            </td>
             <td style="text-align:center;">
                 <?= ($d['id_mobil'] != 0 && !empty($d['plat_nomor'])) ? htmlspecialchars($d['plat_nomor']) : '-' ?>
             </td>
             <td style="text-align:center; font-size:6.5pt; font-weight:bold;"><?= htmlspecialchars($d['tipe_request']) ?></td>
             <td style="text-align:center;"><b><?= (float)$d['jumlah'] ?></b> <?= htmlspecialchars($d['satuan']) ?></td>
+            
+            <td style="text-align:right;">
+                <?= number_format($harga, 0, ',', '.') ?>
+            </td>
+            <td style="text-align:right; font-weight:bold;">
+                <?= number_format($subtotal, 0, ',', '.') ?>
+            </td>
+
             <td style="font-size:7pt;"><?= htmlspecialchars($d['keterangan'] ?: '-') ?></td>
-           
         </tr>
         <?php endforeach; ?>
 
-        <?php for ($x = count($items); $x < 3; $x++): ?>
-       
-        <?php endfor; ?>
+        <tr>
+            <td colspan="7" style="text-align:right; font-weight:bold; background:#f8fafc;">GRAND TOTAL ESTIMASI :</td>
+            <td style="text-align:right; font-weight:bold; background:#f8fafc; color:#1e3a8a;">
+                Rp <?= number_format($grand_total, 0, ',', '.') ?>
+            </td>
+            <td style="background:#f8fafc;"></td>
+        </tr>
     </tbody>
 </table>
 
@@ -427,6 +445,8 @@ $ttd_cols = [
     <?php endforeach; ?>
     </tr>
 </table>
+
+
 
 </body>
 </html>

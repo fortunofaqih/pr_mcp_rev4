@@ -3,7 +3,6 @@
 include '../../config/koneksi.php';
 include '../../auth/check_session.php';
 
-
 if ($_SESSION['status'] != "login") {
     header("location:../../login.php?pesan=belum_login");
     exit;
@@ -47,7 +46,7 @@ if ($_SESSION['status'] != "login") {
 
                 <div class="mb-3">
                     <label class="form-label small fw-bold text-muted">MERK / KWAL.</label>
-                    <input type="text" name="merk" class="form-control" placeholder="Contoh: TOYOTA, ASPIRA, GENUINE">
+                    <input type="text" name="merk" class="form-control" placeholder="Contoh: TOYOTA, ASPIRA, GENUINE" required>
                 </div> 
 
                 <div class="row mb-3">
@@ -231,7 +230,7 @@ inputHarga.addEventListener('keyup', function(e) {
 
         // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
         if (now - lastServerUpdate > 300000) {
-            fetch('/pr_mcp_rev4/auth/keep_alive.php')
+            fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
                 .then(response => response.json())
                 .then(data => {
                     if (data.status !== 'success') {
@@ -250,7 +249,7 @@ inputHarga.addEventListener('keyup', function(e) {
     function forceLogout() {
         alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
         // Redirect ke logout.php agar session server juga dihancurkan
-        window.location.href = "/pr_mcp_rev4/auth/logout.php?pesan=timeout";
+        window.location.href = "http://192.168.31.200/pr_mcp/auth/logout.php?pesan=timeout";
     }
 
     // Pantau aktivitas user
@@ -265,7 +264,7 @@ inputHarga.addEventListener('keyup', function(e) {
     setInterval(function() {
         idleTime++;
         // Cek session ke server juga
-        fetch('/pr_mcp_rev4/auth/keep_alive.php')
+        fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
             .then(response => response.json())
             .then(data => {
                 if (data.status !== 'success') {
@@ -281,6 +280,5 @@ inputHarga.addEventListener('keyup', function(e) {
         }
     }, 60000);
 </script>
-
 </body>
 </html>

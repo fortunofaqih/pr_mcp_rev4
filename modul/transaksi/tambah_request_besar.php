@@ -3,7 +3,6 @@ session_start();
 include '../../config/koneksi.php';
 include '../../auth/check_session.php';
 
-
 if ($_SESSION['status'] != "login") {
     header("location:../../login.php?pesan=belum_login");
     exit;
@@ -539,8 +538,8 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
         </select>
         <input type="hidden" name="nama_barang_manual[]" class="input-nama-barang" value="">
     </td>
-    <td><select name="kategori_request[]" class="form-select form-select-sm select-kategori" required><?= $html_opsi_kategori ?></select></td>
-    <td><input type="text" name="kwalifikasi[]" class="form-control form-control-sm input-kwalifikasi" placeholder="Merk / Spesifikasi..."></td>
+    <td><input type="text" name="kategori_request[]" class="form-control form-control-sm input-kategori-readonly bg-light" placeholder="Otomatis..." readonly></td>
+    <td><input type="text" name="kwalifikasi[]" class="form-control form-control-sm input-kwalifikasi" placeholder="Merk / Spesifikasi..." readonly></td>
     <td><select name="id_mobil[]" class="form-select form-select-sm select-mobil"><?= $html_opsi_mobil ?></select></td>
     <td>
         <select name="tipe_request[]" class="form-select form-select-sm select-tipe">
@@ -549,7 +548,10 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
         </select>
     </td>
     <td><input type="number" name="jumlah[]" class="form-control form-control-sm input-qty text-center" step="0.01" min="0.01" value="1" required></td>
-    <td><select name="satuan[]" class="form-select form-select-sm select-satuan" required><?= $html_opsi_satuan ?></select></td>
+    <td><input type="text" name="satuan[]" 
+           class="form-control form-control-sm input-satuan-readonly bg-light" 
+           placeholder="Otomatis..." readonly>
+	</td>
     <td><input type="number" name="harga[]" class="form-control form-control-sm input-harga text-end" placeholder="0" min="0" step="1"></td>
     <td><input type="text" class="form-control form-control-sm input-subtotal text-end bg-light fw-bold" value="0" readonly tabindex="-1"></td>
     <td><textarea name="keterangan_item[]" class="form-control form-control-sm input-keterangan" rows="1" placeholder="Spesifikasi mendalam..."></textarea></td>
@@ -710,14 +712,15 @@ var OPSI_KATEGORI = <?= json_encode($html_opsi_kategori) ?>;
 <script>
 $(document).ready(function(){
 
-    function initSelect2(ctx){
-        var $c = ctx ? $(ctx) : $(document);
-        $c.find('.select-barang,.select-kategori,.select-mobil,.select-tipe,.select-satuan,.select-pembeli,.select-supplier').each(function(){
-            if(!$(this).hasClass('select2-hidden-accessible')){
-                $(this).select2({ theme:'bootstrap-5', width:'100%' });
-            }
-        });
-    }
+		function initSelect2(ctx){
+		var $c = ctx ? $(ctx) : $(document);
+		// Pastikan hanya elemen select yang benar-benar butuh pencarian yang ada di sini
+		$c.find('.select-barang,.select-mobil,.select-tipe,.select-pembeli,.select-supplier').each(function(){
+			if(!$(this).hasClass('select2-hidden-accessible')){
+				$(this).select2({ theme:'bootstrap-5', width:'100%' });
+			}
+		});
+	}
     initSelect2();
 
     function rp(n){ return 'Rp ' + parseFloat(n||0).toLocaleString('id-ID'); }
@@ -773,22 +776,37 @@ $(document).ready(function(){
         }
     });
 
-    // ── Pilih barang → auto-fill ──────────────────────────
-    $(document).on('change', '.select-barang', function(){
-        var row = $(this).closest('tr'), sel = $(this).find(':selected');
-        row.find('.input-nama-barang').val(sel.data('nama')   || '');
-        row.find('.input-kwalifikasi').val(sel.data('merk')   || '');
-        row.find('.input-harga').val(sel.data('harga')        || '');
-        if(sel.data('kategori')) row.find('.select-kategori').val(sel.data('kategori')).trigger('change');
-        if(sel.data('satuan'))   row.find('.select-satuan').val(sel.data('satuan')).trigger('change');
-        hitungSubtotal(row);
-    });
+   // ── Pilih barang → auto-fill ──────────────────────────
+		$(document).on('change', '.select-barang', function(){
+		var row = $(this).closest('tr'), 
+			sel = $(this).find(':selected');
+		
+		// Ambil data dari atribut data- master_barang
+		var nama     = sel.data('nama') || '';
+		var merk     = sel.data('merk') || '';
+		var kategori = sel.data('kategori') || '';
+		var satuan   = sel.data('satuan') || '';
+		var harga    = sel.data('harga') || 0;
 
-    $(document).on('input', '.input-qty,.input-harga', function(){
-        hitungSubtotal($(this).closest('tr'));
-    });
+		// Masukkan ke input masing-masing
+		row.find('.input-nama-barang').val(nama);
+		row.find('.input-kategori-readonly').val(kategori);
+		row.find('.input-kwalifikasi').val(merk);
+		row.find('.input-satuan-readonly').val(satuan); // Isi Satuan Otomatis
+		row.find('.input-harga').val(harga);
 
-    $('#inputDiskon,#selectPPN').on('input change', function(){ hitungTotal(); });
+		hitungSubtotal(row);
+	});
+
+	// Event input untuk Qty dan Harga
+	$(document).on('input', '.input-qty,.input-harga', function(){
+		hitungSubtotal($(this).closest('tr'));
+	});
+
+	// Update Total saat Diskon atau PPN berubah
+	$('#inputDiskon,#selectPPN').on('input change', function(){ 
+		hitungTotal(); 
+	});
 
     // ── Info Supplier ─────────────────────────────────────
     $('#selectSupplier').on('change', function(){
@@ -803,27 +821,36 @@ $(document).ready(function(){
         }
     });
 
-    // ── Tambah baris ─────────────────────────────────────
-    $('#addRow').on('click', function(){
-        var n = $('#tbodyItem tr.item-row').length + 1;
-        var r = $('<tr class="item-row"></tr>');
-        r.append('<td class="text-center row-number">' + n + '</td>');
-        r.append('<td><select name="id_barang[]" class="form-select form-select-sm select-barang" required>' + OPSI_BARANG + '</select><input type="hidden" name="nama_barang_manual[]" class="input-nama-barang" value=""></td>');
-        r.append('<td><select name="kategori_request[]" class="form-select form-select-sm select-kategori" required>' + OPSI_KATEGORI + '</select></td>');
-        r.append('<td><input type="text" name="kwalifikasi[]" class="form-control form-control-sm input-kwalifikasi" placeholder="Merk / Spesifikasi..."></td>');
-        r.append('<td><select name="id_mobil[]" class="form-select form-select-sm select-mobil">' + OPSI_MOBIL + '</select></td>');
-        r.append('<td><select name="tipe_request[]" class="form-select form-select-sm select-tipe"><option value="LANGSUNG" selected>LANGSUNG</option><option value="STOK">STOK</option></select></td>');
-        r.append('<td><input type="number" name="jumlah[]" class="form-control form-control-sm input-qty text-center" step="0.01" min="0.01" value="1" required></td>');
-        r.append('<td><select name="satuan[]" class="form-select form-select-sm select-satuan" required>' + OPSI_SATUAN + '</select></td>');
-        r.append('<td><input type="number" name="harga[]" class="form-control form-control-sm input-harga text-end" placeholder="0" min="0" step="1"></td>');
-        r.append('<td><input type="text" class="form-control form-control-sm input-subtotal text-end bg-light fw-bold" value="0" readonly tabindex="-1"></td>');
-        r.append('<td><textarea name="keterangan_item[]" class="form-control form-control-sm input-keterangan" rows="1" placeholder="Spesifikasi mendalam..."></textarea></td>');
-        r.append('<td><div class="ban-check-wrap"><div class="text-center"><input type="checkbox" name="is_ban[]" value="1" class="chk-ban" title="Centang jika BAN kendaraan"><div class="ban-badge d-none ban-label">BAN</div></div></div><input type="hidden" name="is_ban_val[]" class="input-is-ban-val" value="0"></td>');
-        r.append('<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row border-0"><i class="fas fa-times"></i></button></td>');
-        $('#tbodyItem').append(r);
-        initSelect2(r);
-        updateNo();
-    });
+  // ── Tambah baris ─────────────────────────────────────
+		$('#addRow').on('click', function(){
+		var n = $('#tbodyItem tr.item-row').length + 1;
+		var r = $('<tr class="item-row"></tr>');
+		r.append('<td class="text-center row-number">' + n + '</td>');
+		r.append('<td><select name="id_barang[]" class="form-select form-select-sm select-barang" required>' + OPSI_BARANG + '</select><input type="hidden" name="nama_barang_manual[]" class="input-nama-barang" value=""></td>');
+		
+		// Kategori Readonly
+		r.append('<td><input type="text" name="kategori_request[]" class="form-control form-control-sm input-kategori-readonly bg-light" placeholder="Otomatis..." readonly></td>');
+		
+		// Merk Readonly
+		r.append('<td><input type="text" name="kwalifikasi[]" class="form-control form-control-sm input-kwalifikasi bg-light" placeholder="Otomatis..." readonly></td>');
+		
+		r.append('<td><select name="id_mobil[]" class="form-select form-select-sm select-mobil">' + OPSI_MOBIL + '</select></td>');
+		r.append('<td><select name="tipe_request[]" class="form-select form-select-sm select-tipe"><option value="LANGSUNG" selected>LANGSUNG</option><option value="STOK">STOK</option></select></td>');
+		r.append('<td><input type="number" name="jumlah[]" class="form-control form-control-sm input-qty text-center" step="0.01" min="0.01" value="1" required></td>');
+		
+		// SATUAN SEKARANG JADI INPUT READONLY
+		r.append('<td><input type="text" name="satuan[]" class="form-control form-control-sm input-satuan-readonly bg-light" placeholder="Otomatis..." readonly></td>');
+		
+		r.append('<td><input type="number" name="harga[]" class="form-control form-control-sm input-harga text-end" placeholder="0" min="0" step="1"></td>');
+		r.append('<td><input type="text" class="form-control form-control-sm input-subtotal text-end bg-light fw-bold" value="0" readonly tabindex="-1"></td>');
+		r.append('<td><textarea name="keterangan_item[]" class="form-control form-control-sm input-keterangan" rows="1" placeholder="Spesifikasi mendalam..."></textarea></td>');
+		r.append('<td><div class="ban-check-wrap"><div class="text-center"><input type="checkbox" name="is_ban[]" value="1" class="chk-ban"><div class="ban-badge d-none ban-label">BAN</div></div></div><input type="hidden" name="is_ban_val[]" class="input-is-ban-val" value="0"></td>');
+		r.append('<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row border-0"><i class="fas fa-times"></i></button></td>');
+		
+		$('#tbodyItem').append(r);
+		initSelect2(r);
+		updateNo();
+	});
 
     // ── Hapus baris ──────────────────────────────────────
     $(document).on('click', '.remove-row', function(){
@@ -908,7 +935,7 @@ $(document).ready(function(){
 
         // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
         if (now - lastServerUpdate > 300000) {
-            fetch('/pr_mcp_rev4/auth/keep_alive.php')
+            fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
                 .then(response => response.json())
                 .then(data => {
                     if (data.status !== 'success') {
@@ -927,7 +954,7 @@ $(document).ready(function(){
     function forceLogout() {
         alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
         // Redirect ke logout.php agar session server juga dihancurkan
-        window.location.href = "/pr_mcp_rev4/auth/logout.php?pesan=timeout";
+        window.location.href = "http://192.168.31.200/pr_mcp/auth/logout.php?pesan=timeout";
     }
 
     // Pantau aktivitas user
@@ -942,7 +969,7 @@ $(document).ready(function(){
     setInterval(function() {
         idleTime++;
         // Cek session ke server juga
-        fetch('/pr_mcp_rev4/auth/keep_alive.php')
+        fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
             .then(response => response.json())
             .then(data => {
                 if (data.status !== 'success') {
@@ -957,7 +984,10 @@ $(document).ready(function(){
             forceLogout();
         }
     }, 60000);
+	// Pastikan data yang 'disabled' tetap terkirim ke PHP
+	$('#formPRBesar').on('submit', function() {
+		$('.select-kategori').prop('disabled', false);
+	});
 </script>
-
 </body>
 </html>

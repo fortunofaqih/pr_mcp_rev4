@@ -2,8 +2,6 @@
 session_start();
 include '../../config/koneksi.php';
 include '../../auth/check_session.php';
-include '../../auth/keep_alive.php';
-
 if ($_SESSION['status'] != "login") {
     header("location:../../login.php?pesan=belum_login");
     exit;
@@ -147,22 +145,7 @@ $nama_user_login = isset($_SESSION['username']) ? strtoupper($_SESSION['username
                                     <input type="hidden" name="nama_barang_manual[]" class="input-nama-barang">
                                         </td>
                                         <td>
-                                            <select name="kategori_request[]" class="form-select form-select-sm select-kategori" required>
-                                                <option value="">- PILIH -</option>
-                                                <optgroup label="BENGKEL">
-                                                    <option value="BENGKEL MOBIL">BENGKEL MOBIL</option>
-                                                    <option value="BENGKEL LISTRIK">BENGKEL LISTRIK</option>
-                                                    <option value="BENGKEL DINAMO">BENGKEL DINAMO</option>
-                                                    <option value="BENGKEL BUBUT">BENGKEL BUBUT</option>
-                                                    <option value="MESIN">MESIN</option>
-                                                    <option value="LAS">LAS</option>
-                                                </optgroup>
-                                                <optgroup label="UMUM">
-                                                    <option value="KANTOR">KANTOR</option>
-                                                    <option value="BANGUNAN">BANGUNAN</option>
-                                                    <option value="UMUM">UMUM</option>
-                                                </optgroup>
-                                            </select>
+                                            <input type="text" name="kategori_request[]" class="form-control form-control-sm input-kategori-readonly bg-light" placeholder="Otomatis..." readonly>
                                         </td>
                                         <td>
                                             <select name="id_mobil[]" class="form-select form-select-sm select-mobil">
@@ -183,37 +166,7 @@ $nama_user_login = isset($_SESSION['username']) ? strtoupper($_SESSION['username
                                         </td>
                                         <td><input type="number" name="jumlah[]" class="form-control form-control-sm input-qty text-center" step="any" value="1" required></td>
                                         <td>
-                                            <select name="satuan[]" class="form-select form-select-sm select-satuan" required>
-                                                <option value="">- PILIH -</option>
-                                                <option value="PCS">PCS</option>
-                                                <option value="DUS">DUS</option>
-                                                <option value="KG">KG</option>
-                                                 <option value="ONS">ONS</option>
-                                                <option value="LITER">LITER</option>
-												<option value="ML">MiliLiter</option>
-                                                <option value="METER">METER</option>
-                                                <option value="CM">CM</option>
-                                                <option value="LONJOR">LONJOR</option>
-                                                <option value="SET">SET</option>
-                                                <option value="ROLL">ROLL</option>
-                                                <option value="PACK">PACK</option>
-                                                <option value="UNIT">UNIT</option>
-                                                <option value="DRUM">DRUM</option>
-                                                <option value="SAK">SAK</option>
-                                                <option value="PAIL">PAIL</option>
-                                                <option value="CAN">CAN</option>
-                                                <option value="BOTOL">BOTOL</option>
-                                                <option value="TUBE">TUBE</option>
-                                                <option value="GALON">GALON</option>
-                                                <option value="IKAT">IKAT</option>
-                                                <option value="LEMBAR">LEMBAR</option>
-                                                <option value="TABUNG">TABUNG</option>
-                                                <option value="KALENG">KALENG</option>
-                                        <option value="BATANG">BATANG</option>
-                                        <option value="KOTAK">KOTAK</option>
-                                        <option value="COLT">COLT</option>
-                                        <option value="JURIGEN">JURIGEN</option>
-										 <option value="RIM">RIM</option>
+                                           <input type="text" name="satuan[]" class="form-control form-control-sm input-satuan-readonly bg-light" placeholder="Otomatis..." readonly>
                                         </td>
                                         <input type="hidden" name="kwalifikasi[]" class="input-kwalifikasi">
                                         <input type="hidden" name="harga[]" class="input-harga" value="0">
@@ -254,16 +207,18 @@ $nama_user_login = isset($_SESSION['username']) ? strtoupper($_SESSION['username
 <script>
 $(document).ready(function(){
     
+    // 1. Inisialisasi Select2
     function initSelect2() {
-    $('.select-barang, .select-kategori, .select-mobil, .select-tipe, .select-satuan, .select-pembeli').select2({
-        theme: 'bootstrap-5',
-        width: '100%',
-        placeholder: "-- PILIH --"
-    });
-}
+        // Hanya inisialisasi pada elemen yang memang butuh pencarian (bukan readonly)
+        $('.select-barang, .select-mobil, .select-tipe, .select-pembeli').select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            placeholder: "-- PILIH --"
+        });
+    }
     initSelect2();
 
-    // Fungsi hitung subtotal tetap berjalan di background untuk validasi jika perlu
+    // 2. Fungsi hitung subtotal (opsional untuk PR Kecil)
     function hitungSubtotal(row) {
         var qty = parseFloat(row.find('.input-qty').val()) || 0;
         var harga = parseFloat(row.find('.input-harga').val()) || 0;
@@ -271,55 +226,78 @@ $(document).ready(function(){
         row.find('.input-subtotal').val(subtotal); 
     }
 
-   $(document).on('change', '.select-barang', function(){
-    var row = $(this).closest('tr');
-    var selected = $(this).find(':selected');
-    
-    // Simpan nama barang ke hidden input agar database tetap punya teks namanya
-    row.find('.input-nama-barang').val(selected.data('nama')); 
-    
-    row.find('.input-kwalifikasi').val(selected.data('merk'));
-    row.find('.input-harga').val(selected.data('harga'));
-        if(selected.data('kategori')) row.find('.select-kategori').val(selected.data('kategori')).trigger('change.select2');
-        if(selected.data('satuan')) row.find('.select-satuan').val(selected.data('satuan')).trigger('change.select2');
+    // 3. Event saat Barang dipilih
+    $(document).on('change', '.select-barang', function(){
+        var row = $(this).closest('tr');
+        var selected = $(this).find(':selected');
+        
+        if (selected.val() != "") {
+            // Isi nama barang ke hidden input
+            row.find('.input-nama-barang').val(selected.data('nama')); 
+            
+            // Isi Merk/Spek ke hidden input
+            row.find('.input-kwalifikasi').val(selected.data('merk'));
+            
+            // Isi Harga estimasi ke hidden input
+            row.find('.input-harga').val(selected.data('harga'));
+            
+            // AUTOMATIC FILL: Kategori & Satuan (Input Teks Readonly)
+            row.find('.input-kategori-readonly').val(selected.data('kategori'));
+            row.find('.input-satuan-readonly').val(selected.data('satuan'));
+        } else {
+            // Reset jika pilihan dikosongkan
+            row.find('.input-kategori-readonly, .input-satuan-readonly, .input-nama-barang').val('');
+        }
+        
         hitungSubtotal(row);
     });
 
-           $("#addRow").click(function(){
-            // Salin baris terakhir
-            var newRow = $('.item-row:last').clone(); 
+    // 4. Tambah Baris Baru
+    $("#addRow").click(function(){
+        // Clone baris terakhir
+        var newRow = $('.item-row:last').clone(); 
         
-            // Hapus Select2 yang lama dari baris baru sebelum di-append
-            newRow.find('.select2-container').remove();
-            newRow.find('.select2-hidden-accessible').removeClass('select2-hidden-accessible').removeAttr('data-select2-id').attr('tabindex', '0');
+        // Hapus container Select2 yang lama agar tidak error saat inisialisasi ulang
+        newRow.find('.select2-container').remove();
+        newRow.find('.select2-hidden-accessible')
+              .removeClass('select2-hidden-accessible')
+              .removeAttr('data-select2-id')
+              .attr('tabindex', '0');
         
-            // Reset nilai
-            newRow.find('input').val('');
-            newRow.find('textarea').val('');
-            newRow.find('.input-qty').val('1');
-            newRow.find('.input-subtotal').val('0');
-            newRow.find('select').val('').trigger('change');
-            newRow.find('.select-mobil').val('0');
-            newRow.find('.select-tipe').val('STOK');
-            
-            // Masukkan ke tabel
-            $("#tableItem tbody").append(newRow);
-            
-            // Inisialisasi ulang Select2 hanya untuk baris yang baru atau semua
-            initSelect2();
-        });
+        // Reset semua nilai input di baris baru
+        newRow.find('input').val('');
+        newRow.find('textarea').val('');
+        newRow.find('.input-qty').val('1');
+        newRow.find('.input-subtotal').val('0');
+        newRow.find('.input-harga').val('0');
+        
+        // Reset select ke default
+        newRow.find('select').val('');
+        newRow.find('.select-mobil').val('0');
+        newRow.find('.select-tipe').val('STOK');
+        
+        // Masukkan baris baru ke tabel
+        $("#tableItem tbody").append(newRow);
+        
+        // Jalankan ulang Select2 untuk baris yang baru
+        initSelect2();
+    });
 
+    // 5. Hapus Baris
     $(document).on('click', '.remove-row', function(){
         if($("#tableItem tbody tr").length > 1){
             $(this).closest('tr').remove();
+        } else {
+            Swal.fire('Info', 'Minimal harus ada 1 item dalam request.', 'info');
         }
     });
 
-    // Modifikasi Submit (Tanpa Total Estimasi karena di-hide)
+    // 6. Validasi & Proses Simpan (Submit)
     $('form').on('submit', function(e) {
         e.preventDefault();
         var form = this;
 
+        // Cek apakah barang pertama sudah dipilih
         if (!$('.select-barang').first().val()) {
             Swal.fire('Peringatan', 'Mohon pilih minimal satu barang.', 'warning');
             return false;
@@ -327,7 +305,7 @@ $(document).ready(function(){
 
         Swal.fire({
             title: 'Simpan Purchase Request?',
-            text: "Pastikan data barang sudah benar.",
+            text: "Pastikan data item dan kategori sudah sesuai.",
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: '#0000FF',
@@ -345,6 +323,11 @@ $(document).ready(function(){
             }
         });
     });
+
+    // 7. Hitung ulang jika qty diubah manual
+    $(document).on('input', '.input-qty', function(){
+        hitungSubtotal($(this).closest('tr'));
+    });
 });
 </script>
 <script>
@@ -360,7 +343,7 @@ $(document).ready(function(){
 
         // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
         if (now - lastServerUpdate > 300000) {
-            fetch('/pr_mcp_rev4/auth/keep_alive.php')
+            fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
                 .then(response => response.json())
                 .then(data => {
                     if (data.status !== 'success') {
@@ -379,7 +362,7 @@ $(document).ready(function(){
     function forceLogout() {
         alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
         // Redirect ke logout.php agar session server juga dihancurkan
-        window.location.href = "/pr_mcp_rev4/auth/logout.php?pesan=timeout";
+        window.location.href = "http://192.168.31.200/pr_mcp/auth/logout.php?pesan=timeout";
     }
 
     // Pantau aktivitas user
@@ -394,7 +377,7 @@ $(document).ready(function(){
     setInterval(function() {
         idleTime++;
         // Cek session ke server juga
-        fetch('/pr_mcp_rev4/auth/keep_alive.php')
+        fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
             .then(response => response.json())
             .then(data => {
                 if (data.status !== 'success') {
