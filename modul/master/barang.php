@@ -1,7 +1,11 @@
 <?php
-//session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+session_start();
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
+
+if (!isset($koneksi) || !$koneksi) {
+    die("Koneksi database tidak tersedia.");
+}
 
 if ($_SESSION['status'] != "login") {
     header("location:../../login.php?pesan=belum_login");
@@ -57,35 +61,15 @@ if ($_SESSION['status'] != "login") {
                     <div class="col-md-4">
                         <label class="form-label small fw-bold text-muted">SATUAN UTAMA</label>
                         <select name="satuan" class="form-select" required>
-                             <option value="">- PILIH -</option>
-                             <option value="PCS">PCS</option>
-                             <option value="DUS">SET</option>
-                             <option value="KG">KG</option>
-                              <option value="ONS">ONS</option>
-                             <option value="LITER">LITER</option>
-                             <option value="ML">MiliLiter</option>
-                             <option value="METER">METER</option>
-                             <option value="CM">CM</option>
-                             <option value="LEMBAR">LEMBAR</option>
-                             <option value="LONJOR">LONJOR</option>
-                             <option value="SET">DUS</option>
-                             <option value="ROLL">ROLL</option>
-                             <option value="PACK">PACK</option>
-                             <option value="UNIT">UNIT</option>
-                             <option value="SAK">SAK</option>
-                             <option value="GALON">GALON</option>
-                             <option value="PAIL">PAIL</option>
-                             <option value="TABUNG">TABUNG</option>
-                             <option value="KALENG">KALENG</option>
-                             <option value="DRUM">DRUM</option>
-                             <option value="KOTAK">KOTAK</option>
-                             <option value="BATANG">BATANG</option>
-                             <option value="COLT">COLT</option>
-                             <option value="JURIGEN">JURIGEN</option>
-							 <option value="PEKERJAAN">PEKERJAAN</option>
-							  <option value="ACARA">ACARA</option>
-							  <option value="RIM">RIM</option>
-                        </select>
+                        <option value="">- PILIH SATUAN -</option>
+                        <?php
+                        
+                        $query_satuan = mysqli_query($koneksi, "SELECT * FROM master_satuan ORDER BY nama_satuan ASC");
+                        while($s = mysqli_fetch_array($query_satuan)){
+                            echo "<option value='".$s['nama_satuan']."'>".$s['nama_satuan']."</option>";
+                        }
+                        ?>
+                    </select>
                     </div>
                     <div class="col-md-4">
                        <label class="form-label small fw-bold text-muted">STOK AWAL</label>
@@ -106,30 +90,26 @@ if ($_SESSION['status'] != "login") {
                 <div class="mb-3">
                     <label class="form-label small fw-bold text-muted">KATEGORI BARANG</label>
                     <select name="kategori" class="form-select" required>
-                        <option value="">-- PILIH KATEGORI --</option>
-                        <option value="UMUM">KANTOR (ATK/UMUM)</option>
-                        <option value="BANGUNAN">BANGUNAN</option>
-                        <option value="LAS">LAS</option>
-                        <optgroup label="BENGKEL">
-                            <option value="MOBIL">BENGKEL - MOBIL</option>
-                            <option value="LISTRIK">BENGKEL - LISTRIK</option>
-                            <option value="DINAMO">BENGKEL - DINAMO</option>
-                            <option value="BUBUT">BENGKEL - BUBUT</option>
-                        </optgroup>
-						<optgroup label="PR BESAR">
-                            <option value="INVESTASI MESIN">INVESTASI MESIN</option>
-                            <option value="INVESTASI KENDARAAN">INVESTASI KENDARAAN</option>
-                            <option value="INVESTASI IT">INVESTASI IT</option>
-                            <option value="ACARA">ACARA</option>
-							<option value="INVESTASI LAINNYA">INVESTASI LAINNYA</option>
-                        </optgroup>
-                    </select>
+                    <option value="">-- PILIH KATEGORI --</option>
+                    <?php
+                    $query_kat = mysqli_query($koneksi, "SELECT * FROM master_kategori ORDER BY nama_kategori ASC");
+                    while($k = mysqli_fetch_array($query_kat)){
+                        echo "<option value='".$k['nama_kategori']."'>".$k['nama_kategori']."</option>";
+                    }
+                    ?>
+                </select>
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label small fw-bold text-muted">LOKASI PENYIMPANAN (RAK)</label>
-                    <input type="text" name="lokasi_rak" class="form-control" placeholder="CONTOH: RAK-A1">
-                </div>
+               <label class="form-label small fw-bold text-muted">LOKASI PENYIMPANAN (RAK)</label>
+                <select name="lokasi_rak" class="form-select">
+                    <option value="">-- PILIH RAK --</option>
+                    <?php
+                    $query_rak = mysqli_query($koneksi, "SELECT * FROM master_rak ORDER BY nama_rak ASC");
+                    while($r = mysqli_fetch_array($query_rak)){
+                        echo "<option value='".$r['nama_rak']."'>".$r['nama_rak']."</option>";
+                    }
+                    ?>
+                </select>
 
                 <div class="mb-4">
                     <label class="form-label small fw-bold text-muted">STATUS AKTIF</label>

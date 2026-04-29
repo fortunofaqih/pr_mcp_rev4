@@ -245,6 +245,9 @@ if ($is_finance) {
                     <li class="nav-item"><a href="modul/master/data_barang.php" class="nav-link text-warning fw-bold"><i class="fas fa-boxes me-2"></i> Master Barang</a></li>
                     <li class="nav-item"><a href="modul/master/data_mobil.php" class="nav-link text-warning fw-bold"><i class="fas fa-truck me-2"></i> Master Mobil</a></li>
                     <li class="nav-item"><a href="modul/master/data_supplier.php" class="nav-link text-warning fw-bold"><i class="fa-brands fa-shopify me-2"></i> Master Supplier</a></li>
+                    <li class="nav-item"><a href="modul/master/data_kategori.php" class="nav-link text-warning fw-bold"><i class="fas fa-tags me-2"></i> Master Kategori</a></li>
+                    <li class="nav-item"><a href="modul/master/data_satuan.php" class="nav-link text-warning fw-bold"><i class="fas fa-ruler-horizontal me-2"></i> Master Satuan</a></li>
+                    <li class="nav-item"><a href="modul/master/data_rak.php" class="nav-link text-warning fw-bold"><i class="fas fa-warehouse me-2"></i> Master Rak</a></li>
                     
                     <div class="nav-category">-- Transaksi Gudang --</div>
                     <li class="nav-item"><a href="modul/transaksi/tambah_request.php" class="nav-link text-warning fw-bold"><i class="fas fa-file-invoice me-2"></i> Form PR (Kecil)</a></li>
