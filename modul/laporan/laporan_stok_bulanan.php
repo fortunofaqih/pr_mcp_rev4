@@ -1,8 +1,7 @@
 <?php
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
-include '../../auth/keep_alive.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 // Default filter: Bulan berjalan
 $tgl_mulai = isset($_GET['tgl_mulai']) ? $_GET['tgl_mulai'] : date('Y-m-01');
@@ -18,8 +17,53 @@ $tgl_selesai = isset($_GET['tgl_selesai']) ? $_GET['tgl_selesai'] : date('Y-m-d'
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .header-report { background: #00008B; color: white; padding: 20px; border-radius: 10px 10px 0 0; }
-        @media print { .no-print { display: none; } }
+    .header-report { background: #00008B; color: white; padding: 20px; border-radius: 10px 10px 0 0; }
+    
+    @media print { 
+        .no-print { display: none; } 
+        
+        @page {
+            size: 215mm 330mm; /* F4 / Folio */
+            margin: 5mm; /* Margin diperkecil agar area cetak lebih luas */
+        }
+
+        body {
+            background-color: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            font-size: 9pt; /* Mengecilkan font dasar */
+        }
+
+        /* Merapatkan Tabel */
+        .table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            table-layout: auto; /* Membiarkan browser menyesuaikan lebar kolom */
+        }
+
+        /* Menghilangkan padding berlebih di sel tabel */
+        .table td, .table th {
+            padding: 2px 4px !important; /* Jarak atas-bawah 2px, kiri-kanan 4px */
+            line-height: 1.2 !important;
+            word-wrap: break-word;
+            font-size: 8pt; /* Font khusus data tabel lebih kecil lagi */
+        }
+
+        .table thead th {
+            vertical-align: middle !important;
+            font-size: 8pt;
+        }
+
+        /* Memastikan warna cetak tetap keluar */
+        * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        /* Menghilangkan shadow card agar bersih */
+        .card { border: none !important; box-shadow: none !important; }
+        .card-body { padding: 0 !important; }
+    }
     </style>
 </head>
 <body class="bg-light py-4">
@@ -77,7 +121,10 @@ $tgl_selesai = isset($_GET['tgl_selesai']) ? $_GET['tgl_selesai'] : date('Y-m-d'
                     <tbody class="small text-uppercase">
                         <?php
                         $no = 1;
-                        $res = mysqli_query($koneksi, "SELECT * FROM master_barang WHERE is_active = 1 ORDER BY nama_barang ASC");
+                        $res = mysqli_query($koneksi, "SELECT * FROM master_barang 
+                               WHERE is_active = 1 
+                               AND status_aktif = 'AKTIF' 
+                               ORDER BY nama_barang ASC");
                         while($b = mysqli_fetch_array($res)){
                             $id_b = $b['id_barang'];
 
@@ -99,6 +146,9 @@ $tgl_selesai = isset($_GET['tgl_selesai']) ? $_GET['tgl_selesai'] : date('Y-m-d'
                             $keluar = $d_mutasi['keluar'] ?? 0;
 
                             $stok_akhir = $stok_awal + $masuk - $keluar;
+                            if ($stok_awal == 0 && $masuk == 0 && $keluar == 0) {
+                                continue; // Lewati barang ini dan lanjut ke perulangan berikutnya
+                            }
                         ?>
                         <tr>
                             <td class="text-center"><?= $no++ ?></td>
@@ -117,49 +167,6 @@ $tgl_selesai = isset($_GET['tgl_selesai']) ? $_GET['tgl_selesai'] : date('Y-m-d'
         </div>
     </div>
 </div>
-<script>
-    let idleTime = 0;
-    const maxIdleMinutes = 15;
-    let lastServerUpdate = Date.now();
-
-    // Fungsi untuk mereset timer idle
-    function resetTimer() {
-        idleTime = 0;
-        
-        let now = Date.now();
-        // Kirim sinyal "Keep Alive" ke server setiap 5 menit sekali jika user aktif
-        // Ini mencegah session PHP mati saat user sedang asyik mengetik/input
-        if (now - lastServerUpdate > 300000) { // 300.000 ms = 5 menit
-            const depth = window.location.pathname.split('/').length - 2;
-            const prefix = "../".repeat(Math.max(0, depth - 1));
-            
-            fetch(prefix + 'auth/keep_alive.php')
-                .then(response => console.log("Sesi diperbarui secara background"))
-                .catch(err => console.error("Gagal memperbarui sesi", err));
-            
-            lastServerUpdate = now;
-        }
-    }
-
-    // Deteksi interaksi user
-    window.onload = resetTimer;
-    document.onmousemove = resetTimer;
-    document.onkeypress = resetTimer;
-    document.onmousedown = resetTimer;
-    document.onclick = resetTimer;
-    document.onscroll = resetTimer;
-
-    // Interval cek setiap 1 menit
-    setInterval(function() {
-        idleTime++;
-        if (idleTime >= maxIdleMinutes) {
-            alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
-            const depth = window.location.pathname.split('/').length - 2;
-            const prefix = "../".repeat(Math.max(0, depth - 1));
-            window.location.href = prefix + "login.php?pesan=timeout";
-        }
-    }, 60000); // Cek setiap 60 detik
-</script>
 
 </body>
 </html>
