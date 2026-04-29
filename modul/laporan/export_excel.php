@@ -2,8 +2,8 @@
 session_start(); 
 ob_start(); 
 
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 // 1. Ambil parameter filter
 $tgl_mulai    = $_REQUEST['tgl_mulai']   ?? date('Y-m-01');
