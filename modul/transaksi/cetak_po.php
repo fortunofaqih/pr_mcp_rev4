@@ -3,8 +3,8 @@
 // cetak_po.php - Versi Flexible (No Null Error)
 // ============================================================
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 if ($_SESSION['status'] != "login") {
     header("location:../../login.php");
@@ -62,15 +62,50 @@ $pr_data = mysqli_fetch_assoc($q_pr);
 $pr = $pr_data ?: ['no_request' => '-'];
 
 // Ambil Detail Barang
-$details = mysqli_query($koneksi, "SELECT d.*, b.nama_barang as nama_master
+// 1. Ambil semua detail barang dari database
+$raw_details = mysqli_query($koneksi, "SELECT d.*, b.nama_barang as nama_master
     FROM tr_request_detail d
     LEFT JOIN master_barang b ON d.id_barang = b.id_barang
     WHERE d.id_request = '".$po['id_request']."'
     ORDER BY d.id_detail ASC");
 
+// 2. Wadah untuk menggabungkan item yang kembar
+$grouped_details = [];
+
+while($row = mysqli_fetch_assoc($raw_details)) {
+    // Gunakan ID Barang sebagai kunci unik, jika ID kosong gunakan nama barang manual
+    $key = !empty($row['id_barang']) ? $row['id_barang'] : $row['nama_barang_manual'];
+    
+    // Jika kunci sudah ada di wadah, tambahkan qty dan subtotalnya
+    if (isset($grouped_details[$key])) {
+        $grouped_details[$key]['jumlah'] += (float)$row['jumlah'];
+        $grouped_details[$key]['subtotal_estimasi'] += (float)$row['subtotal_estimasi'];
+        // Catatan atau kualifikasi bisa digabung jika berbeda
+        if (!empty($row['keterangan']) && strpos($grouped_details[$key]['keterangan'], $row['keterangan']) === false) {
+            $grouped_details[$key]['keterangan'] .= ", " . $row['keterangan'];
+        }
+    } else {
+        // Jika belum ada, masukkan sebagai baris baru
+        $grouped_details[$key] = $row;
+    }
+}
+
 // Format Tanggal (Cek agar tidak error jika tgl_po kosong)
+// Format Tanggal
 $tgl_po_fmt = (!empty($po['tgl_po']) && $po['tgl_po'] != '-') ? date('d F Y', strtotime($po['tgl_po'])) : '-';
-$total_setelah_diskon = (float)($po['subtotal'] ?? 0) - (float)($po['diskon'] ?? 0);
+
+// --- LOGIKA PERHITUNGAN PPN OTOMATIS ---
+$grand_total = (float)($po['grand_total'] ?? 0);
+$diskon      = (float)($po['diskon'] ?? 0);
+
+// Kita asumsikan Grand Total adalah nilai akhir (DPP + PPN)
+// Maka kita cari DPP (Dasar Pengenaan Pajak) / Subtotal bersihnya
+$dpp_setelah_diskon = $grand_total / 1.11;
+$ppn_tampil         = $grand_total - $dpp_setelah_diskon;
+
+// Subtotal kotor sebelum diskon agar sinkron:
+$subtotal_tampil    = $dpp_setelah_diskon + $diskon;
+
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -174,53 +209,54 @@ $total_setelah_diskon = (float)($po['subtotal'] ?? 0) - (float)($po['diskon'] ??
                 </tr>
             </thead>
             <tbody>
+              
                 <?php 
                 $no = 1; 
-                if(mysqli_num_rows($details) > 0):
-                    while($d = mysqli_fetch_array($details)): 
+                if(!empty($grouped_details)):
+                    foreach($grouped_details as $d): 
                         $nama = !empty($d['nama_master']) ? $d['nama_master'] : ($d['nama_barang_manual'] ?? '-');
+                        
+                        // Harga murni sesuai inputan user
+                       $harga_item = (float)$d['harga_satuan_estimasi'];
+                       $qty        = (float)$d['jumlah'];
+                       $sub_item   = $harga_item * $qty;
                 ?>
                 <tr>
                     <td class="text-center"><?= $no++ ?></td>
                     <td>
                         <strong><?= strtoupper($nama) ?></strong>
-                        <?php if(!empty($d['kwalifikasi'])): ?><br><small style="color:#444;">Spec: <?= $d['kwalifikasi'] ?></small><?php endif; ?>
-                        <?php if(!empty($d['keterangan'])): ?><br><small style="color:#666;">Ket: <?= $d['keterangan'] ?></small><?php endif; ?>
+                        <?php if(!empty($d['kwalifikasi'])): ?><br><small>Spec: <?= $d['kwalifikasi'] ?></small><?php endif; ?>
                     </td>
-                    <td class="text-center"><?= (float)($d['jumlah'] ?? 0) ?></td>
+                    <td class="text-center"><?= $qty ?></td>
                     <td class="text-center"><?= $d['satuan'] ?? '-' ?></td>
-                    <td class="text-end"><?= number_format($d['harga_satuan_estimasi'] ?? 0, 0, ',', '.') ?></td>
-                    <td class="text-end"><?= number_format($d['subtotal_estimasi'] ?? 0, 0, ',', '.') ?></td>
+                    <td class="text-end"><?= number_format($harga_item, 0, ',', '.') ?></td>
+                    <td class="text-end"><?= number_format($sub_item, 0, ',', '.') ?></td>
                 </tr>
-                <?php endwhile; else: ?>
-                <tr><td colspan="6" class="text-center">Tidak ada detail barang</td></tr>
-                <?php endif; ?>
+                <?php endforeach; else: ?>
+                    <tr><td colspan="6" class="text-center">Tidak ada detail barang</td></tr>
+                    <?php endif; ?>
                 
                 <tr>
-                    <td colspan="4" rowspan="5" style="border-bottom: 1px solid #000;">
-                        <div style="font-size: 10px;">
-                            <strong>CATATAN / KETENTUAN:</strong><br>
-                            <?= nl2br($po['catatan'] ?: "1. Pencantuman nama PT. MCP pada faktur dan surat jalan.\n2. Pembayaran Transfer: ".($po['nama_bank'] ?? '-')." a/n ".($po['atas_nama_rekening'] ?? '-')." (".($po['no_rekening'] ?? '-').").") ?>
-                        </div>
+               <td colspan="4" rowspan="4" style="border-bottom: 1px solid #000;">
+                <div style="font-size: 10px;">
+                    <strong>CATATAN / KETENTUAN:</strong><br>
+                    <?= nl2br($po['catatan'] ?: "1. Pencantuman nama PT. MCP pada faktur dan surat jalan.\n2. Pembayaran Transfer...") ?>
+                </div>
                     </td>
                     <td class="text-end fw-bold">Subtotal</td>
-                    <td class="text-end"><?= number_format($po['subtotal'] ?? 0, 0, ',', '.') ?></td>
+                    <td class="text-end"><?= number_format($subtotal_tampil, 0, ',', '.') ?></td>
                 </tr>
                 <tr>
                     <td class="text-end fw-bold">Discount</td>
-                    <td class="text-end"><?= ($po['diskon'] ?? 0) > 0 ? '- '.number_format($po['diskon'], 0, ',', '.') : '0' ?></td>
-                </tr>
-                <tr style="background: #f9f9f9;">
-                    <td class="text-end fw-bold">Total</td>
-                    <td class="text-end fw-bold"><?= number_format($total_setelah_diskon, 0, ',', '.') ?></td>
+                    <td class="text-end"><?= $diskon > 0 ? '- '.number_format($diskon, 0, ',', '.') : '0' ?></td>
                 </tr>
                 <tr>
-                    <td class="text-end fw-bold">PPN <?= $po['ppn_persen'] ?? 0 ?>%</td>
-                    <td class="text-end"><?= number_format($po['ppn_nominal'] ?? 0, 0, ',', '.') ?></td>
+                    <td class="text-end fw-bold">PPN 11%</td>
+                    <td class="text-end"><?= number_format($ppn_tampil, 0, ',', '.') ?></td>
                 </tr>
                 <tr style="background: #eee;">
                     <td class="text-end fw-bold" style="font-size: 12px;">GRAND TOTAL</td>
-                    <td class="text-end fw-bold" style="font-size: 12px;">Rp <?= number_format($po['grand_total'] ?? 0, 0, ',', '.') ?></td>
+                    <td class="text-end fw-bold" style="font-size: 12px;">Rp <?= number_format($grand_total, 0, ',', '.') ?></td>
                 </tr>
             </tbody>
         </table>
