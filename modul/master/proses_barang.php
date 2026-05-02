@@ -1,6 +1,6 @@
 <?php
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);

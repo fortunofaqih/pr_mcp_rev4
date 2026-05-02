@@ -1,8 +1,7 @@
 <?php
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
-
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 if ($_SESSION['status'] != "login") {
     header("location:../../login.php?pesan=belum_login");
@@ -11,16 +10,19 @@ if ($_SESSION['status'] != "login") {
 
 $id = mysqli_real_escape_string($koneksi, $_GET['id']);
 
-// Ambil data barang (Termasuk harga_barang_stok) DAN ambil nilai dari log pertama sebagai Stok Awal
+// 1. Ambil data barang utama
 $sql = "SELECT b.*, 
         (SELECT qty FROM tr_stok_log WHERE id_barang = b.id_barang ORDER BY id_log ASC LIMIT 1) as stok_awal_log
         FROM master_barang b 
         WHERE b.id_barang='$id'";
-
 $query = mysqli_query($koneksi, $sql);
 $data = mysqli_fetch_array($query);
 
-// Format harga untuk tampilan awal di input (menghilangkan desimal jika .00 agar lebih rapi)
+// 2. Ambil data dari tabel-tabel master untuk dropdown
+$q_kat = mysqli_query($koneksi, "SELECT nama_kategori FROM master_kategori ORDER BY nama_kategori ASC");
+$q_rak = mysqli_query($koneksi, "SELECT nama_rak FROM master_rak ORDER BY nama_rak ASC");
+$q_sat = mysqli_query($koneksi, "SELECT nama_satuan FROM master_satuan ORDER BY nama_satuan ASC");
+
 $harga_tampil = number_format($data['harga_barang_stok'], 0, ',', '.');
 ?>
 <!DOCTYPE html>
@@ -37,13 +39,26 @@ $harga_tampil = number_format($data['harga_barang_stok'], 0, ',', '.');
         .card { border-radius: 15px; border: none; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
         .header-edit { background: #00008B; color: white; border-radius: 15px 15px 0 0; padding: 20px; }
         input, select { text-transform: uppercase; }
-        /* Style untuk input group harga */
         .input-group-text { background-color: #e9ecef; font-weight: bold; }
     </style>
 </head>
 <body class="py-5">
 
 <div class="container">
+    <?php if (isset($_GET['pesan'])): ?>
+        <div class="row justify-content-center mb-3">
+            <div class="col-md-6">
+                <?php if ($_GET['pesan'] == "duplikat"): ?>
+                    <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Gagal Update!</strong> Nama barang sudah ada di database.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    <?php endif; ?>
+
     <div class="row justify-content-center">
         <div class="col-md-6">
             <div class="card">
@@ -75,18 +90,23 @@ $harga_tampil = number_format($data['harga_barang_stok'], 0, ',', '.');
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold text-muted">LOKASI RAK</label>
-                                <input type="text" name="lokasi_rak" class="form-control" value="<?php echo $data['lokasi_rak']; ?>" placeholder="Contoh: RAK-A1">
+                                <select name="lokasi_rak" class="form-select">
+                                    <option value="">- PILIH RAK -</option>
+                                    <?php while($r = mysqli_fetch_array($q_rak)): ?>
+                                        <option value="<?= $r['nama_rak'] ?>" <?= ($data['lokasi_rak'] == $r['nama_rak']) ? 'selected' : '' ?>>
+                                            <?= $r['nama_rak'] ?>
+                                        </option>
+                                    <?php endwhile; ?>
+                                </select>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold text-muted">SATUAN UTAMA</label>
                                 <select name="satuan" class="form-select">
-                                    <?php 
-                                    $satuan_list = ['PCS', 'SET', 'DUS', 'PACK', 'METER', 'CM','LEMBAR','KG','ONS','LITER','ML','LONJOR','ROLL','UNIT','DRUM','SAK','BOTOL','TUBE','GALON','IKAT','PAIL','TABUNG','KALENG','RIM'];
-                                    foreach($satuan_list as $s) {
-                                        $selected = ($data['satuan'] == $s) ? 'selected' : '';
-                                        echo "<option value='$s' $selected>$s</option>";
-                                    }
-                                    ?>
+                                    <?php while($s = mysqli_fetch_array($q_sat)): ?>
+                                        <option value="<?= $s['nama_satuan'] ?>" <?= ($data['satuan'] == $s['nama_satuan']) ? 'selected' : '' ?>>
+                                            <?= $s['nama_satuan'] ?>
+                                        </option>
+                                    <?php endwhile; ?>
                                 </select>
                             </div>
                         </div>
@@ -102,7 +122,6 @@ $harga_tampil = number_format($data['harga_barang_stok'], 0, ',', '.');
                                         <input type="number" class="form-control bg-white" value="<?php echo $data['stok_awal_log']; ?>" readonly>
                                         <span class="input-group-text small"><?php echo $data['satuan']; ?></span>
                                     </div>
-                                    <div style="font-size: 0.65rem;" class="text-muted mt-1">* Stok saat pendaftaran pertama</div>
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small fw-bold text-danger text-uppercase">Sisa (Stok Akhir)</label>
@@ -121,25 +140,15 @@ $harga_tampil = number_format($data['harga_barang_stok'], 0, ',', '.');
                                 <option value="NONAKTIF" <?php if($data['status_aktif'] == 'NONAKTIF') echo 'selected'; ?>>NONAKTIF</option>
                             </select>
                         </div>
+                        
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-muted">KATEGORI BARANG</label>
                             <select name="kategori" class="form-select" required>
-                                <?php 
-                                $kategori_list = [
-                                    'UMUM'   => 'KANTOR (ATK/UMUM)',
-                                    'BANGUNAN' => 'BANGUNAN',
-                                    'LAS' => 'LAS',
-                                    'MOBIL'    => 'BENGKEL - MOBIL',
-                                    'LISTRIK'  => 'BENGKEL - LISTRIK',
-                                    'DINAMO'   => 'BENGKEL - DINAMO',
-                                    'BUBUT'    => 'BENGKEL - BUBUT'
-                                ];
-
-                                foreach($kategori_list as $key => $val) {
-                                    $sel = ($data['kategori'] == $key) ? 'selected' : '';
-                                    echo "<option value='$key' $sel>$val</option>";
-                                }
-                                ?>
+                                <?php while($k = mysqli_fetch_array($q_kat)): ?>
+                                    <option value="<?= $k['nama_kategori'] ?>" <?= ($data['kategori'] == $k['nama_kategori']) ? 'selected' : '' ?>>
+                                        <?= $k['nama_kategori'] ?>
+                                    </option>
+                                <?php endwhile; ?>
                             </select>
                         </div>
 
@@ -155,6 +164,8 @@ $harga_tampil = number_format($data['harga_barang_stok'], 0, ',', '.');
         </div>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
     // SCRIPT FORMAT RUPIAH
@@ -175,8 +186,6 @@ $harga_tampil = number_format($data['harga_barang_stok'], 0, ',', '.');
 
         rupiah = split[1] != undefined ? rupiah + ',' + split[1] : rupiah;
         this.value = rupiah;
-        
-        // Simpan angka murni ke input hidden
         hargaBersih.value = number_string.replace(/\./g, '').replace(',', '.');
     });
 </script>
