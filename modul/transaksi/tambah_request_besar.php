@@ -639,7 +639,7 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
             <input type="number" name="diskon" id="inputDiskon" class="form-control form-control-sm" value="0" min="0">
         </div>
         <div class="col-6 col-md-3">
-            <div class="section-label">PPN</div>
+            <div class="section-label">PPN <span class="text-danger fw-normal">(Pilih "Tanpa PPN" jika harga Barang sudah include PPN)</span></div>
             <select name="ppn_persen" id="selectPPN" class="form-select form-select-sm">
                 <option value="0">Tanpa PPN</option>
                 <option value="11" selected>PPN 11%</option>
@@ -657,9 +657,13 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
     </div>
 
     <div>
-        <div class="section-label">Catatan / Ketentuan Pembayaran PO</div>
-        <textarea name="catatan_po" class="form-control form-control-sm" rows="3"
-                  placeholder="Contoh: Pembayaran AN. PT. XYZ, No Rek: 1234, Bank BCA Cab. Surabaya..."></textarea>
+        <div class="section-label">Keterangan / Payment Term (Sesuaikan dengan kebutuhan)</div>
+        <textarea name="catatan_po" class="form-control form-control-sm" rows="5" required><?php 
+            echo "1. Pembayaran : 30 hari setelah pengiriman\n";
+            echo "2. Pengiriman : Diambil\n";
+            echo "3. Nomor invoice dicantumkan di referensi faktur pajak\n";
+            echo "4. Lain-lain : -"; 
+        ?></textarea>
                   <div class="mt-3">
                 <div class="section-label">
                     Lampiran Penawaran Supplier 
