@@ -240,7 +240,7 @@ $subtotal_tampil    = $dpp_setelah_diskon + $diskon;
                     <td colspan="4" rowspan="4">
                         <div style="font-size: 10px;">
                             <strong>Keterangan (Payment Term):</strong><br>
-                            <?= nl2br($po['catatan'] ?: "1. Pencantuman nama PT. MCP pada faktur dan surat jalan.\n2. Pembayaran Transfer...") ?>
+                            <?= nl2br($po['catatan'] ?: "1. _____________________\n2. _____________________\n3. _____________________") ?>
                         </div>
                     </td>
                     <td class="text-end fw-bold">DPP</td>
