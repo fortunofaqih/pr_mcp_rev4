@@ -1,8 +1,8 @@
 <?php
 // ============================================================
-// modul/transaksi/update_status_ban.php
-// Update status pembelian item & pemasangan ban
-// PO otomatis CLOSE bila semua item dibeli + semua ban terpasang
+// modul/transaksi/update_status_pemasangan_ban.php
+// Update status pemasangan ban (hanya item dengan is_ban = 1)
+// PO otomatis CLOSE bila semua ban terpasang
 // ============================================================
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
@@ -31,8 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id_po_redir  = (int)($_POST['id_po']      ?? 0);
     $id_req_redir = (int)($_POST['id_request'] ?? 0);
 
-    if (!$id_detail || !in_array($aksi, ['beli', 'pasang'])) {
-        header('location:update_status_ban.php?pesan=invalid');
+    if (!$id_detail || $aksi !== 'pasang') {
+        header('location:update_status_pemasangan_ban.php?pesan=invalid');
         exit;
     }
 
@@ -43,79 +43,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     mysqli_begin_transaction($koneksi);
     try {
-        if ($aksi === 'beli') {
-            // Ambil data dari tabel pembelian
-            $cek = mysqli_fetch_assoc(mysqli_query($koneksi,
-                "SELECT harga FROM pembelian WHERE id_request_detail = $id_detail LIMIT 1"));
-            if (!$cek) {
-                throw new Exception('Barang belum diinput ke database Pembelian. Silakan input nota terlebih dahulu.');
-            }
-            $harga_aktual = (float)$cek['harga'];
-
-            // Update status beli + sinkronisasi harga nota ke detail PR
-            if (!mysqli_query($koneksi,
-                "UPDATE tr_request_detail SET
-                    is_dibeli              = 1,
-                    tgl_dibeli             = '$today',
-                    dibeli_oleh            = '$nama_esc',
-                    harga_satuan_estimasi  = $harga_aktual,
-                    subtotal_estimasi      = (jumlah * $harga_aktual)
-                 WHERE id_detail = $id_detail AND is_dibeli = 0")) {
-                throw new Exception('Gagal update detail beli: ' . mysqli_error($koneksi));
-            }
-
-            // Re-hitung subtotal & grand_total PO
-            if ($id_req_redir > 0) {
-                mysqli_query($koneksi,
-                    "UPDATE tr_purchase_order SET
-                        subtotal = (SELECT SUM(subtotal_estimasi) FROM tr_request_detail WHERE id_request = $id_req_redir)
-                     WHERE id_request = $id_req_redir");
-                mysqli_query($koneksi,
-                    "UPDATE tr_purchase_order SET
-                        ppn_nominal = subtotal * (ppn_persen / 100),
-                        grand_total = subtotal + (subtotal * (ppn_persen / 100)) - diskon
-                     WHERE id_request = $id_req_redir");
-            }
-
-        } elseif ($aksi === 'pasang') {
-            if (!mysqli_query($koneksi,
-                "UPDATE tr_request_detail SET
-                    status_pasang = 'TERPASANG',
-                    tgl_pasang    = '$today',
-                    pasang_oleh   = '$nama_esc'
-                 WHERE id_detail = $id_detail AND is_ban = 1 AND is_dibeli = 1 AND status_pasang = 'BELUM_TERPASANG'")) {
-                throw new Exception('Gagal update pasang: ' . mysqli_error($koneksi));
-            }
+        // Gunakan status_item = 'TERBELI' sebagai syarat, bukan is_dibeli
+        if (!mysqli_query($koneksi,
+            "UPDATE tr_request_detail SET
+                status_pasang = 'TERPASANG',
+                tgl_pasang    = '$today',
+                pasang_oleh   = '$nama_esc'
+             WHERE id_detail = $id_detail AND is_ban = 1 AND status_item = 'TERBELI' AND status_pasang = 'BELUM_TERPASANG'")) {
+            throw new Exception('Gagal update pasang: ' . mysqli_error($koneksi));
         }
 
-        // Cek apakah PO bisa otomatis CLOSE
-        if ($id_req_redir > 0) {
-            $belum_beli = (int)(mysqli_fetch_assoc(mysqli_query($koneksi,
-                "SELECT COUNT(*) AS jml FROM tr_request_detail
-                 WHERE id_request = $id_req_redir AND is_dibeli = 0 AND status_item != 'REJECTED'"))['jml'] ?? 1);
+        // Cek apakah ada rows yang terupdate
+        if (mysqli_affected_rows($koneksi) === 0) {
+            throw new Exception('Tidak ada data yang diupdate. Pastikan status item sudah TERBELI dan ban belum terpasang.');
+        }
 
+        // Cek apakah PO bisa otomatis CLOSE (semua ban terpasang)
+        $po_jadi_close = false;
+        if ($id_req_redir > 0) {
             $ban_belum = (int)(mysqli_fetch_assoc(mysqli_query($koneksi,
                 "SELECT COUNT(*) AS jml FROM tr_request_detail
                  WHERE id_request = $id_req_redir AND is_ban = 1 AND status_pasang = 'BELUM_TERPASANG'"))['jml'] ?? 0);
 
-            if ($belum_beli === 0 && $ban_belum === 0) {
+            if ($ban_belum === 0) {
                 mysqli_query($koneksi,
                     "UPDATE tr_purchase_order SET status_po = 'CLOSE'
                      WHERE id_request = $id_req_redir AND status_po = 'OPEN'");
                 mysqli_query($koneksi,
                     "UPDATE tr_request SET status_request = 'SELESAI', updated_by = '$user_esc', updated_at = '$now'
                      WHERE id_request = $id_req_redir AND status_request != 'SELESAI'");
+                $po_jadi_close = true;
             }
         }
 
         mysqli_commit($koneksi);
-        header("location:update_status_ban.php?id_po=$id_po_redir&tab=open&pesan=berhasil");
+        // Kalau PO jadi CLOSE, redirect ke tab close. Kalau masih OPEN, tetap di tab open.
+        $tab_redir = $po_jadi_close ? 'close' : 'open';
+        header("location:update_status_pemasangan_ban.php?id_po=$id_po_redir&tab=$tab_redir&pesan=berhasil");
         exit;
 
     } catch (Exception $e) {
         mysqli_rollback($koneksi);
-        error_log('update_status_ban.php ERROR: ' . $e->getMessage());
-        header('location:update_status_ban.php?id_po=' . $id_po_redir . '&pesan=gagal&msg=' . urlencode($e->getMessage()));
+        error_log('update_status_pemasangan_ban.php ERROR: ' . $e->getMessage());
+        header('location:update_status_pemasangan_ban.php?id_po=' . $id_po_redir . '&pesan=gagal&msg=' . urlencode($e->getMessage()));
         exit;
     }
 }
@@ -126,21 +96,28 @@ $tab_aktif    = in_array($_GET['tab'] ?? '', ['open', 'close']) ? $_GET['tab'] :
 $search_po    = trim($_GET['cari'] ?? '');
 
 // Helper WHERE untuk search sidebar
+// Hanya PO yang memiliki minimal 1 item ban
 function searchWhere(string $s, $koneksi): string {
-    if ($s === '') return '';
+    $ban_filter = "AND EXISTS (
+        SELECT 1 FROM tr_request_detail db
+        WHERE db.id_request = r.id_request AND db.is_ban = 1
+    )";
+    if ($s === '') return $ban_filter;
     $e = mysqli_real_escape_string($koneksi, $s);
-    return "AND (p.no_po LIKE '%$e%' 
-             OR r.no_request LIKE '%$e%' 
-             OR s.nama_supplier LIKE '%$e%' 
-             OR r.nama_pemesan LIKE '%$e%'
-             OR EXISTS (
-                SELECT 1 FROM tr_request_detail d
-                LEFT JOIN master_barang b ON d.id_barang = b.id_barang
-                WHERE d.id_request = r.id_request
-                  AND (b.nama_barang LIKE '%$e%' 
-                       OR d.keterangan LIKE '%$e%'
-                       OR d.nama_barang_manual LIKE '%$e%')
-             ))";
+    return "$ban_filter
+        AND (p.no_po LIKE '%$e%'
+         OR r.no_request LIKE '%$e%'
+         OR s.nama_supplier LIKE '%$e%'
+         OR r.nama_pemesan LIKE '%$e%'
+         OR EXISTS (
+            SELECT 1 FROM tr_request_detail d
+            LEFT JOIN master_barang b ON d.id_barang = b.id_barang
+            WHERE d.id_request = r.id_request
+              AND d.is_ban = 1
+              AND (b.nama_barang LIKE '%$e%'
+                   OR d.keterangan LIKE '%$e%'
+                   OR d.nama_barang_manual LIKE '%$e%')
+         ))";
 }
 
 $sw_open  = searchWhere($search_po, $koneksi);
@@ -184,42 +161,40 @@ if ($id_po_filter) {
 
     if ($po_detail) {
         $id_request_sel = (int)$po_detail['id_request'];
+        // Hanya ambil item yang is_ban = 1
         $detail_items = mysqli_query($koneksi,
             "SELECT d.*,
                     b.nama_barang AS nama_master,
-                    m.plat_nomor,
-                    pb.harga      AS harga_nota,
-                    pb.qty        AS qty_nota,
-                    pb.id_pembelian
+                    m.plat_nomor
              FROM tr_request_detail d
-             LEFT JOIN master_barang b  ON d.id_barang = b.id_barang
-             LEFT JOIN master_mobil  m  ON d.id_mobil  = m.id_mobil
-             LEFT JOIN pembelian     pb ON d.id_detail  = pb.id_request_detail
+             LEFT JOIN master_barang b ON d.id_barang = b.id_barang
+             LEFT JOIN master_mobil  m ON d.id_mobil  = m.id_mobil
              WHERE d.id_request = $id_request_sel
+               AND d.is_ban = 1
              ORDER BY d.id_detail ASC");
     }
 }
 
-// Hitung summary item
-$total_item = $item_beli = $item_pending = 0;
+// Hitung summary item ban
+$total_item = $item_pasang = $item_pending = 0;
 $rows_item  = [];
 if ($detail_items) {
     while ($d = mysqli_fetch_assoc($detail_items)) {
         if (($d['status_item'] ?? '') === 'REJECTED') continue;
         $total_item++;
-        if ((int)($d['is_dibeli'] ?? 0)) $item_beli++;
-        else                              $item_pending++;
+        if (($d['status_pasang'] ?? '') === 'TERPASANG') $item_pasang++;
+        else                                              $item_pending++;
         $rows_item[] = $d;
     }
 }
-$pct = $total_item > 0 ? round($item_beli / $total_item * 100) : 0;
+$pct = $total_item > 0 ? round($item_pasang / $total_item * 100) : 0;
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Update Status Pembelian — MCP</title>
+<title>Update Status Pemasangan Ban — MCP</title>
 <link rel="icon" type="image/png" href="../../assets/img/logo_mcp.png">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -407,7 +382,6 @@ body {
 }
 .bdg-open    { background: var(--green-lt); color: #065f46; }
 .bdg-close   { background: var(--slate-lt); color: var(--slate); border: 1px solid var(--border); }
-.bdg-beli    { background: var(--blue-lt);  color: var(--navy-mid); }
 .bdg-pending { background: var(--amber-lt); color: #92400e; }
 .bdg-done    { background: var(--teal-lt);  color: var(--teal-dk); }
 .bdg-ban-ok  { background: var(--green-lt); color: #065f46; }
@@ -446,10 +420,9 @@ body {
 }
 .prog-bar-fill {
     height: 100%; border-radius: 4px;
-    background: linear-gradient(90deg, var(--teal-dk), var(--teal));
+    background: linear-gradient(90deg, var(--amber), #f59e0b);
     transition: width .5s ease;
 }
-.prog-meta { font-size: .68rem; display: flex; gap: 12px; flex-wrap: wrap; margin-top: 5px; }
 
 /* ── ITEM SEARCH ──────────────────────── */
 .item-search-bar {
@@ -468,10 +441,10 @@ body {
     background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 10px center;
     outline: none; transition: border-color .15s;
 }
-.item-search-bar input:focus { border-color: var(--teal); }
+.item-search-bar input:focus { border-color: var(--amber); }
 .item-count-badge {
     font-size: .65rem; font-weight: 800;
-    background: var(--blue-lt); color: var(--navy);
+    background: var(--amber-lt); color: #92400e;
     border-radius: 20px; padding: 2px 8px; white-space: nowrap;
 }
 
@@ -491,24 +464,12 @@ body {
     border-bottom: 1px solid var(--border);
     vertical-align: middle;
 }
-.item-table tbody tr:hover { background: #f0fdfa; }
+.item-table tbody tr { background: #fffbeb; }
+.item-table tbody tr:hover { background: #fef3c7; }
 .item-table tbody tr:last-child td { border-bottom: none; }
-.item-table .row-ban { background: #fffbeb; }
-.item-table .row-ban:hover { background: #fef3c7; }
 .item-table tr.row-hidden { display: none; }
 
 /* ── TOMBOL AKSI ──────────────────────── */
-.btn-beli {
-    display: inline-flex; align-items: center; gap: 5px;
-    background: var(--teal-dk); color: #fff;
-    border: none; border-radius: var(--radius-sm);
-    padding: 5px 11px; font-size: .72rem; font-weight: 700;
-    cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif;
-    transition: background .15s, transform .1s;
-}
-.btn-beli:hover   { background: var(--teal); transform: translateY(-1px); }
-.btn-beli:active  { transform: translateY(0); }
-
 .btn-pasang {
     display: inline-flex; align-items: center; gap: 5px;
     background: var(--amber); color: #fff;
@@ -561,10 +522,10 @@ body {
 <header class="topbar">
     <div class="topbar-inner">
         <div class="topbar-brand">
-            <div class="topbar-icon"><i class="fas fa-shopping-bag"></i></div>
+            <div class="topbar-icon"><i class="fas fa-circle"></i></div>
             <div>
-                <div class="topbar-title">UPDATE STATUS <span>PEMBELIAN BESAR & PO</span></div>
-                <div class="topbar-sub">Tandai item terbeli & ban terpasang</div>
+                <div class="topbar-title">UPDATE STATUS <span>PEMASANGAN BAN</span></div>
+                <div class="topbar-sub">Tandai ban sudah terpasang pada kendaraan</div>
             </div>
         </div>
         <div class="topbar-right">
@@ -586,7 +547,7 @@ body {
     <?php if ($pesan === 'berhasil'): ?>
     <div class="alert-bar success">
         <i class="fas fa-check-circle"></i>
-        <strong>Berhasil!</strong> Status berhasil diperbarui.
+        <strong>Berhasil!</strong> Status pemasangan ban berhasil diperbarui.
         <button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:inherit;font-size:.9rem;">✕</button>
     </div>
     <?php elseif ($pesan === 'gagal'): ?>
@@ -608,8 +569,8 @@ body {
         <!-- ── SIDEBAR ──────────────────────────────────────── -->
         <div class="sidebar-card">
             <div class="sidebar-head">
-                <i class="fas fa-list-ul" style="color:var(--teal);"></i>
-                Daftar Purchase Order
+                <i class="fas fa-circle" style="color:var(--amber);font-size:.55rem;"></i>
+                Daftar Purchase Order (Ban)
             </div>
 
             <!-- Search sidebar -->
@@ -657,7 +618,7 @@ body {
                     <i class="fas fa-<?= $search_po ? 'search' : 'inbox' ?>"></i>
                     <?= $search_po
                         ? 'Tidak ada hasil untuk <strong>' . htmlspecialchars($search_po) . '</strong>'
-                        : 'Tidak ada PO ' . strtoupper($tab_aktif) . '.' ?>
+                        : 'Tidak ada PO ' . strtoupper($tab_aktif) . ' dengan item ban.' ?>
                 </div>
             <?php else:
                 while ($po_row = mysqli_fetch_assoc($result_aktif)):
@@ -717,8 +678,8 @@ body {
 
                     <!-- Progress ringkas -->
                     <div style="text-align:right;">
-                        <div style="font-family:'JetBrains Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--teal-dk);"><?= $pct ?>%</div>
-                        <div style="font-size:.65rem;color:var(--slate);"><?= $item_beli ?>/<?= $total_item ?> item selesai</div>
+                        <div style="font-family:'JetBrains Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--amber);"><?= $pct ?>%</div>
+                        <div style="font-size:.65rem;color:var(--slate);"><?= $item_pasang ?>/<?= $total_item ?> ban terpasang</div>
                     </div>
                 </div>
 
@@ -757,26 +718,26 @@ body {
             </div>
         </div>
 
-        <!-- Tabel item -->
+        <!-- Tabel item ban -->
         <div class="detail-card">
             <!-- Header tabel -->
-            <div style="padding:12px 16px;border-bottom:1px solid var(--border);background:linear-gradient(to right,#f8fafc,#fff);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);background:linear-gradient(to right,#fffbeb,#fff);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
                 <div style="font-weight:800;font-size:.84rem;color:var(--navy);display:flex;align-items:center;gap:6px;">
-                    <i class="fas fa-<?= $is_close_view ? 'lock' : 'tasks' ?>" style="color:<?= $is_close_view ? 'var(--slate)' : 'var(--teal)' ?>;"></i>
-                    <?= $is_close_view ? 'Histori Item — Readonly' : 'Daftar Item — Update Status' ?>
+                    <i class="fas fa-<?= $is_close_view ? 'lock' : 'circle' ?>" style="color:<?= $is_close_view ? 'var(--slate)' : 'var(--amber)' ?>;font-size:<?= $is_close_view ? '1rem' : '.55rem' ?>;"></i>
+                    <?= $is_close_view ? 'Histori Pemasangan Ban — Readonly' : 'Daftar Ban — Update Status Pemasangan' ?>
                 </div>
                 <?php if ($is_close_view): ?>
                 <span class="bdg bdg-close"><i class="fas fa-lock me-1"></i>SELESAI</span>
                 <?php endif; ?>
             </div>
 
-            <!-- Search item barang -->
+            <!-- Search item ban -->
             <div class="item-search-bar">
                 <input type="text"
                        id="searchItem"
-                       placeholder="Cari nama barang, keterangan, atau plat nomor…"
+                       placeholder="Cari nama ban, keterangan, atau plat nomor…"
                        oninput="filterItems(this.value)">
-                <span class="item-count-badge" id="itemCount"><?= count($rows_item) ?> item</span>
+                <span class="item-count-badge" id="itemCount"><?= count($rows_item) ?> ban</span>
             </div>
 
             <div class="detail-body">
@@ -784,11 +745,11 @@ body {
                     <thead>
                         <tr>
                             <th width="4%">#</th>
-                            <th>Nama Barang</th>
+                            <th>Nama Ban</th>
                             <th width="90">Unit / Plat</th>
                             <th width="75">Qty</th>
                             <th width="140">Status Beli</th>
-                            <th width="140">Status Ban</th>
+                            <th width="160">Status Pasang</th>
                             <?php if (!$is_close_view): ?>
                             <th width="155">Aksi</th>
                             <?php endif; ?>
@@ -798,46 +759,36 @@ body {
                     <?php if (empty($rows_item)): ?>
                         <tr>
                             <td colspan="<?= $is_close_view ? 6 : 7 ?>" style="text-align:center;padding:30px;color:var(--slate);">
-                                <i class="fas fa-minus" style="opacity:.3;"></i> Tidak ada item.
+                                <i class="fas fa-minus" style="opacity:.3;"></i> Tidak ada item ban pada PO ini.
                             </td>
                         </tr>
                     <?php else:
                         foreach ($rows_item as $i => $d):
                             $nama          = $d['nama_master'] ?: ($d['nama_barang_manual'] ?? '-');
                             $unit          = $d['plat_nomor']  ?: '-';
-                            $is_ban        = (int)($d['is_ban']    ?? 0);
                             $is_dibeli     = (int)($d['is_dibeli'] ?? 0);
-                            $status_pasang = $d['status_pasang'] ?? null;
-                            $harga_nota    = $d['harga_nota']    ?? null;
-                            $sudah_nota    = !empty($d['id_pembelian']);
-                            $keterangan    = $d['keterangan'] ?? '';
-                            $kwalifikasi   = $d['kwalifikasi'] ?? '';
+                            $status_item   = $d['status_item']  ?? '';
+                            $status_pasang = $d['status_pasang'] ?? 'BELUM_TERPASANG';
+                            $sudah_beli    = ($status_item === 'TERBELI');
+                            $keterangan    = $d['keterangan']   ?? '';
+                            $kwalifikasi   = $d['kwalifikasi']  ?? '';
                             $harga_est     = $d['harga_satuan_estimasi'] ?? '';
                     ?>
-                        <tr class="<?= $is_ban ? 'row-ban' : '' ?>"
-                            data-search="<?= htmlspecialchars(strtolower($nama . ' ' . $unit . ' ' . $keterangan . ' ' . $kwalifikasi . ' ' . $harga_est . ' ' . ($harga_nota ?: ''))) ?>">
+                        <tr data-search="<?= htmlspecialchars(strtolower($nama . ' ' . $unit . ' ' . $keterangan . ' ' . $kwalifikasi . ' ' . $harga_est)) ?>">
                             <td style="text-align:center;color:var(--slate);font-size:.73rem;"><?= $i + 1 ?></td>
                             <td>
                                 <div style="font-weight:700;"><?= htmlspecialchars(strtoupper($nama)) ?></div>
-                                <?php if ($is_ban): ?>
                                 <span style="font-size:.6rem;background:#fff3cd;border:1px solid #ffc107;color:#7c4a00;padding:1px 5px;border-radius:4px;font-weight:700;">
                                     <i class="fas fa-circle me-1" style="font-size:.35rem;"></i>BAN
                                 </span>
-                                <?php endif; ?>
                                 <?php if (!empty($d['kwalifikasi'])): ?>
                                 <div style="font-size:.68rem;color:var(--slate);margin-top:2px;"><?= htmlspecialchars($d['kwalifikasi']) ?></div>
                                 <?php endif; ?>
-                                <!-- Harga estimasi vs nota -->
-                                <div style="font-size:.68rem;margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;">
+                                <!-- Harga estimasi -->
+                                <div style="font-size:.68rem;margin-top:3px;">
                                     <span style="color:var(--slate);">
                                         Est: <span style="font-family:'JetBrains Mono',monospace;">Rp <?= number_format((float)($d['harga_satuan_estimasi'] ?? 0), 0, ',', '.') ?></span>
                                     </span>
-                                    <?php if ($sudah_nota && $harga_nota !== null): ?>
-                                    <span style="color:<?= ((float)$harga_nota > (float)($d['harga_satuan_estimasi'] ?? 0)) ? 'var(--red)' : 'var(--teal-dk)' ?>;font-weight:700;">
-                                        <i class="fas fa-tag me-1"></i>Nota:
-                                        <span style="font-family:'JetBrains Mono',monospace;">Rp <?= number_format((float)$harga_nota, 0, ',', '.') ?></span>
-                                    </span>
-                                    <?php endif; ?>
                                 </div>
                                 <?php if (!empty($keterangan)): ?>
                                 <div style="font-size:.65rem;color:var(--slate);margin-top:2px;font-style:italic;">
@@ -858,69 +809,50 @@ body {
                                 <?= (float)($d['jumlah'] ?? 0) + 0 ?>
                                 <span style="font-size:.65rem;color:var(--slate);font-weight:500;"><?= htmlspecialchars($d['satuan'] ?? '') ?></span>
                             </td>
+                            <!-- Status Beli -->
                             <td style="text-align:center;">
-                                <?php if ($is_dibeli): ?>
+                                <?php if ($sudah_beli): ?>
                                     <span class="bdg bdg-done"><i class="fas fa-check me-1"></i>TERBELI</span>
                                     <div style="font-size:.63rem;color:var(--slate);margin-top:3px;">
                                         <?= !empty($d['tgl_dibeli']) ? date('d/m/Y', strtotime($d['tgl_dibeli'])) : '' ?>
                                         <?= !empty($d['dibeli_oleh']) ? '<br>' . htmlspecialchars($d['dibeli_oleh']) : '' ?>
                                     </div>
                                 <?php else: ?>
-                                    <span class="bdg bdg-pending"><i class="fas fa-clock me-1"></i>OPEN</span>
+                                    <span class="bdg bdg-pending"><i class="fas fa-clock me-1"></i><?= htmlspecialchars($status_item ?: 'PENDING') ?></span>
                                 <?php endif; ?>
                             </td>
+                            <!-- Status Pasang -->
                             <td style="text-align:center;">
-                                <?php if ($is_ban): ?>
-                                    <?php if ($status_pasang === 'TERPASANG'): ?>
-                                        <span class="bdg bdg-ban-ok"><i class="fas fa-check me-1"></i>TERPASANG</span>
-                                        <div style="font-size:.63rem;color:var(--slate);margin-top:3px;">
-                                            <?= !empty($d['tgl_pasang']) ? date('d/m/Y', strtotime($d['tgl_pasang'])) : '' ?>
-                                            <?= !empty($d['pasang_oleh']) ? '<br>' . htmlspecialchars($d['pasang_oleh']) : '' ?>
-                                        </div>
-                                    <?php else: ?>
-                                        <span class="bdg bdg-ban-no"><i class="fas fa-clock me-1"></i>BELUM PASANG</span>
-                                    <?php endif; ?>
+                                <?php if ($status_pasang === 'TERPASANG'): ?>
+                                    <span class="bdg bdg-ban-ok"><i class="fas fa-check me-1"></i>TERPASANG</span>
+                                    <div style="font-size:.63rem;color:var(--slate);margin-top:3px;">
+                                        <?= !empty($d['tgl_pasang']) ? date('d/m/Y', strtotime($d['tgl_pasang'])) : '' ?>
+                                        <?= !empty($d['pasang_oleh']) ? '<br>' . htmlspecialchars($d['pasang_oleh']) : '' ?>
+                                    </div>
                                 <?php else: ?>
-                                    <span style="color:var(--slate);">—</span>
+                                    <span class="bdg bdg-ban-no"><i class="fas fa-clock me-1"></i>BELUM PASANG</span>
                                 <?php endif; ?>
                             </td>
                             <?php if (!$is_close_view): ?>
                             <td style="text-align:center;">
                                 <div style="display:flex;flex-direction:column;gap:5px;align-items:center;">
-                                <?php if (!$is_dibeli): ?>
-                                    <?php if ($sudah_nota): ?>
-                                        <div style="font-size:.63rem;color:var(--teal-dk);font-weight:700;margin-bottom:2px;">
-                                            <i class="fas fa-check-circle me-1"></i>Nota ada
-                                        </div>
-                                        <form method="POST" onsubmit="return konfirmBeli(event, '<?= htmlspecialchars(strtoupper($nama), ENT_QUOTES) ?>')">
+                                <?php if ($status_pasang !== 'TERPASANG'): ?>
+                                    <?php if (!$sudah_beli): ?>
+                                        <span class="nota-warning">
+                                            <i class="fas fa-exclamation-triangle"></i> Belum terbeli
+                                        </span>
+                                    <?php else: ?>
+                                        <form method="POST" onsubmit="return konfirmPasang(event, '<?= htmlspecialchars(strtoupper($nama), ENT_QUOTES) ?>', '<?= htmlspecialchars($unit, ENT_QUOTES) ?>')">
                                             <input type="hidden" name="id_detail"  value="<?= (int)$d['id_detail'] ?>">
                                             <input type="hidden" name="id_po"      value="<?= $id_po_filter ?>">
                                             <input type="hidden" name="id_request" value="<?= $id_request_sel ?>">
-                                            <input type="hidden" name="aksi"       value="beli">
-                                            <button type="submit" class="btn-beli">
-                                                <i class="fas fa-shopping-bag"></i> DONE
+                                            <input type="hidden" name="aksi"       value="pasang">
+                                            <button type="submit" class="btn-pasang">
+                                                <i class="fas fa-circle"></i> Tandai Terpasang
                                             </button>
                                         </form>
-                                    <?php else: ?>
-                                        <span class="nota-warning">
-                                            <i class="fas fa-exclamation-triangle"></i> Nota belum diinput
-                                        </span>
                                     <?php endif; ?>
-                                <?php endif; ?>
-
-                                <?php if ($is_ban && $is_dibeli && $status_pasang === 'BELUM_TERPASANG'): ?>
-                                    <form method="POST" onsubmit="return konfirmPasang(event, '<?= htmlspecialchars(strtoupper($nama), ENT_QUOTES) ?>', '<?= htmlspecialchars($unit, ENT_QUOTES) ?>')">
-                                        <input type="hidden" name="id_detail"  value="<?= (int)$d['id_detail'] ?>">
-                                        <input type="hidden" name="id_po"      value="<?= $id_po_filter ?>">
-                                        <input type="hidden" name="id_request" value="<?= $id_request_sel ?>">
-                                        <input type="hidden" name="aksi"       value="pasang">
-                                        <button type="submit" class="btn-pasang">
-                                            <i class="fas fa-circle"></i> Tandai Terpasang
-                                        </button>
-                                    </form>
-                                <?php endif; ?>
-
-                                <?php if ($is_dibeli && (!$is_ban || $status_pasang === 'TERPASANG')): ?>
+                                <?php else: ?>
                                     <span style="font-size:.72rem;color:var(--teal-dk);font-weight:700;">
                                         <i class="fas fa-check-circle me-1"></i>Selesai
                                     </span>
@@ -936,7 +868,7 @@ body {
                 <!-- No result saat search item -->
                 <div id="itemNoResult" style="display:none;padding:24px;text-align:center;color:var(--slate);font-size:.8rem;">
                     <i class="fas fa-search" style="opacity:.2;font-size:1.8rem;display:block;margin-bottom:8px;"></i>
-                    Tidak ada item yang cocok.
+                    Tidak ada ban yang cocok.
                 </div>
             </div>
         </div><!-- /detail-card tabel -->
@@ -946,7 +878,7 @@ body {
             <div class="empty-state">
                 <i class="fas fa-hand-point-left"></i>
                 <p><strong>Pilih PO dari daftar sebelah kiri</strong></p>
-                <p style="font-size:.75rem;color:var(--slate);">untuk melihat dan mengupdate status item</p>
+                <p style="font-size:.75rem;color:var(--slate);">untuk melihat dan mengupdate status pemasangan ban</p>
             </div>
         </div>
         <?php endif; ?>
@@ -966,7 +898,7 @@ function goTab(tab) {
     window.location.href = url.toString();
 }
 
-// ── Filter item barang (client-side, realtime) ────────────────
+// ── Filter item ban (client-side, realtime) ───────────────────
 function filterItems(val) {
     const q     = val.trim().toLowerCase();
     const rows  = document.querySelectorAll('#itemTableBody tr[data-search]');
@@ -984,30 +916,8 @@ function filterItems(val) {
 
     const counter  = document.getElementById('itemCount');
     const noResult = document.getElementById('itemNoResult');
-    if (counter)  counter.textContent = visible + ' item';
+    if (counter)  counter.textContent = visible + ' ban';
     if (noResult) noResult.style.display = (visible === 0 && rows.length > 0) ? 'block' : 'none';
-}
-
-// ── Konfirmasi beli ───────────────────────────────────────────
-function konfirmBeli(e, nama) {
-    e.preventDefault();
-    var form = e.target;
-    Swal.fire({
-        title: 'Tandai sudah dibeli?',
-        html: 'Item: <strong>' + nama + '</strong><br><small class="text-muted">Tindakan ini tidak bisa dibatalkan.</small>',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#0f766e',
-        confirmButtonText: '<i class="fas fa-check me-1"></i> Ya, Sudah Dibeli',
-        cancelButtonText: 'Batal'
-    }).then(function(r) {
-        if (r.isConfirmed) {
-            Swal.fire({ title: 'Menyimpan…', allowOutsideClick: false, showConfirmButton: false,
-                didOpen: function() { Swal.showLoading(); } });
-            form.submit();
-        }
-    });
-    return false;
 }
 
 // ── Konfirmasi pasang ─────────────────────────────────────────
@@ -1016,7 +926,7 @@ function konfirmPasang(e, nama, plat) {
     var form = e.target;
     Swal.fire({
         title: 'Tandai ban sudah terpasang?',
-        html: 'Ban: <strong>' + nama + '</strong><br>Kendaraan: <strong>' + plat + '</strong><br><small class="text-muted">Pastikan ban sudah benar-benar terpasang.</small>',
+        html: 'Ban: <strong>' + nama + '</strong><br>Kendaraan: <strong>' + plat + '</strong><br><small class="text-muted">Pastikan ban sudah benar-benar terpasang pada kendaraan.</small>',
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#d97706',
@@ -1024,8 +934,12 @@ function konfirmPasang(e, nama, plat) {
         cancelButtonText: 'Batal'
     }).then(function(r) {
         if (r.isConfirmed) {
-            Swal.fire({ title: 'Menyimpan…', allowOutsideClick: false, showConfirmButton: false,
-                didOpen: function() { Swal.showLoading(); } });
+            Swal.fire({
+                title: 'Menyimpan…',
+                allowOutsideClick: false,
+                showConfirmButton: false,
+                didOpen: function() { Swal.showLoading(); }
+            });
             form.submit();
         }
     });

@@ -238,6 +238,7 @@ if ($is_finance) {
                             <?php endif; ?>
                         </a>
                     </li>
+                    <li class="nav-item"><a href="modul/transaksi/update_status_pemasangan_ban.php" class="nav-link"><i class="fas fa-car me-2"></i> Update Status BAN</a></li>
                 <?php endif; ?>
                 <!-- MENU ADMIN GUDANG -->
                 <?php if ($is_gudang_access) : ?>

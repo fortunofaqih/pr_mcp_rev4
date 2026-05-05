@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
 
             // 3. Update Status Item di Detail PR
-            mysqli_query($koneksi, "UPDATE tr_request_detail SET status_item = 'TERBELI' WHERE id_detail = '$id_det'");
+            mysqli_query($koneksi, "UPDATE tr_request_detail SET status_item = 'TERBELI', is_dibeli = 1 WHERE id_detail = '$id_det'");
         }
 
         // 4. Update Status Header PR

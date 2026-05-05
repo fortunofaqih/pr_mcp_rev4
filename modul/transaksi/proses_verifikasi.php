@@ -6,8 +6,8 @@
  * TOLAK   -> update staging DITOLAK + status item kembali PENDING
  */
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 header('Content-Type: application/json');
 
@@ -119,6 +119,7 @@ try {
         $tipe_request_baru = ($alokasi === 'MASUK STOK') ? 'STOK' : 'LANGSUNG';
         $q_update_detail = "UPDATE tr_request_detail SET 
                                 status_item  = 'TERBELI',
+                                is_dibeli    = 1,
                                 tipe_request = '$tipe_request_baru'
                             WHERE id_detail  = $id_detail";
 
