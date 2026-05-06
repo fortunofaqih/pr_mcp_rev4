@@ -839,7 +839,7 @@ body {
                                 <?php if ($status_pasang !== 'TERPASANG'): ?>
                                     <?php if (!$sudah_beli): ?>
                                         <span class="nota-warning">
-                                            <i class="fas fa-exclamation-triangle"></i> Belum terbeli
+                                            <i class="fas fa-exclamation-triangle"></i> Menunggu
                                         </span>
                                     <?php else: ?>
                                         <form method="POST" onsubmit="return konfirmPasang(event, '<?= htmlspecialchars(strtoupper($nama), ENT_QUOTES) ?>', '<?= htmlspecialchars($unit, ENT_QUOTES) ?>')">

@@ -5,9 +5,8 @@
 // READ-ONLY: Finance hanya bisa melihat & cetak PO
 // ============================================================
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
-
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 if ($_SESSION['status'] !== 'login') {
     header('location:../../login.php?pesan=belum_login');
@@ -1062,6 +1061,15 @@ body {
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+function goTab(tab) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tab);
+    url.searchParams.delete('id_po');  // reset pilihan PO saat ganti tab
+    url.searchParams.delete('cari');   // reset search saat ganti tab
+    window.location.href = url.toString();
+}
+</script>
+<script>
     let idleTime = 0;
     const maxIdleMinutes = 15; // Samakan dengan server
     let lastServerUpdate = Date.now();
@@ -1074,7 +1082,7 @@ body {
 
         // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
         if (now - lastServerUpdate > 300000) {
-            fetch('/pr_mcp_rev4/auth/keep_alive.php')
+            fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
                 .then(response => response.json())
                 .then(data => {
                     if (data.status !== 'success') {
@@ -1093,7 +1101,7 @@ body {
     function forceLogout() {
         alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
         // Redirect ke logout.php agar session server juga dihancurkan
-        window.location.href = "/pr_mcp_rev4/auth/logout.php?pesan=timeout";
+        window.location.href = "http://192.168.31.200/pr_mcp/auth/logout.php?pesan=timeout";
     }
 
     // Pantau aktivitas user
@@ -1108,7 +1116,7 @@ body {
     setInterval(function() {
         idleTime++;
         // Cek session ke server juga
-        fetch('/pr_mcp_rev4/auth/keep_alive.php')
+        fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
             .then(response => response.json())
             .then(data => {
                 if (data.status !== 'success') {
