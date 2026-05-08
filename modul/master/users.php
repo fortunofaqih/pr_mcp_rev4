@@ -1,7 +1,7 @@
 <?php
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 /* =======================
    PROTEKSI HALAMAN
@@ -80,6 +80,7 @@ $daftar_role = [
     'manager'           => '🏢 Manager',
     'pemesan_pr_besar'  => '📋 Pemesan PR Besar',
     'finance'           => '💰 Finance',
+    'it'                => '💻 IT',
 ];
 $daftar_bagian = ['Gudang', 'Pembelian', 'Manager', 'IT', 'Produksi', 'Finance'];
 $badge_role = [
@@ -89,6 +90,7 @@ $badge_role = [
     'bagian_pembelian'  => 'bg-info',
     'pemesan_pr_besar'  => 'bg-warning text-dark',
     'finance'           => 'bg-purple text-white',
+    'it'                => 'bg-info text-white',
 ];
 ?>
 <!DOCTYPE html>
@@ -360,7 +362,7 @@ $badge_role = [
         overlay.addEventListener('click', toggleSidebar);
 
         // Auto-mapping Role ke Bagian
-        const roleMap = { 'admin_gudang':'Gudang', 'bagian_pembelian':'Pembelian', 'manager':'Manager', 'pemesan_pr_besar':'Produksi', 'finance':'Finance' };
+        const roleMap = { 'admin_gudang':'Gudang', 'bagian_pembelian':'Pembelian', 'manager':'Manager', 'pemesan_pr_besar':'Produksi', 'finance':'Finance', 'it':'IT' };
         document.getElementById('role_select').addEventListener('change', function() {
             const bagian = roleMap[this.value] || '';
             const bSel = document.getElementById('bagian_select');

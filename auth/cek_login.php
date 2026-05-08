@@ -1,6 +1,12 @@
 <?php
 session_start();
-include '../config/koneksi.php';
+require_once __DIR__ . '/../config/koneksi.php';
+
+// Cegah user yang sudah login masuk lagi
+if (isset($_SESSION['status']) && $_SESSION['status'] == 'login') {
+    header("location:index.php");
+    exit;
+}
 
 // Validasi method
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -14,7 +20,7 @@ $password      = $_POST['password'];
 $login_sebagai = mysqli_real_escape_string($koneksi, $_POST['login_sebagai']);
 
 // Validasi: pastikan nilai login_sebagai adalah role yang valid
-$role_valid = ['administrator', 'manager', 'admin_gudang', 'bagian_pembelian', 'pemesan_pr_besar', 'finance'];
+$role_valid = ['administrator', 'manager', 'admin_gudang', 'bagian_pembelian', 'pemesan_pr_besar', 'finance', 'it'];
 if (!in_array($login_sebagai, $role_valid)) {
     header("location:../login.php?pesan=gagal");
     exit();
@@ -104,6 +110,8 @@ if (mysqli_num_rows($query) === 1) {
         } elseif ($login_sebagai === 'finance') {
             header("location:../modul/finance/index.php");
 
+        } elseif ($login_sebagai === 'it') {
+            header("location:../modul/it_asset/index.php");
         } else {
             header("location:../index.php");
         }

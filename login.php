@@ -1,6 +1,6 @@
 <?php
 session_start();
-include 'config/koneksi.php';
+include '../pr_mcp_rev4/config/koneksi.php';
 
 // Cegah user yang sudah login masuk lagi
 if (isset($_SESSION['status']) && $_SESSION['status'] == 'login') {
@@ -158,6 +158,7 @@ if (isset($_SESSION['status']) && $_SESSION['status'] == 'login') {
                     <option value="bagian_pembelian">🛒 Bagian Pembelian</option>
                     <option value="pemesan_pr_besar">📋 Pemesan PR Besar</option>
                     <option value="finance">💰 Finance</option>
+                    <option value="it">💻 IT</option>
                 </select>
                 <div class="form-text text-muted small">
                     <i class="fas fa-info-circle me-1"></i>
@@ -197,6 +198,7 @@ if (isset($_SESSION['status']) && $_SESSION['status'] == 'login') {
             'admin_gudang'     : '#198754',
             'pemesan_pr_besar' : '#fd7e14',
             'finance'          : '#6f42c1',
+            'it'               : '#212529'
         };
         this.style.color = colors[this.value] || '#333';
     });

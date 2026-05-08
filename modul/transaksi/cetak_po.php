@@ -42,8 +42,33 @@ if ($id_po > 0) {
     $where = "p.id_request = '$id_request'";
 }
 
-$sql_po = "SELECT p.*, s.nama_supplier, s.alamat, s.kota, s.telp, s.fax, s.email, 
-                  s.contact_person, s.atas_nama, s.no_rekening, s.nama_bank, s.atas_nama_rekening
+$sql_po = "SELECT 
+                p.id_po,
+                p.no_po,
+                p.id_request,
+                p.id_supplier,
+                p.tgl_po,
+                p.subtotal,
+                p.diskon,
+                p.total,
+                p.ppn_persen,
+                p.ppn_nominal,
+                p.grand_total,
+                p.catatan,
+                p.prepared_by,
+                p.approved_by,
+                p.status_po,
+                s.nama_supplier,
+                s.alamat,
+                s.kota,
+                s.telp,
+                s.fax,
+                s.email,
+                s.contact_person,
+                s.atas_nama,
+                s.no_rekening,
+                s.nama_bank,
+                s.atas_nama_rekening
            FROM tr_purchase_order p
            LEFT JOIN master_supplier s ON p.id_supplier = s.id_supplier
            WHERE $where LIMIT 1";
@@ -239,8 +264,8 @@ $subtotal_tampil    = $dpp_setelah_diskon + $diskon;
                 <tr>
                     <td colspan="4" rowspan="4">
                         <div style="font-size: 10px;">
-                            <strong>Keterangan (Payment Term):</strong><br>
-                            <?= nl2br($po['catatan'] ?: "1. _____________________\n2. _____________________\n3. _____________________") ?>
+                            <strong>Keterangan : </strong><br>
+                             <?= nl2br($po['catatan'] ?: "1. _____________________\n2. _____________________\n3. _____________________") ?>
                         </div>
                     </td>
                     <td class="text-end fw-bold">DPP</td>
@@ -264,16 +289,16 @@ $subtotal_tampil    = $dpp_setelah_diskon + $diskon;
         <table class="ttd-table">
             <tr>
                 <td>
-                    Menyetujui,<br><br>
+                    
                     <small>PEMBELI</small>
                     <div class="ttd-space"></div>
-                    <div class="ttd-name">....................................</div>
+                    <div class="ttd-name">PT. Mutiaracahaya Plastindo</div>
                 </td>
                 <td>
-                    SURABAYA, <?= tgl_indo(date('Y-m-d')) ?><br><br>
+                    Menyetujui,<br><br>
                     <small>PENJUAL</small>
                     <div class="ttd-space"></div>
-                    <div class="ttd-name">....................................</div>
+                    <div class="ttd-name"><?= strtoupper($po['nama_supplier'] ?? '---------------------') ?></div>
                 </td>
             </tr>
         </table>

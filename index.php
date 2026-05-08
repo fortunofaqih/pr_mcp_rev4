@@ -20,6 +20,8 @@ if ($role == 'administrator' || $role == 'manager') {
 $is_gudang_access = ($role == 'admin_gudang' || $role == 'administrator');
 $is_pemesan_pr  = ($role == 'pemesan_pr_besar');
 $is_finance     = ($role == 'finance');
+
+
 if ($is_finance) {
     $bln_awal  = date('Y-m-01');
     $bln_akhir = date('Y-m-t');
@@ -316,6 +318,8 @@ if ($is_finance) {
                     </li>
                    <!-- <li class="nav-item"><a href="modul/finance/update_pr_besar.php" class="nav-link"><i class="fas fa-bell me-2"></i> Update Status PR</a></li>-->
                 <?php endif; ?>
+
+        
             </ul>
         </div>
 
@@ -571,8 +575,7 @@ if ($is_finance) {
 
             <!-- DASHBOARD FINANCE -->
            
-<?php if ($is_finance) : ?>
-
+<?php if ($is_finance) : ?> 
 <!-- ── Finance CSS (scoped) ───────────────────────────────── -->
 <style>
 .fin-wrap {

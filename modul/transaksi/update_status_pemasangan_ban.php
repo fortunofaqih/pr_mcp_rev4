@@ -472,13 +472,13 @@ body {
 /* ── TOMBOL AKSI ──────────────────────── */
 .btn-pasang {
     display: inline-flex; align-items: center; gap: 5px;
-    background: var(--amber); color: #fff;
+    background: var(--amber); color: #ffffff;
     border: none; border-radius: var(--radius-sm);
     padding: 5px 11px; font-size: .72rem; font-weight: 700;
     cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif;
     transition: background .15s, transform .1s;
 }
-.btn-pasang:hover  { background: #b45309; transform: translateY(-1px); }
+.btn-pasang:hover  {  background: var(--teal); transform: translateY(-1px); }
 .btn-pasang:active { transform: translateY(0); }
 
 .nota-warning {
@@ -848,7 +848,7 @@ body {
                                             <input type="hidden" name="id_request" value="<?= $id_request_sel ?>">
                                             <input type="hidden" name="aksi"       value="pasang">
                                             <button type="submit" class="btn-pasang">
-                                                <i class="fas fa-circle"></i> Tandai Terpasang
+                                                <i class="fas fa-circle"></i> Done, Tandai Terpasang
                                             </button>
                                         </form>
                                     <?php endif; ?>
