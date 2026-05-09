@@ -1,8 +1,7 @@
 <?php
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
-include '../../auth/keep_alive.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 if ($_SESSION['status'] != "login") {
     header("location:../../login.php?pesan=belum_login");
@@ -287,12 +286,28 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
         ========================================================= */
         @media print {
             @page {
-                size: 210mm 330mm portrait; /* F4 / Folio */
-                margin-top: 10mm;
-                margin-bottom: 10mm;
-                margin-left: 12mm;
-                margin-right: 10mm;
-            }
+                    size: 210mm 330mm portrait;
+                    margin-top: 10mm;
+                    margin-bottom: 10mm;
+                    margin-left: 12mm;
+                    margin-right: 10mm;
+                    
+                    /* Instruksi duplex ke printer */
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+                
+                /* Halaman genap (belakang) — mirror margin untuk jilid */
+                @page :left {
+                    margin-left: 15mm;
+                    margin-right: 10mm;
+                }
+                
+                /* Halaman ganjil (depan) */
+                @page :right {
+                    margin-left: 10mm;
+                    margin-right: 15mm;
+                }
 
             html, body {
                 width: 210mm;
@@ -403,6 +418,9 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                     <button type="button" onclick="window.print()" class="btn btn-sm btn-dark">
                         <i class="fas fa-print me-1"></i>Cetak Laporan
                     </button>
+                    <button type="button" onclick="cetakDuplex()" class="btn btn-sm btn-dark">
+                        <i class="fas fa-print me-1"></i>Cetak Laporan (Bolak-Balik)
+                    </button>
                     <a href="../../index.php" class="btn btn-sm btn-danger">
                         <i class="fas fa-arrow-left me-1"></i>Kembali
                     </a>
@@ -433,7 +451,7 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
             <col class="c-tgllast">
             <col class="c-harga">
             <col class="c-subtotal">
-            <col class="c-aksi no-print">
+            
         </colgroup>
         <thead>
             <tr>
@@ -444,7 +462,7 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                 <th>TGL TERAKHIR</th>
                 <th>HARGA SATUAN</th>
                 <th>SUBTOTAL</th>
-                <th class="no-print">AKSI</th>
+                
             </tr>
         </thead>
         <tbody>
@@ -458,7 +476,7 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                         <i class="fas fa-user me-1"></i>
                         DRIVER: <?= ($driver_name === 'TANPA DRIVER') ? '-' : strtoupper($driver_name) ?>
                     </td>
-                    <td class="no-print"></td>
+                    
                 </tr>
 
                 <?php
@@ -545,13 +563,7 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                         </td>
 
                         <!-- Aksi (hanya screen) -->
-                        <td class="text-center no-print">
-                            <a href="hapus_item_mobil.php?id=<?= $item['id_transaksi'] ?>&kat=<?= $item['kategori'] ?>"
-                               class="text-danger"
-                               onclick="return confirm('Yakin hapus item ini?')">
-                                <i class="fas fa-trash-alt"></i>
-                            </a>
-                        </td>
+                       
                     </tr>
                 <?php endforeach; ?>
 
@@ -563,7 +575,7 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                     <td class="text-end fw-bold" style="font-size:7.5pt; white-space:nowrap;">
                         Rp <?= number_format($sub_total_mobil, 0, ',', '.') ?>
                     </td>
-                    <td class="no-print"></td>
+                  
                 </tr>
 
             <?php endforeach; endforeach; ?>
@@ -574,7 +586,7 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                 <td class="text-end fw-bold" style="white-space:nowrap;">
                     Rp <?= number_format($grand_total, 0, ',', '.') ?>
                 </td>
-                <td class="no-print"></td>
+                
             </tr>
         </tbody>
     </table>
@@ -627,47 +639,11 @@ function editTanggal(id, kat, tgl) {
 }
 </script>
 <script>
-    let idleTime = 0;
-    const maxIdleMinutes = 15;
-    let lastServerUpdate = Date.now();
-
-    // Fungsi untuk mereset timer idle
-    function resetTimer() {
-        idleTime = 0;
-        
-        let now = Date.now();
-        // Kirim sinyal "Keep Alive" ke server setiap 5 menit sekali jika user aktif
-        // Ini mencegah session PHP mati saat user sedang asyik mengetik/input
-        if (now - lastServerUpdate > 300000) { // 300.000 ms = 5 menit
-            const depth = window.location.pathname.split('/').length - 2;
-            const prefix = "../".repeat(Math.max(0, depth - 1));
-            
-            fetch(prefix + 'auth/keep_alive.php')
-                .then(response => console.log("Sesi diperbarui secara background"))
-                .catch(err => console.error("Gagal memperbarui sesi", err));
-            
-            lastServerUpdate = now;
-        }
-    }
-
-    // Deteksi interaksi user
-    window.onload = resetTimer;
-    document.onmousemove = resetTimer;
-    document.onkeypress = resetTimer;
-    document.onmousedown = resetTimer;
-    document.onclick = resetTimer;
-    document.onscroll = resetTimer;
-
-    // Interval cek setiap 1 menit
-    setInterval(function() {
-        idleTime++;
-        if (idleTime >= maxIdleMinutes) {
-            alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
-            const depth = window.location.pathname.split('/').length - 2;
-            const prefix = "../".repeat(Math.max(0, depth - 1));
-            window.location.href = prefix + "login.php?pesan=timeout";
-        }
-    }, 60000); // Cek setiap 60 detik
+function cetakDuplex() {
+    // Beri tahu user sebelum cetak
+    alert('Tips cetak bolak-balik:\n\nDi dialog Print browser:\n• Chrome/Edge: More settings → Two-sided → On\n• Firefox: Properties → Duplex → Long Edge\n\nKlik OK untuk lanjut cetak.');
+    window.print();
+}
 </script>
 </body>
 </html>

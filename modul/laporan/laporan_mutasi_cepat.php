@@ -141,7 +141,36 @@ $rak_list_for_jump = array_values($rak_list_for_jump);
         }
         .rak-checkbox-item input { margin-right: 4px; }
         
-        @media print { .no-print { display: none !important; } .table-scroll-container { max-height: none !important; overflow: visible !important; } }
+        @media print {
+        .no-print { display: none !important; }
+        .table-scroll-container { max-height: none !important; overflow: visible !important; }
+        
+        /* Perkecil font saat cetak */
+        body { font-size: 8px !important; }
+        
+        table { font-size: 8px !important; }
+        
+        thead th { 
+            font-size: 8px !important; 
+            padding: 2px 3px !important; 
+        }
+        
+        tbody td { 
+            font-size: 8px !important; 
+            padding: 1px 3px !important; 
+        }
+        
+        /* Perkecil judul & subjudul */
+        h4 { font-size: 11px !important; margin-bottom: 2px !important; }
+        .text-muted.fw-bold { font-size: 8px !important; }
+        
+        /* Tanda tangan lebih kompak */
+        .ttd-container { margin-top: 15px !important; }
+        .ttd-container p { font-size: 8px !important; margin: 0 !important; }
+        
+        /* Margin kertas lebih kecil */
+        @page { margin: 8mm; }
+    }
     </style>
 </head>
 <body class="p-3">
@@ -327,49 +356,6 @@ document.getElementById('checkAllRak').addEventListener('change', function() {
         checkbox.checked = this.checked;
     }
 });
-</script>
-<script>
-    let idleTime = 0;
-    const maxIdleMinutes = 15;
-    let lastServerUpdate = Date.now();
-
-    // Fungsi untuk mereset timer idle
-    function resetTimer() {
-        idleTime = 0;
-        
-        let now = Date.now();
-        // Kirim sinyal "Keep Alive" ke server setiap 5 menit sekali jika user aktif
-        // Ini mencegah session PHP mati saat user sedang asyik mengetik/input
-        if (now - lastServerUpdate > 300000) { // 300.000 ms = 5 menit
-            const depth = window.location.pathname.split('/').length - 2;
-            const prefix = "../".repeat(Math.max(0, depth - 1));
-            
-            fetch(prefix + 'auth/keep_alive.php')
-                .then(response => console.log("Sesi diperbarui secara background"))
-                .catch(err => console.error("Gagal memperbarui sesi", err));
-            
-            lastServerUpdate = now;
-        }
-    }
-
-    // Deteksi interaksi user
-    window.onload = resetTimer;
-    document.onmousemove = resetTimer;
-    document.onkeypress = resetTimer;
-    document.onmousedown = resetTimer;
-    document.onclick = resetTimer;
-    document.onscroll = resetTimer;
-
-    // Interval cek setiap 1 menit
-    setInterval(function() {
-        idleTime++;
-        if (idleTime >= maxIdleMinutes) {
-            alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
-            const depth = window.location.pathname.split('/').length - 2;
-            const prefix = "../".repeat(Math.max(0, depth - 1));
-            window.location.href = prefix + "login.php?pesan=timeout";
-        }
-    }, 60000); // Cek setiap 60 detik
 </script>
 
 </body>
