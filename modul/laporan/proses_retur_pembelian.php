@@ -1,7 +1,7 @@
 <?php
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 if ($_SESSION['status'] != "login") {
     header("location:../../login.php?pesan=belum_login");
@@ -126,39 +126,42 @@ try {
         throw new Exception("Gagal catat log retur: " . mysqli_error($koneksi));
     }
 
-    // C. Kembalikan status item PR supaya bisa dibeli ulang (opsional)
+  // ── C. Update Keterangan di tr_request_detail (Retur ke Toko) ───────
     if (!empty($id_req_detail)) {
-        $sql_pr = "UPDATE tr_request_detail
-                   SET is_dibeli  = 0,
-                       tgl_dibeli = NULL,
-                       dibeli_oleh = NULL
-                   WHERE id_detail = '$id_req_detail'";
-        if (!mysqli_query($koneksi, $sql_pr)) {
-            throw new Exception("Gagal reset status item PR: " . mysqli_error($koneksi));
+        // Ambil nama barang saat ini untuk digabungkan dengan kata retur
+        $q_current = mysqli_query($koneksi, "SELECT nama_barang_manual FROM tr_request_detail WHERE id_detail = '$id_req_detail'");
+        $current_data = mysqli_fetch_assoc($q_current);
+        
+        if ($current_data) {
+            $nama_lama = $current_data['nama_barang_manual'];
+            // Hindari penumpukan kata "RETUR KE TOKO" jika proses retur dilakukan lebih dari sekali
+            if (strpos($nama_lama, '(RETUR KE TOKO)') === false) {
+                $nama_baru = mysqli_real_escape_string($koneksi, $nama_lama . " (RETUR KE TOKO)");
+                
+                $sql_pr = "UPDATE tr_request_detail
+                           SET nama_barang_manual = '$nama_baru',
+                               status_item  = 'TERBELI', -- Tetap TERBELI sesuai request
+                               is_dibeli    = 1          -- Tetap 1 sesuai request
+                           WHERE id_detail = '$id_req_detail'";
+                
+                if (!mysqli_query($koneksi, $sql_pr)) {
+                    throw new Exception("Gagal update keterangan retur di PR: " . mysqli_error($koneksi));
+                }
+            }
         }
-
-        // Jika PO terlanjur CLOSE, kembalikan ke OPEN
-        $row_req = mysqli_fetch_assoc(mysqli_query($koneksi,
-            "SELECT id_request FROM tr_request_detail WHERE id_detail = '$id_req_detail'"));
-        if ($row_req) {
-            $id_req = (int)$row_req['id_request'];
-            mysqli_query($koneksi,
-                "UPDATE tr_purchase_order
-                 SET status_po = 'OPEN'
-                 WHERE id_request = '$id_req' AND status_po = 'CLOSE'");
-            mysqli_query($koneksi,
-                "UPDATE tr_request
-                 SET status_request = 'PROSES'
-                 WHERE id_request = '$id_req' AND status_request = 'SELESAI'");
-        }
+        
+        /* 
+           CATATAN: 
+           Update status_request ke 'PROSES' dan update status_po ke 'OPEN' 
+           Dihapus dari sini karena Anda menginginkan status_request tetap (tidak berubah).
+        */
     }
 
-    // D. Hapus data pembelian
+    // ── D. Hapus data pembelian (Realisasi dihapus karena barang dikembalikan) ──
     $sql_hapus = "DELETE FROM pembelian WHERE id_pembelian = '$id'";
     if (!mysqli_query($koneksi, $sql_hapus)) {
         throw new Exception("Gagal hapus data pembelian: " . mysqli_error($koneksi));
     }
-
     mysqli_commit($koneksi);
     header("location:data_pembelian.php?pesan=retur_sukses");
     exit;
