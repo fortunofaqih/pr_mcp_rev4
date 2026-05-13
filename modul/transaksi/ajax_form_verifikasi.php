@@ -4,8 +4,8 @@
  * Dipanggil via AJAX GET → return HTML form verifikasi untuk 1 item staging
  */
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     echo '<div class="alert alert-danger">ID tidak valid.</div>'; exit;

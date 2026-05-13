@@ -1,7 +1,7 @@
 <?php
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 // 1. Tangkap Data Input
 $id_pembelian    = (int)$_POST['id_pembelian'];
@@ -95,6 +95,7 @@ try {
                                 subtotal_estimasi = $subtotal,
                                 tipe_request = '$tipe_request',
                                 status_item = 'TERBELI',
+                                keterangan   = '$keterangan',
                                 is_dibeli = 1
                             WHERE id_detail = $id_req_detail";
         

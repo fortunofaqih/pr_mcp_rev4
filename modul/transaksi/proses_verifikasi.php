@@ -117,11 +117,13 @@ try {
         // 3. Update status item & tipe_request pada tr_request_detail (SINKRONISASI)
         // Mapping: 'MASUK STOK' -> 'STOK', 'LANGSUNG PAKAI' -> 'LANGSUNG'
         $tipe_request_baru = ($alokasi === 'MASUK STOK') ? 'STOK' : 'LANGSUNG';
-        $q_update_detail = "UPDATE tr_request_detail SET 
-                                status_item  = 'TERBELI',
-                                is_dibeli    = 1,
-                                tipe_request = '$tipe_request_baru'
-                            WHERE id_detail  = $id_detail";
+       $q_update_detail = "UPDATE tr_request_detail SET 
+                        status_item  = 'TERBELI',
+                        is_dibeli    = 1,
+                        tipe_request = '$tipe_request_baru',
+                        keterangan   = '$keterangan',
+                        id_mobil     = $id_mobil_baru
+                    WHERE id_detail  = $id_detail";
 
         if (!mysqli_query($koneksi, $q_update_detail)) {
             throw new Exception('Gagal update detail request: '.mysqli_error($koneksi));
