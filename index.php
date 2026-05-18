@@ -282,7 +282,7 @@ if ($is_finance) {
                     <li class="nav-item"><a href="modul/master/data_supplier.php" class="nav-link text-warning fw-bold"><i class="fa-brands fa-shopify me-2"></i> Master Supplier</a></li>
                 <div class="nav-category">Pembelian</div>
                 <li class="nav-item"><a href="modul/pembelian/index.php" class="nav-link"><i class="fas fa-shopping-cart me-2"></i> Halaman Pembelian</a></li>
-                <li class="nav-item"><a href="modul/transaksi/tambah_request.php" class="nav-link"><i class="fas fa-clipboard me-2"></i> Form PR (Kecil)</a></li>
+                <!--<li class="nav-item"><a href="modul/transaksi/tambah_request.php" class="nav-link"><i class="fas fa-clipboard me-2"></i> Form PR (Kecil)</a></li>-->
                 <li class="nav-item"><a href="modul/transaksi/tambah_request_besar.php" class="nav-link text-warning fw-bold"><i class="fas fa-cart-plus me-2"></i> Form PR (Besar)</a></li>
                 <li class="nav-item"><a href="modul/transaksi/update_status_ban.php" class="nav-link"><i class="fas fa-car me-2"></i> Update Status PO</a></li>
             <?php endif; ?>
