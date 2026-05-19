@@ -384,6 +384,11 @@ if ($is_finance) {
                             <i class="fas fa-file-invoice me-2"></i> Purchase Request (PR)
                         </a>
                     </li>
+                     <li class="nav-item">
+                        <a href="modul/laporan/data_pembelian_finance.php" class="nav-link">
+                            <i class="fas fa-file-alt me-2"></i> Buku Pembelian
+                        </a>
+                    </li>
                    <!-- <li class="nav-item"><a href="modul/finance/update_pr_besar.php" class="nav-link"><i class="fas fa-bell me-2"></i> Update Status PR</a></li>-->
                 <?php endif; ?>
 

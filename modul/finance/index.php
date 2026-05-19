@@ -1019,6 +1019,10 @@ body {
                             <?php if ($is_ban): ?>
                                 <?php if ($status_pasang === 'TERPASANG'): ?>
                                     <span class="bdg st-terpasang"><i class="fas fa-check me-1"></i>TERPASANG</span>
+                                     <div style="font-size:.65rem;color:var(--slate);">diiupdate oleh : <?= htmlspecialchars($d['pasang_oleh'] ?? '-') ?> pada tanggal</div>
+                                    <i class="far fa-calendar-alt me-1"></i>
+                                    <?= date('d/m/Y', strtotime($d['tgl_pasang'])) ?>
+                                </div>
                                 <?php else: ?>
                                     <span class="bdg st-belum-pasang"><i class="fas fa-clock me-1"></i>BELUM PASANG</span>
                                 <?php endif; ?>
