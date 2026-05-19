@@ -1,7 +1,7 @@
 <?php
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 if ($_SESSION['role'] != "superadmin") { die("Akses Ditolak!"); }
 
 $sql = "SELECT * FROM tr_request WHERE status_approval = 'PENDING' AND kategori_pr = 'BESAR'";

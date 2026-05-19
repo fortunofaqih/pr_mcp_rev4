@@ -9,11 +9,55 @@ $nama  = $_SESSION['nama'];
 $tahun_pilihan = isset($_GET['tahun_filter']) ? $_GET['tahun_filter'] : date('Y');
 
 // Hitung notif approval
-$jumlah_notif = 0;
+$jumlah_notif    = 0;
+$jumlah_notif_it = 0;
+ 
 if ($role == 'administrator' || $role == 'manager') {
-    $q_notif = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM tr_request WHERE kategori_pr = 'BESAR' AND status_approval = 'MENUNGGU APPROVAL'");
-    $d_notif = mysqli_fetch_assoc($q_notif);
-    $jumlah_notif = $d_notif['total'];
+ 
+    $username_saya_esc = mysqli_real_escape_string($koneksi, $_SESSION['username'] ?? '');
+ 
+    // ── Notif PR BESAR ──────────────────────────────────────
+    // Hitung PR yang benar-benar butuh aksi dari manager ini
+    $q_notif_besar = mysqli_query($koneksi,
+        "SELECT COUNT(*) as total FROM tr_request
+         WHERE kategori_pr = 'BESAR'
+         AND status_request NOT IN ('BATAL','SELESAI')
+         AND (
+             (status_approval = 'MENUNGGU APPROVAL'
+              AND (approve1_by IS NULL OR approve1_by = ''))
+             OR
+             (status_approval = 'APPROVED 1'
+              AND approve1_by != '$username_saya_esc'
+              AND (approve2_by IS NULL OR approve2_by = ''))
+             OR
+             (status_approval = 'APPROVED 2'
+              AND need_approve3 = 1
+              AND approve3_target = '$username_saya_esc'
+              AND (approve3_by IS NULL OR approve3_by = ''))
+         )"
+    );
+    $jumlah_notif = (int)(mysqli_fetch_assoc($q_notif_besar)['total'] ?? 0);
+ 
+    // ── Notif PR IT ─────────────────────────────────────────
+    $q_notif_it = mysqli_query($koneksi,
+        "SELECT COUNT(*) as total FROM tr_request
+         WHERE kategori_pr = 'IT'
+         AND status_request NOT IN ('BATAL','SELESAI')
+         AND (
+             (status_approval = 'MENUNGGU APPROVAL'
+              AND (approve1_by IS NULL OR approve1_by = ''))
+             OR
+             (status_approval = 'APPROVED 1'
+              AND approve1_by != '$username_saya_esc'
+              AND (approve2_by IS NULL OR approve2_by = ''))
+             OR
+             (status_approval = 'APPROVED 2'
+              AND need_approve3 = 1
+              AND approve3_target = '$username_saya_esc'
+              AND (approve3_by IS NULL OR approve3_by = ''))
+         )"
+    );
+    $jumlah_notif_it = (int)(mysqli_fetch_assoc($q_notif_it)['total'] ?? 0);
 }
 
 // Apakah tampilkan menu gudang?
@@ -230,8 +274,10 @@ if ($is_finance) {
                     <a href="index.php" class="nav-link active"><i class="fas fa-home me-2"></i> Dashboard</a>
                 </li>
                 <!-- MENU MANAGER -->
-                <?php if ($role == 'administrator' || $role == 'manager') : ?>
+               <?php if ($role == 'administrator' || $role == 'manager' || $role == 'it') : ?>
                     <div class="nav-category text-warning">Panel Approval</div>
+
+                    <!-- PR Barang Besar (IT juga bisa lihat ini) -->
                     <li class="nav-item">
                         <a href="modul/pimpinan/approval_pimpinan.php" class="nav-link">
                             <i class="fas fa-circle-check me-2"></i> Approval PR Besar
@@ -240,7 +286,23 @@ if ($is_finance) {
                             <?php endif; ?>
                         </a>
                     </li>
-                    <li class="nav-item"><a href="modul/transaksi/update_status_pemasangan_ban.php" class="nav-link"><i class="fas fa-car me-2"></i> Update Status BAN</a></li>
+
+                    <!-- PR IT -->
+                    <li class="nav-item">
+                        <a href="modul/pimpinan/approval_pimpinan.php" class="nav-link">
+                            <i class="fas fa-laptop me-2"></i> Approval PR IT
+                            <?php if ($jumlah_notif_it > 0): ?>
+                                <span class="badge rounded-pill bg-danger float-end"><?= $jumlah_notif_it ?></span>
+                            <?php endif; ?>
+                        </a>
+                    </li>
+
+                    <!-- Update Status BAN (IT juga bisa lihat ini) -->
+                    <li class="nav-item">
+                        <a href="modul/transaksi/update_status_pemasangan_ban.php" class="nav-link">
+                            <i class="fas fa-car me-2"></i> Update Status BAN
+                        </a>
+                    </li>
                 <?php endif; ?>
                 <!-- MENU ADMIN GUDANG -->
                 <?php if ($is_gudang_access) : ?>
@@ -255,6 +317,7 @@ if ($is_finance) {
                     <div class="nav-category">-- Transaksi Gudang --</div>
                     <li class="nav-item"><a href="modul/transaksi/tambah_request.php" class="nav-link text-warning fw-bold"><i class="fas fa-file-invoice me-2"></i> Form PR (Kecil)</a></li>
                     <li class="nav-item"><a href="modul/transaksi/tambah_request_besar.php" class="nav-link text-warning fw-bold"><i class="fas fa-cart-plus me-2"></i> Form PR (Besar)</a></li>
+                    <li class="nav-item"><a href="modul/transaksi/tambah_request_it.php" class="nav-link text-warning fw-bold"><i class="fas fa-laptop me-2"></i> Form PR (IT)</a></li>
                     <li class="nav-item"><a href="modul/transaksi/pr.php" class="nav-link text-warning fw-bold"><i class="fa-solid fa-bars-progress me-2"></i> Progress PR</a></li>
                     <li class="nav-item"><a href="modul/transaksi/verifikasi_pembelian.php" class="nav-link text-warning fw-bold"><i class="fas fa-check-double me-2"></i> Verifikasi Pembelian</a></li>
                     <li class="nav-item"><a href="modul/transaksi/pengambilan.php" class="nav-link text-warning fw-bold"><i class="fas fa-dolly me-2"></i> Bon Pengambilan</a></li>
@@ -314,6 +377,11 @@ if ($is_finance) {
                     <li class="nav-item">
                         <a href="modul/finance/index.php" class="nav-link">
                             <i class="fas fa-file-invoice-dollar me-2"></i> Detail Request
+                        </a>
+                    </li>
+                     <li class="nav-item">
+                        <a href="modul/transaksi/pr_finance.php" class="nav-link">
+                            <i class="fas fa-file-invoice me-2"></i> Purchase Request (PR)
                         </a>
                     </li>
                    <!-- <li class="nav-item"><a href="modul/finance/update_pr_besar.php" class="nav-link"><i class="fas fa-bell me-2"></i> Update Status PR</a></li>-->

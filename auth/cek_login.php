@@ -112,7 +112,8 @@ if (mysqli_num_rows($query) === 1) {
 
         } elseif ($login_sebagai === 'it') {
             header("location:../modul/it_asset/index.php");
-        } else {
+
+        }else {
             header("location:../index.php");
         }
         exit();

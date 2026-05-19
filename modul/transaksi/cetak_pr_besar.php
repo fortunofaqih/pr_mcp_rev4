@@ -1,27 +1,37 @@
 <?php
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 // ── 1. TERIMA PARAMETER: bisa ?id=123 ATAU ?no=PRB/IV/26/0002 ────────────────
 $h = null;
 
 if (!empty($_GET['id'])) {
     $id_raw = (int)$_GET['id'];
+    // BUG FIX: hapus filter no_request LIKE 'PRB%'
+    // Ganti dengan filter kategori_pr IN ('BESAR','IT') agar PR IT ikut masuk
     $h = mysqli_fetch_assoc(mysqli_query($koneksi,
-        "SELECT * FROM tr_request WHERE id_request = '$id_raw' AND no_request LIKE 'PRB%' LIMIT 1"));
+        "SELECT * FROM tr_request
+         WHERE id_request = '$id_raw'
+         AND kategori_pr IN ('BESAR','IT')
+         LIMIT 1"));
 
 } elseif (!empty($_GET['no'])) {
     $no_raw = mysqli_real_escape_string($koneksi, trim($_GET['no']));
+    // BUG FIX: hapus filter LIKE 'PRB%', pakai kategori_pr IN agar PR IT (PRI/...)
+    // bisa diakses juga lewat parameter ?no=
     $h = mysqli_fetch_assoc(mysqli_query($koneksi,
-        "SELECT * FROM tr_request WHERE no_request = '$no_raw' AND no_request LIKE 'PRB%' LIMIT 1"));
+        "SELECT * FROM tr_request
+         WHERE no_request = '$no_raw'
+         AND kategori_pr IN ('BESAR','IT')
+         LIMIT 1"));
 }
 
 if (!$h) {
     die("<div style='font-family:Arial;padding:30px;color:red;'>
             <b>Data tidak ditemukan.</b><br>
-            Pastikan parameter <code>?id=</code> atau <code>?no=PRB/...</code> sudah benar,
-            dan nomor request dimulai dengan <b>PRB</b>.
+            Pastikan parameter <code>?id=</code> atau <code>?no=PRB/...</code> / <code>?no=PRI/...</code> sudah benar,
+            dan nomor request dimulai dengan <b>PRB</b> (Besar) atau <b>PRI</b> (IT).
          </div>");
 }
 
@@ -32,7 +42,9 @@ if (empty($h['no_form'])) {
     $bulan  = date('m');
     $tahun  = date('Y');
     $suffix = substr($h['no_request'], -4);
-    $no_form = "PRB-MCP-$suffix/$bulan/$tahun";
+    // BUG FIX: prefix no_form disesuaikan dengan kategori
+    $prefix_form = ($h['kategori_pr'] === 'IT') ? 'PRI-MCP' : 'PRB-MCP';
+    $no_form = "$prefix_form-$suffix/$bulan/$tahun";
     mysqli_query($koneksi, "UPDATE tr_request SET no_form = '$no_form' WHERE id_request = '$id'");
     $h['no_form'] = $no_form;
 }
@@ -40,8 +52,8 @@ if (empty($h['no_form'])) {
 // ── 3. AMBIL DETAIL BARANG ────────────────────────────────────────────────────
 $items = [];
 $q = mysqli_query($koneksi,
-    "SELECT d.*, 
-            m.plat_nomor, 
+    "SELECT d.*,
+            m.plat_nomor,
             b.nama_barang as nama_barang_master,
             p.tgl_beli_barang
      FROM tr_request_detail d
@@ -73,8 +85,6 @@ foreach ([1,2,3] as $lv) {
 }
 
 // ── 5. PATH GAMBAR TANDA TANGAN ───────────────────────────────────────────────
-// Letakkan file TTD di: /pr_mcp/assets/ttd/{username}.png (atau .jpg/.jpeg)
-// Contoh: /pr_mcp/assets/ttd/budi.png  → untuk user dengan username "budi"
 $ttd_base_dir = $_SERVER['DOCUMENT_ROOT'] . '/pr_mcp/assets/ttd/';
 $ttd_base_url = '/pr_mcp/assets/ttd/';
 
@@ -95,29 +105,31 @@ $ttd_url = [
     3 => getTtdUrl($ttd_base_dir, $ttd_base_url, $approver[3]['by']),
 ];
 
-
 $fully_approved = ($h['status_approval'] === 'APPROVED');
 $need_m3        = (int)($h['need_approve3'] ?? 0);
+
+// Label judul sesuai kategori
+$is_it         = ($h['kategori_pr'] === 'IT');
+$judul_cetak   = $is_it ? 'PURCHASE REQUEST (PR) IT' : 'PURCHASE REQUEST (PR) BESAR';
+$warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Cetak PR Besar - <?= htmlspecialchars($h['no_request']) ?></title>
+    <title>Cetak PR <?= $is_it ? 'IT' : 'Besar' ?> - <?= htmlspecialchars($h['no_request']) ?></title>
     <style>
         @page { size: 21.5cm 16.5cm landscape; margin: 0.5cm 0.7cm; }
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; font-size: 8pt; margin: 0; padding: 8px; background: #fff; color: #000; }
 
-        /* ── Header ── */
         .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 6px; }
         .header h2 { margin: 0; font-size: 11pt; font-weight: bold; }
         .header h4 { margin: 0; font-size: 8pt; font-weight: normal; }
 
-        /* ── Badge PR Besar ── */
-        .badge-besar {
+        .badge-pr {
             display: inline-block;
-            background: #1e3a8a;
+            background: <?= $warna_badge ?>;
             color: #fff;
             font-size: 6.5pt;
             font-weight: bold;
@@ -129,13 +141,11 @@ $need_m3        = (int)($h['need_approve3'] ?? 0);
             print-color-adjust: exact;
         }
 
-        /* ── Info PR ── */
         .info-pr { width: 100%; margin-bottom: 5px; font-size: 7.5pt; font-weight: bold; border-collapse: collapse; }
 
-        /* ── Tabel Data ── */
         table.data { width: 100%; border-collapse: collapse; font-size: 7.5pt; table-layout: fixed; }
         table.data th {
-            background-color: #1e3a8a !important;
+            background-color: <?= $warna_badge ?> !important;
             color: #fff !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
@@ -153,85 +163,40 @@ $need_m3        = (int)($h['need_approve3'] ?? 0);
             overflow: hidden;
         }
 
-        /* ── Lebar Kolom ── */
- 
-		.c-no     { width: 22px; text-align: center; }
-		.c-tgl    { width: 55px; text-align: center; }
-		.c-unit   { width: 65px; text-align: center; }
-		.c-tipe   { width: 60px; text-align: center; }
-		.c-qty    { width: 45px; text-align: center; }
-		.c-harga  { width: 80px; text-align: right; } /* Kolom Baru */
-		.c-sub    { width: 85px; text-align: right; } /* Kolom Baru */
-		.c-ket    { width: auto; }
+        .c-no     { width: 22px;  text-align: center; }
+        .c-tgl    { width: 55px;  text-align: center; }
+        .c-unit   { width: 65px;  text-align: center; }
+        .c-tipe   { width: 60px;  text-align: center; }
+        .c-qty    { width: 45px;  text-align: center; }
+        .c-harga  { width: 80px;  text-align: right; }
+        .c-sub    { width: 85px;  text-align: right; }
+        .c-ket    { width: auto; }
 
-        /* ── Blok TTD di bawah tabel ── */
-        .ttd-section {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        .ttd-section td {
-            width: 33.33%;
-            text-align: center;
-            vertical-align: top;
-            padding: 0 8px;
-        }
+        .ttd-section { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .ttd-section td { width: 33.33%; text-align: center; vertical-align: top; padding: 0 8px; }
         .ttd-box {
-            border: 0.5px solid #cbd5e1;
-            border-radius: 4px;
-            padding: 5px 6px 5px;
-            min-height: 85px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            border: 0.5px solid #cbd5e1; border-radius: 4px; padding: 5px 6px 5px;
+            min-height: 85px; display: flex; flex-direction: column; align-items: center;
         }
         .ttd-label {
-            font-size: 6.5pt;
-            font-weight: bold;
-            text-transform: uppercase;
-            color: #1e3a8a;
-            margin-bottom: 4px;
-            letter-spacing: .04em;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+            font-size: 6.5pt; font-weight: bold; text-transform: uppercase;
+            color: <?= $warna_badge ?>; margin-bottom: 4px; letter-spacing: .04em;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
         }
-        /* Area gambar TTD — area putih tempat gambar muncul */
         .ttd-img-area {
-            width: 110px;
-            height: 52px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 3px;
+            width: 110px; height: 52px;
+            display: flex; align-items: center; justify-content: center; margin: 0 auto 3px;
         }
-        .ttd-img {
-            max-width: 110px;
-            max-height: 52px;
-            object-fit: contain;
-        }
-        /* Kotak kosong — pemesan atau belum ada file TTD */
+        .ttd-img { max-width: 110px; max-height: 52px; object-fit: contain; }
         .ttd-empty-box {
-            width: 110px;
-            height: 52px;
-            border: 0.5px dashed #94a3b8;
-            border-radius: 3px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            width: 110px; height: 52px; border: 0.5px dashed #94a3b8; border-radius: 3px;
+            display: flex; align-items: center; justify-content: center;
         }
         .ttd-empty-text { font-size: 5.5pt; color: #94a3b8; font-style: italic; }
-        .ttd-nama {
-            font-size: 7pt;
-            font-weight: bold;
-            color: #1e293b;
-            margin-top: 3px;
-            text-align: center;
-            line-height: 1.3;
-        }
-        .ttd-tgl { font-size: 5.5pt; color: #64748b; margin-top: 1px; }
+        .ttd-nama { font-size: 7pt; font-weight: bold; color: #1e293b; margin-top: 3px; text-align: center; line-height: 1.3; }
+        .ttd-tgl  { font-size: 5.5pt; color: #64748b; margin-top: 1px; }
         .ttd-menunggu { font-size: 6pt; color: #94a3b8; font-style: italic; margin-top: 3px; }
 
-        /* ── Watermark ── */
         .wm-pending {
             position: fixed; top: 50%; left: 50%;
             transform: translate(-50%, -50%) rotate(-35deg);
@@ -239,12 +204,7 @@ $need_m3        = (int)($h['need_approve3'] ?? 0);
             pointer-events: none; z-index: 0; letter-spacing: 4px;
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
         }
-
-        /* ── Catatan bawah ── */
-        .ttd-note {
-            margin-top: 5px; font-size: 6pt; color: #64748b;
-            border-top: 0.5px dashed #aaa; padding-top: 3px;
-        }
+        .ttd-note { margin-top: 5px; font-size: 6pt; color: #64748b; border-top: 0.5px dashed #aaa; padding-top: 3px; }
 
         @media print {
             .no-print { display: none !important; }
@@ -258,10 +218,10 @@ $need_m3        = (int)($h['need_approve3'] ?? 0);
 <div class="wm-pending">BELUM DISETUJUI</div>
 <?php endif; ?>
 
-<!-- ── Tombol Cetak (tidak ikut print) ── -->
+<!-- ── Tombol Cetak ── -->
 <div class="no-print" style="background:#dbeafe; padding:8px; margin-bottom:10px; border:1px solid #93c5fd; border-radius:4px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-    <button onclick="window.print()" style="padding:7px 18px; background:#1e3a8a; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">
-        🖨️ CETAK PR BESAR
+    <button onclick="window.print()" style="padding:7px 18px; background:<?= $warna_badge ?>; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">
+        🖨️ CETAK PR <?= $is_it ? 'IT' : 'BESAR' ?>
     </button>
     <span style="font-size:11px; color:#555;">Kertas: F4 / Setengah Folio (21.5 × 16.5 cm Landscape)</span>
     <span style="font-size:10px; color:#475569;">
@@ -274,14 +234,20 @@ $need_m3        = (int)($h['need_approve3'] ?? 0);
 
 <!-- ── Header ── -->
 <div class="header">
-    <h2>PURCHASE REQUEST (PR) BESAR</h2>
+    <h2><?= $judul_cetak ?></h2>
     <h4>PT. Mutiara Cahaya Plastindo</h4>
 </div>
 
 <!-- ── Info PR ── -->
 <table class="info-pr">
     <tr>
-        <td width="40%">NO: <b><?= htmlspecialchars($h['no_request']) ?></b> &nbsp;|&nbsp; FORM: <?= htmlspecialchars($h['no_form']) ?></td>
+        <td width="40%">
+            NO: <b><?= htmlspecialchars($h['no_request']) ?></b>
+            &nbsp;|&nbsp;
+            FORM: <?= htmlspecialchars($h['no_form']) ?>
+            &nbsp;
+            <span class="badge-pr"><?= $is_it ? 'IT' : 'BESAR' ?></span>
+        </td>
         <td width="30%" style="text-align:center;">ADMIN: <?= strtoupper(htmlspecialchars($h['nama_pemesan'])) ?></td>
         <td width="30%" style="text-align:right;">TGL: <?= date('d/m/Y', strtotime($h['tgl_request'])) ?></td>
     </tr>
@@ -310,12 +276,12 @@ $need_m3        = (int)($h['need_approve3'] ?? 0);
         </tr>
     </thead>
     <tbody>
-        <?php 
+        <?php
         $grand_total = 0;
         foreach ($items as $i => $d):
-            $nama = !empty($d['nama_barang_manual']) ? $d['nama_barang_manual'] : $d['nama_barang_master'];
-            $harga = (float)($d['harga_satuan_estimasi'] ?? 0);
-            $subtotal = (float)($d['subtotal_estimasi'] ?? 0);
+            $nama     = !empty($d['nama_barang_manual']) ? $d['nama_barang_manual'] : $d['nama_barang_master'];
+            $harga    = (float)($d['harga_satuan_estimasi'] ?? 0);
+            $subtotal = (float)($d['subtotal_estimasi']    ?? 0);
             $grand_total += $subtotal;
         ?>
         <tr>
@@ -323,9 +289,7 @@ $need_m3        = (int)($h['need_approve3'] ?? 0);
             <td style="font-weight:bold;"><?= strtoupper(htmlspecialchars($nama)) ?></td>
             <td style="text-align:center;">
                 <?php if (!empty($d['tgl_beli_barang']) && $d['tgl_beli_barang'] != '0000-00-00'): ?>
-                    <span style="font-weight:bold; color:#166534;">
-                        <?= date('d/m/y', strtotime($d['tgl_beli_barang'])) ?>
-                    </span>
+                    <span style="font-weight:bold; color:#166534;"><?= date('d/m/y', strtotime($d['tgl_beli_barang'])) ?></span>
                 <?php else: ?>
                     <span style="color:#cbd5e1;">—</span>
                 <?php endif; ?>
@@ -335,21 +299,15 @@ $need_m3        = (int)($h['need_approve3'] ?? 0);
             </td>
             <td style="text-align:center; font-size:6.5pt; font-weight:bold;"><?= htmlspecialchars($d['tipe_request']) ?></td>
             <td style="text-align:center;"><b><?= (float)$d['jumlah'] ?></b> <?= htmlspecialchars($d['satuan']) ?></td>
-            
-            <td style="text-align:right;">
-                <?= number_format($harga, 0, ',', '.') ?>
-            </td>
-            <td style="text-align:right; font-weight:bold;">
-                <?= number_format($subtotal, 0, ',', '.') ?>
-            </td>
-
+            <td style="text-align:right;"><?= number_format($harga,    0, ',', '.') ?></td>
+            <td style="text-align:right; font-weight:bold;"><?= number_format($subtotal, 0, ',', '.') ?></td>
             <td style="font-size:7pt;"><?= htmlspecialchars($d['keterangan'] ?: '-') ?></td>
         </tr>
         <?php endforeach; ?>
 
         <tr>
             <td colspan="7" style="text-align:right; font-weight:bold; background:#f8fafc;">GRAND TOTAL ESTIMASI :</td>
-            <td style="text-align:right; font-weight:bold; background:#f8fafc; color:#1e3a8a;">
+            <td style="text-align:right; font-weight:bold; background:#f8fafc; color:<?= $warna_badge ?>;">
                 Rp <?= number_format($grand_total, 0, ',', '.') ?>
             </td>
             <td style="background:#f8fafc;"></td>
@@ -357,16 +315,11 @@ $need_m3        = (int)($h['need_approve3'] ?? 0);
     </tbody>
 </table>
 
-<!-- ══════════════════════════════════════════════════════════════
-     BLOK TANDA TANGAN DI BAWAH TABEL
-     Kolom 1 : Manager 1       
-     Kolom 2 : Manager 2 
-     Kolom 3 : Manager 3 
-════════════════════════════════════════════════════════════════ -->
+<!-- ── Blok Tanda Tangan ── -->
 <?php
 $ttd_cols = [
     [
-        'label'   => 'Approval 1' ,
+        'label'   => 'Approval 1',
         'nama'    => $approver[1]['nama_lengkap'],
         'at'      => $approver[1]['at'],
         'by'      => $approver[1]['by'],
@@ -374,7 +327,7 @@ $ttd_cols = [
         'mode'    => 'digital',
     ],
     [
-        'label'   => 'Approval 2' ,
+        'label'   => 'Approval 2',
         'nama'    => $approver[2]['nama_lengkap'],
         'at'      => $approver[2]['at'],
         'by'      => $approver[2]['by'],
@@ -396,12 +349,9 @@ $ttd_cols = [
     <?php foreach ($ttd_cols as $col): ?>
         <td>
             <div class="ttd-box">
-
-                <!-- Label kolom (TTD 1, TTD 2, TTD 3) -->
                 <div class="ttd-label"><?= htmlspecialchars($col['label']) ?></div>
 
                 <?php if ($col['mode'] === 'manual'): ?>
-                    <!-- Pemesan: kotak kosong untuk TTD tangan -->
                     <div class="ttd-img-area">
                         <div class="ttd-empty-box">
                             <span class="ttd-empty-text">tanda tangan</span>
@@ -410,15 +360,12 @@ $ttd_cols = [
                     <div class="ttd-nama"><?= htmlspecialchars($col['nama']) ?></div>
 
                 <?php elseif (!empty($col['by'])): ?>
-                    <!-- Sudah ada approver -->
                     <div class="ttd-img-area">
                         <?php if ($col['img_url']): ?>
-                            <!-- Ada file gambar TTD -->
                             <img src="<?= htmlspecialchars($col['img_url']) ?>"
                                  alt="TTD <?= htmlspecialchars($col['nama']) ?>"
                                  class="ttd-img">
                         <?php else: ?>
-                            <!-- Approve sudah ada tapi file gambar TTD belum diupload -->
                             <div class="ttd-empty-box">
                                 <span class="ttd-empty-text">ttd tidak tersedia</span>
                             </div>
@@ -430,14 +377,12 @@ $ttd_cols = [
                     <?php endif; ?>
 
                 <?php else: ?>
-                    <!-- Belum ada yang approve pada level ini -->
                     <div class="ttd-img-area">
                         <div class="ttd-empty-box">
                             <span class="ttd-empty-text">belum disetujui</span>
                         </div>
                     </div>
                     <div class="ttd-menunggu">— Menunggu —</div>
-
                 <?php endif; ?>
 
             </div>
@@ -445,8 +390,6 @@ $ttd_cols = [
     <?php endforeach; ?>
     </tr>
 </table>
-
-
 
 </body>
 </html>

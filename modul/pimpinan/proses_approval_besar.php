@@ -1,12 +1,12 @@
 <?php
 // ============================================================
 // proses_approval_besar.php
-// Proses approve / reject PR Besar - 3 approval manager
-// + logika status PO OPEN / CLOSE
+// Proses approve / reject PR Besar & IT — 2-3 approval manager
+// BUG FIX: hapus filter kategori_pr='BESAR' agar PR IT bisa diapprove
 // ============================================================
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 if ($_SESSION['status'] != "login" || $_SESSION['role'] != 'manager') {
     header("location:../../login.php?pesan=bukan_pimpinan");
@@ -16,10 +16,10 @@ if ($_SESSION['status'] != "login" || $_SESSION['role'] != 'manager') {
 $id            = (int)($_GET['id']        ?? 0);
 $action        = $_GET['action']          ?? '';
 $catatan_raw   = $_GET['catatan']         ?? '';
-$need_m3_raw   = (int)($_GET['need_m3']   ?? 0);    // 1 = M2 pilih tambah M3
-$m3_target_raw = $_GET['m3_target']       ?? '';     // username M3 yang ditunjuk
+$need_m3_raw   = (int)($_GET['need_m3']   ?? 0);
+$m3_target_raw = $_GET['m3_target']       ?? '';
 
-$username_saya = $_SESSION['username']    ?? '';
+$username_saya = $_SESSION['username'] ?? '';
 
 if (!$id || !in_array($action, ['approve','reject'])) {
     header("location:approval_pimpinan.php");
@@ -29,17 +29,20 @@ if (!$id || !in_array($action, ['approve','reject'])) {
 $catatan   = mysqli_real_escape_string($koneksi, $catatan_raw);
 $m3_target = mysqli_real_escape_string($koneksi, strtolower(trim($m3_target_raw)));
 
-// Ambil data PR
+// ── Ambil data PR ────────────────────────────────────────────
+// BUG FIX UTAMA: hapus AND kategori_pr='BESAR'
+// Ganti dengan whitelist kategori yang diizinkan lewat halaman ini
 $pr = mysqli_fetch_assoc(mysqli_query($koneksi,
-    "SELECT * FROM tr_request WHERE id_request='$id' AND kategori_pr='BESAR'"));
+    "SELECT * FROM tr_request
+     WHERE id_request='$id'
+     AND kategori_pr IN ('BESAR','IT')"));
 
 if (!$pr) { header("location:approval_pimpinan.php?pesan=tidak_ditemukan"); exit; }
 
 $status_app  = $pr['status_approval'];
 $approve1_by = $pr['approve1_by'] ?? '';
-$need_m3_db  = (int)$pr['need_approve3'];
 
-// Validasi: hanya bisa diaksi pada status yang benar
+// Validasi: hanya bisa diaksi pada status yang relevan
 if (!in_array($status_app, ['MENUNGGU APPROVAL', 'APPROVED 1', 'APPROVED 2'])) {
     header("location:approval_pimpinan.php?pesan=sudah_diproses");
     exit;
@@ -66,24 +69,22 @@ $now = date('Y-m-d H:i:s');
 mysqli_begin_transaction($koneksi);
 try {
 
+    // ── TOLAK ─────────────────────────────────────────────────
     if ($action === 'reject') {
-        // ── TOLAK — siapapun manager-nya ───────────────────
-        // status_request = DITOLAK agar bisa direvisi pembuat PR
-        // PO kembali DRAFT (tidak BATAL), direset saat PR direvisi
-        // Hanya catat penolak terakhir
+
         $sql = "UPDATE tr_request SET
-                    status_approval  = 'DITOLAK',
-                    status_request   = 'DITOLAK',
-                    tolak_by         = '$username_saya',
-                    tolak_at         = '$now',
-                    catatan_tolak    = '$catatan',
-                    updated_by       = '$username_saya',
-                    updated_at       = '$now'
+                    status_approval = 'DITOLAK',
+                    status_request  = 'DITOLAK',
+                    tolak_by        = '$username_saya',
+                    tolak_at        = '$now',
+                    catatan_tolak   = '$catatan',
+                    updated_by      = '$username_saya',
+                    updated_at      = '$now'
                 WHERE id_request = '$id'";
 
         if (!mysqli_query($koneksi, $sql)) throw new Exception("Gagal tolak: " . mysqli_error($koneksi));
 
-        // PO kembali DRAFT, siap direset saat PR direvisi
+        // PO kembali ke DRAFT saat ditolak
         mysqli_query($koneksi,
             "UPDATE tr_purchase_order SET status_po='DRAFT' WHERE id_request='$id'");
 
@@ -91,10 +92,11 @@ try {
         header("location:approval_pimpinan.php?pesan=ditolak");
         exit;
 
+    // ── APPROVE ───────────────────────────────────────────────
     } elseif ($action === 'approve') {
 
         // ════════════════════════════════════════════════════
-        // APPROVE KE-1 (status MENUNGGU APPROVAL)
+        // APPROVE KE-1 (status: MENUNGGU APPROVAL)
         // ════════════════════════════════════════════════════
         if ($status_app === 'MENUNGGU APPROVAL') {
 
@@ -114,12 +116,12 @@ try {
             exit;
 
         // ════════════════════════════════════════════════════
-        // APPROVE KE-2 (status APPROVED 1)
+        // APPROVE KE-2 (status: APPROVED 1)
         // ════════════════════════════════════════════════════
         } elseif ($status_app === 'APPROVED 1') {
 
             if ($need_m3_raw && !empty($m3_target)) {
-                // ── M2 memilih tambah M3 → status APPROVED 2, belum final ──
+                // M2 memilih tambah M3 → belum final, status APPROVED 2
                 $sql = "UPDATE tr_request SET
                             status_approval  = 'APPROVED 2',
                             approve2_by      = '$username_saya',
@@ -132,14 +134,14 @@ try {
                             updated_at       = '$now'
                         WHERE id_request = '$id'";
 
-                if (!mysqli_query($koneksi, $sql)) throw new Exception("Gagal approve ke-2 (+ M3): " . mysqli_error($koneksi));
+                if (!mysqli_query($koneksi, $sql)) throw new Exception("Gagal approve ke-2 (+M3): " . mysqli_error($koneksi));
 
                 mysqli_commit($koneksi);
                 header("location:approval_pimpinan.php?pesan=approve2_berhasil");
                 exit;
 
             } else {
-                // ── M2 tidak pilih M3 → langsung APPROVED FINAL ──
+                // M2 tidak pilih M3 → langsung APPROVED FINAL
                 $sql = "UPDATE tr_request SET
                             status_approval  = 'APPROVED',
                             status_request   = 'PROSES',
@@ -155,10 +157,12 @@ try {
 
                 if (!mysqli_query($koneksi, $sql)) throw new Exception("Gagal approve ke-2 (final): " . mysqli_error($koneksi));
 
-                // PO → OPEN (bukan CLOSE, karena belum dibeli)
+                // PO → OPEN setelah approval final
+                $approved_by_esc = mysqli_real_escape_string($koneksi,
+                    $pr['approve1_by'] . ' & ' . $username_saya);
                 $sql_po = "UPDATE tr_purchase_order SET
                                 status_po   = 'OPEN',
-                                approved_by = CONCAT('".$pr['approve1_by']."', ' & $username_saya'),
+                                approved_by = '$approved_by_esc',
                                 tgl_approve = '$now'
                            WHERE id_request = '$id'";
                 if (!mysqli_query($koneksi, $sql_po)) throw new Exception("Gagal update PO ke OPEN: " . mysqli_error($koneksi));
@@ -169,11 +173,11 @@ try {
             }
 
         // ════════════════════════════════════════════════════
-        // APPROVE KE-3 (status APPROVED 2, final)
+        // APPROVE KE-3 (status: APPROVED 2, final)
         // ════════════════════════════════════════════════════
         } elseif ($status_app === 'APPROVED 2') {
 
-            $all_approvers = $pr['approve1_by'] . ' & ' . $pr['approve2_by'] . ' & ' . $username_saya;
+            $all_approvers     = $pr['approve1_by'] . ' & ' . $pr['approve2_by'] . ' & ' . $username_saya;
             $all_approvers_esc = mysqli_real_escape_string($koneksi, $all_approvers);
 
             $sql = "UPDATE tr_request SET

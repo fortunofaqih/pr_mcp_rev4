@@ -60,9 +60,9 @@ if ($_SESSION['status'] != "login") {
             // Cek jika role BUKAN pemesan_pr_besar, maka tampilkan tombol
             if ($_SESSION['role'] !== 'pemesan_pr_besar'): 
             ?>
-                <a href="tambah_request.php" class="btn btn-sm btn-warning fw-bold">
+               <!-- <a href="tambah_request.php" class="btn btn-sm btn-warning fw-bold">
                     <i class="fas fa-plus-circle"></i> BUAT REQUEST BARU (BARANG KECIL)
-                </a>
+                </a> -->
             <?php endif; ?>
 
             <button type="button" class="btn btn-sm btn-success fw-bold" data-bs-toggle="modal" data-bs-target="#modalCetakTanggal">
@@ -310,63 +310,22 @@ if ($_SESSION['status'] != "login") {
                                 title="Cetak PR">
                                     <i class="fas fa-print"></i>
                                 </a>-->
-								<?php
-                                        // 1. Logika penentuan file cetak
-                                        $is_pr_besar = (
-                                            $row['kategori_pr'] === 'BESAR' || 
-                                            strpos($row['no_request'] ?? '', 'PRB') === 0 || 
-                                            strpos($row['no_request'] ?? '', 'PRI') === 0
-                                        );
-                                        $file_cetak = $is_pr_besar ? 'cetak_pr_besar.php' : 'cetak_pr.php';
-
-                                        // 2. Logika styling & label (BESAR atau IT)
-                                        $is_besar_or_it = in_array($row['kategori_pr'] ?? '', ['BESAR', 'IT'], true);
-
-                                        $btn_class   = $is_besar_or_it ? 'btn-danger' : 'btn-info text-white';
-                                        $btn_title   = $is_besar_or_it ? 'Cetak PR Besar (QR)' : 'Cetak PR Kecil';
-                                        $show_qr     = $is_besar_or_it;
-                                        ?>
-
-                                        <a href="<?= htmlspecialchars($file_cetak) ?>?id=<?= urlencode($row['id_request'] ?? '') ?>"
-                                        target="_blank"
-                                        class="btn btn-sm <?= $btn_class ?>"
-                                        title="<?= htmlspecialchars($btn_title) ?>">
-                                            <i class="fas fa-print"></i>
-                                            <?php if ($show_qr): ?>
-                                                <i class="fas fa-qrcode ms-1" style="font-size:.6rem;opacity:.8;"></i>
-                                            <?php endif; ?>
-                                        </a>
-                        
-                             <?php 
-								// 1. Tentukan tujuan file berdasarkan kategori barang
-								$link_edit = ($row['kategori_pr'] == 'BESAR') ? 'edit_request_besar.php' : 'edit_request.php';
-
-								// 2. Tentukan syarat tombol muncul (Bisa edit jika belum selesai/batal, atau jika ditolak)
-								$status_bisa_edit = in_array($row['status_request'], ['PENDING', 'PROSES']) || $row['status_approval'] == 'DITOLAK';
-
-								if ($status_bisa_edit): 
+								 <?php
+								$file_cetak = ($row['kategori_pr'] === 'BESAR' || strpos($row['no_request'], 'PRB') === 0)
+											  ? 'cetak_pr_besar.php'
+											  : 'cetak_pr.php';
 								?>
-									<a href="<?= $link_edit ?>?id=<?= $row['id_request'] ?>" 
-									   class="btn btn-sm btn-warning" 
-									   title="<?= ($row['status_approval'] == 'DITOLAK') ? 'Revisi PR' : 'Edit PR' ?>">
-										
-										<?php if ($row['status_approval'] == 'DITOLAK'): ?>
-											<i class="fas fa-redo me-1"></i> Revisi
-										<?php else: ?>
-											<i class="fas fa-edit"></i> Edit
-										<?php endif; ?>
-									</a>
-								<?php endif; ?>
+								<a href="<?= $file_cetak ?>?id=<?= $row['id_request'] ?>"
+								   target="_blank"
+								   class="btn btn-sm <?= $row['kategori_pr'] === 'BESAR' ? 'btn-danger' : 'btn-info text-white' ?>"
+								   title="Cetak PR <?= $row['kategori_pr'] === 'BESAR' ? 'Besar (QR)' : 'Kecil' ?>">
+									<i class="fas fa-print"></i>
+									<?php if ($row['kategori_pr'] === 'BESAR'): ?>
+										<i class="fas fa-qrcode ms-1" style="font-size:.6rem;opacity:.8;"></i>
+									<?php endif; ?>
+								</a>
                         
-                                <!-- Hapus: hanya barang KECIL PENDING -->
-                                <?php if ($row['status_request'] == 'PENDING' && $row['kategori_pr'] != 'BESAR'): ?>
-                                    <a href="hapus_request.php?id=<?= $row['id_request'] ?>"
-                                    class="btn btn-sm btn-outline-danger"
-                                    onclick="return confirm('Hapus seluruh form request ini?')"
-                                    title="Hapus">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                <?php endif; ?>
+                          
                         
                             </div>
                         </td>
@@ -550,7 +509,7 @@ $(document).ready(function () {
 
         // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
         if (now - lastServerUpdate > 300000) {
-            fetch('/pr_mcp_rev4/auth/keep_alive.php')
+            fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
                 .then(response => response.json())
                 .then(data => {
                     if (data.status !== 'success') {
@@ -569,7 +528,7 @@ $(document).ready(function () {
     function forceLogout() {
         alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
         // Redirect ke logout.php agar session server juga dihancurkan
-        window.location.href = "/pr_mcp_rev4/auth/logout.php?pesan=timeout";
+        window.location.href = "http://192.168.31.200/pr_mcp/auth/logout.php?pesan=timeout";
     }
 
     // Pantau aktivitas user
@@ -584,7 +543,7 @@ $(document).ready(function () {
     setInterval(function() {
         idleTime++;
         // Cek session ke server juga
-        fetch('/pr_mcp_rev4/auth/keep_alive.php')
+        fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
             .then(response => response.json())
             .then(data => {
                 if (data.status !== 'success') {

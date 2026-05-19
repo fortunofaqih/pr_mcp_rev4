@@ -1,7 +1,7 @@
 <?php
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 if ($_SESSION['status'] != "login" || $_SESSION['role'] != 'manager') {
     header("location:../../login.php?pesan=bukan_pimpinan");
@@ -14,8 +14,16 @@ $nama_manager  = strtoupper($_SESSION['nama'] ?? $username_saya);
 
 if (!$id) { header("location:approval_pimpinan.php"); exit; }
 
-$pr = mysqli_fetch_assoc(mysqli_query($koneksi, "SELECT * FROM tr_request WHERE id_request='$id'"));
+// BUG FIX: Hapus filter kategori_pr agar PR IT dan BESAR sama-sama bisa dibuka
+$pr = mysqli_fetch_assoc(mysqli_query($koneksi,
+    "SELECT * FROM tr_request WHERE id_request='$id'"));
 if (!$pr) { header("location:approval_pimpinan.php?pesan=tidak_ditemukan"); exit; }
+
+// Pastikan hanya kategori yang valid yang bisa diakses dari sini
+if (!in_array($pr['kategori_pr'], ['BESAR', 'IT'])) {
+    header("location:approval_pimpinan.php?pesan=tidak_ditemukan");
+    exit;
+}
 
 $sudah_approve_saya = (
     ($pr['approve1_by'] === $username_saya) ||
@@ -26,9 +34,18 @@ $sudah_approve_saya = (
 $status_app = $pr['status_approval'];
 $need_m3    = (int)$pr['need_approve3'];
 
-$giliran_m1 = ($status_app === 'MENUNGGU APPROVAL');
-$giliran_m2 = ($status_app === 'APPROVED 1') && ($pr['approve1_by'] !== $username_saya);
-$giliran_m3 = ($status_app === 'APPROVED 2') && $need_m3 && ($pr['approve3_target'] === $username_saya) && empty($pr['approve3_by']);
+$giliran_m1 = ($status_app === 'MENUNGGU APPROVAL')
+              && (empty($pr['approve1_by']));
+
+// BUG FIX: Tambahkan cek approve2_by kosong agar M1 tidak bisa approve ulang sebagai M2
+$giliran_m2 = ($status_app === 'APPROVED 1')
+              && ($pr['approve1_by'] !== $username_saya)
+              && (empty($pr['approve2_by']));
+
+$giliran_m3 = ($status_app === 'APPROVED 2')
+              && $need_m3
+              && ($pr['approve3_target'] === $username_saya)
+              && empty($pr['approve3_by']);
 
 $bisa_diaksi = ($giliran_m1 || $giliran_m2 || $giliran_m3) && !$sudah_approve_saya;
 
@@ -38,7 +55,7 @@ if ($giliran_m2) {
         "SELECT username, nama_lengkap FROM users
          WHERE role='manager' AND status_aktif='AKTIF'
          AND username != '$username_saya'
-         AND username != '".$pr['approve1_by']."'
+         AND username != '".mysqli_real_escape_string($koneksi, $pr['approve1_by'])."'
          ORDER BY nama_lengkap ASC");
     while ($m = mysqli_fetch_assoc($res_m)) {
         $list_manager_m3[] = $m;
@@ -66,13 +83,19 @@ $po = mysqli_fetch_assoc(mysqli_query($koneksi,
      FROM tr_purchase_order p
      LEFT JOIN master_supplier s ON p.id_supplier = s.id_supplier
      WHERE p.id_request = '$id' LIMIT 1"));
+
+// Label kategori untuk tampilan
+$label_kategori = $pr['kategori_pr'] === 'IT' ? 'PR IT' : 'PR Barang Besar';
+$icon_kategori  = $pr['kategori_pr'] === 'IT' ? 'fa-laptop' : 'fa-boxes-stacked';
+$color_kategori = $pr['kategori_pr'] === 'IT' ? '#1e40af' : '#991b1b';
+$bg_kategori    = $pr['kategori_pr'] === 'IT' ? '#dbeafe'  : '#fee2e2';
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Review PR <?= htmlspecialchars($pr['no_request']) ?> - MCP</title>
+<title>Review <?= htmlspecialchars($pr['no_request']) ?> - MCP</title>
 <link rel="icon" type="image/png" href="/pr_mcp/assets/img/logo_mcp.png">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -81,12 +104,11 @@ $po = mysqli_fetch_assoc(mysqli_query($koneksi,
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     body{background:#f1f5f9; font-family:'Inter', sans-serif; font-size:.875rem; color:#334155;}
     .navbar-mcp{background: linear-gradient(135deg, #1e3a8a, #2563eb); padding: 0.8rem 0;}
-    
+
     .info-header{background:white; border-radius:16px; box-shadow:0 4px 6px -1px rgba(0,0,0,.05); padding:20px; margin-bottom:15px; border: 1px solid #e2e8f0;}
     .info-label{font-size:.65rem; font-weight:800; text-transform:uppercase; color:#64748b; letter-spacing:.05em; margin-bottom:3px;}
     .info-value{font-size:.9rem; font-weight:700; color:#1e293b;}
-    
-    /* Timeline Responsive */
+
     .timeline-container { overflow-x: auto; padding: 10px 0; -webkit-overflow-scrolling: touch; }
     .approval-timeline{ display: flex; align-items: flex-start; gap: 0; min-width: 480px; margin-bottom: 0; }
     .apv-step{flex:1; text-align:center; position:relative;}
@@ -100,22 +122,44 @@ $po = mysqli_fetch_assoc(mysqli_query($koneksi,
     @keyframes pulse{ from{box-shadow:0 0 0 0 rgba(255,193,7,.4);} to{box-shadow:0 0 0 8px rgba(255,193,7,0);}}
     .apv-label{font-size:.65rem; margin-top:6px; font-weight:700; line-height: 1.2;}
 
-    /* Table Optimization */
     .table-detail thead { background: #1e293b; color: white; }
     .table-detail th { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; padding: 12px 10px !important; }
 
-    /* Action & Badges */
     .btn-approve{background:#10b981; color:white; border:none; padding:12px 24px; font-size:.85rem; font-weight:700; border-radius:10px; transition: 0.2s;}
     .btn-reject{background:#ef4444; color:white; border:none; padding:12px 24px; font-size:.85rem; font-weight:700; border-radius:10px; transition: 0.2s;}
     .btn-approve:hover, .btn-reject:hover { opacity: 0.9; transform: translateY(-1px); color: white; }
     .action-box{background:white; border-radius:16px; box-shadow:0 10px 15px -3px rgba(0,0,0,.1); padding:24px; border: 1px solid #e2e8f0;}
-    
+
     .ban-badge-item{display:inline-block; background:#fff3cd; border:1px solid #ffc107; color:#7c4a00; font-size:.62rem; font-weight:700; padding:2px 6px; border-radius:4px;}
     .m3-select-box{background:#f0f7ff; border:1px solid #bae6fd; border-radius:12px; padding:16px;}
 
+    .banner-penawaran {
+        display: flex; align-items: center; gap: 14px;
+        background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+        border: 1.5px solid #86efac; border-left: 5px solid #16a34a;
+        border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;
+        box-shadow: 0 2px 8px rgba(22,163,74,.08);
+    }
+    .banner-penawaran .icon-pdf {
+        font-size: 2rem; color: #dc2626; flex-shrink: 0;
+        background: white; width: 44px; height: 44px; border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 2px 6px rgba(0,0,0,.1);
+    }
+    .banner-penawaran .info-wrap { flex: 1; min-width: 0; }
+    .banner-penawaran .label { font-size: .68rem; font-weight: 800; color: #166534; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 3px; }
+    .banner-penawaran .filename { font-size: .82rem; color: #1e293b; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .banner-penawaran .btn-buka-pdf {
+        flex-shrink: 0; margin-left: auto;
+        display: inline-flex; align-items: center; gap: 6px;
+        background: #16a34a; color: #fff; border-radius: 8px; padding: 8px 16px;
+        font-size: .75rem; font-weight: 700; text-decoration: none; white-space: nowrap;
+        transition: .2s; box-shadow: 0 2px 6px rgba(22,163,74,.3);
+    }
+    .banner-penawaran .btn-buka-pdf:hover { background: #15803d; color: white; transform: translateY(-1px); }
+
     @media (max-width: 768px) {
         .info-header { padding: 15px; }
-        /* Tabel jadi Card di Mobile */
         .table-detail thead { display: none; }
         .table-detail tbody tr { display: block; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 10px; padding: 10px; background: white; }
         .table-detail td { display: flex; justify-content: space-between; align-items: center; border: none !important; padding: 6px 5px !important; text-align: right; }
@@ -124,77 +168,9 @@ $po = mysqli_fetch_assoc(mysqli_query($koneksi,
         .table-detail tfoot td { border: none !important; display: flex; justify-content: space-between; }
         .btn-approve, .btn-reject { width: 100%; }
         .navbar-text { display: none; }
+        .banner-penawaran { flex-wrap: wrap; }
+        .banner-penawaran .btn-buka-pdf { width: 100%; justify-content: center; margin-left: 0; }
     }
-	/* Banner Penawaran PDF */
-.banner-penawaran {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    background: linear-gradient(135deg, #f0fdf4, #dcfce7);
-    border: 1.5px solid #86efac;
-    border-left: 5px solid #16a34a;
-    border-radius: 12px;
-    padding: 14px 18px;
-    margin-bottom: 16px;
-    box-shadow: 0 2px 8px rgba(22,163,74,.08);
-}
-	.banner-penawaran .icon-pdf {
-		font-size: 2rem;
-		color: #dc2626;
-		flex-shrink: 0;
-		background: white;
-		width: 44px; height: 44px;
-		border-radius: 10px;
-		display: flex; align-items: center; justify-content: center;
-		box-shadow: 0 2px 6px rgba(0,0,0,.1);
-	}
-	.banner-penawaran .info-wrap {
-		flex: 1;
-		min-width: 0;
-	}
-	.banner-penawaran .label {
-		font-size: .68rem;
-		font-weight: 800;
-		color: #166534;
-		text-transform: uppercase;
-		letter-spacing: .06em;
-		margin-bottom: 3px;
-	}
-	.banner-penawaran .filename {
-		font-size: .82rem;
-		color: #1e293b;
-		font-weight: 700;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		max-width: 100%;
-	}
-	.banner-penawaran .btn-buka-pdf {
-		flex-shrink: 0;
-		margin-left: auto;
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		background: #16a34a;
-		color: #fff;
-		border-radius: 8px;
-		padding: 8px 16px;
-		font-size: .75rem;
-		font-weight: 700;
-		text-decoration: none;
-		white-space: nowrap;
-		transition: .2s;
-		box-shadow: 0 2px 6px rgba(22,163,74,.3);
-	}
-	.banner-penawaran .btn-buka-pdf:hover {
-		background: #15803d;
-		color: white;
-		transform: translateY(-1px);
-	}
-	@media (max-width: 576px) {
-		.banner-penawaran { flex-wrap: wrap; }
-		.banner-penawaran .btn-buka-pdf { width: 100%; justify-content: center; margin-left: 0; }
-	}
 </style>
 </head>
 <body>
@@ -211,6 +187,14 @@ $po = mysqli_fetch_assoc(mysqli_query($koneksi,
 </nav>
 
 <div class="container-fluid px-3 px-md-4">
+
+    <!-- Badge Kategori PR -->
+    <div class="mb-3">
+        <span class="badge rounded-pill px-3 py-2 fw-bold"
+              style="background:<?= $bg_kategori ?>; color:<?= $color_kategori ?>; font-size:.75rem; border:1px solid <?= $color_kategori ?>30;">
+            <i class="fas <?= $icon_kategori ?> me-1"></i> <?= $label_kategori ?>
+        </span>
+    </div>
 
     <?php if ($giliran_m1): ?>
     <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center gap-3 mb-3 py-3">
@@ -230,23 +214,28 @@ $po = mysqli_fetch_assoc(mysqli_query($koneksi,
         <i class="fas fa-flag-checkered fs-4"></i>
         <div class="small"><strong>Final Review.</strong> Anda ditunjuk sebagai Manager ke-3 oleh <?= htmlspecialchars($pr['approve2_by']) ?>.</div>
     </div>
+    <?php elseif ($sudah_approve_saya): ?>
+    <div class="alert alert-secondary border-0 shadow-sm d-flex align-items-center gap-3 mb-3 py-3">
+        <i class="fas fa-check-double fs-4"></i>
+        <div class="small"><strong>Anda sudah memberikan persetujuan</strong> untuk PR ini.</div>
+    </div>
     <?php endif; ?>
-	<?php if (!empty($pr['file_penawaran'])): ?>
-		<div class="banner-penawaran">
-			<div class="icon-pdf"><i class="fas fa-file-pdf"></i></div>
-			<div class="info-wrap">
-				<div class="label"><i class="fas fa-paperclip me-1"></i>Lampiran Penawaran Supplier</div>
-				<div class="filename" title="<?= htmlspecialchars($pr['file_penawaran']) ?>">
-					<?= htmlspecialchars($pr['file_penawaran']) ?>
-				</div>
-			</div>
-			<a href="../../download_penawaran.php?file=<?= urlencode($pr['file_penawaran']) ?>&id_request=<?= $id ?>"
-			   target="_blank"
-			   class="btn-buka-pdf">
-				<i class="fas fa-eye"></i> Buka PDF
-			</a>
-		</div>
-		<?php endif; ?>
+
+    <?php if (!empty($pr['file_penawaran'])): ?>
+    <div class="banner-penawaran">
+        <div class="icon-pdf"><i class="fas fa-file-pdf"></i></div>
+        <div class="info-wrap">
+            <div class="label"><i class="fas fa-paperclip me-1"></i>Lampiran Penawaran Supplier</div>
+            <div class="filename" title="<?= htmlspecialchars($pr['file_penawaran']) ?>">
+                <?= htmlspecialchars($pr['file_penawaran']) ?>
+            </div>
+        </div>
+        <a href="../../download_penawaran.php?file=<?= urlencode($pr['file_penawaran']) ?>&id_request=<?= $id ?>"
+           target="_blank" class="btn-buka-pdf">
+            <i class="fas fa-eye"></i> Buka PDF
+        </a>
+    </div>
+    <?php endif; ?>
 
     <div class="info-header">
         <div class="row g-3">
@@ -275,15 +264,21 @@ $po = mysqli_fetch_assoc(mysqli_query($koneksi,
                 <div class="timeline-container">
                     <div class="approval-timeline">
                         <div class="apv-step">
-                            <div class="apv-circle <?= in_array($status_app, ['APPROVED 1','APPROVED 2','APPROVED']) ? 'apv-done' : ($status_app === 'MENUNGGU APPROVAL' ? 'apv-active' : 'apv-todo') ?>"><?= in_array($status_app, ['APPROVED 1','APPROVED 2','APPROVED']) ? '<i class="fas fa-check"></i>' : '1' ?></div>
+                            <div class="apv-circle <?= in_array($status_app, ['APPROVED 1','APPROVED 2','APPROVED']) ? 'apv-done' : ($status_app === 'MENUNGGU APPROVAL' ? 'apv-active' : 'apv-todo') ?>">
+                                <?= in_array($status_app, ['APPROVED 1','APPROVED 2','APPROVED']) ? '<i class="fas fa-check"></i>' : '1' ?>
+                            </div>
                             <div class="apv-label"><?= $pr['approve1_by'] ? '<span class="text-success">'.htmlspecialchars($pr['approve1_by']).'</span>' : 'M1' ?></div>
                         </div>
                         <div class="apv-step">
-                            <div class="apv-circle <?= in_array($status_app, ['APPROVED 2','APPROVED']) ? 'apv-done' : ($status_app === 'APPROVED 1' ? 'apv-active' : 'apv-todo') ?>"><?= in_array($status_app, ['APPROVED 2','APPROVED']) ? '<i class="fas fa-check"></i>' : '2' ?></div>
+                            <div class="apv-circle <?= in_array($status_app, ['APPROVED 2','APPROVED']) ? 'apv-done' : ($status_app === 'APPROVED 1' ? 'apv-active' : 'apv-todo') ?>">
+                                <?= in_array($status_app, ['APPROVED 2','APPROVED']) ? '<i class="fas fa-check"></i>' : '2' ?>
+                            </div>
                             <div class="apv-label"><?= $pr['approve2_by'] ? '<span class="text-success">'.htmlspecialchars($pr['approve2_by']).'</span>' : 'M2' ?></div>
                         </div>
                         <div class="apv-step">
-                            <div class="apv-circle <?= ($status_app === 'APPROVED' && $need_m3) ? 'apv-done' : ($status_app === 'APPROVED 2' ? 'apv-active' : ($need_m3 ? 'apv-optional' : 'apv-todo')) ?>"><?= ($status_app === 'APPROVED') ? '<i class="fas fa-check"></i>' : '3' ?></div>
+                            <div class="apv-circle <?= ($status_app === 'APPROVED' && $need_m3) ? 'apv-done' : ($status_app === 'APPROVED 2' ? 'apv-active' : ($need_m3 ? 'apv-optional' : 'apv-todo')) ?>">
+                                <?= ($status_app === 'APPROVED') ? '<i class="fas fa-check"></i>' : '3' ?>
+                            </div>
                             <div class="apv-label"><?= $pr['approve3_by'] ? htmlspecialchars($pr['approve3_by']) : ($need_m3 ? 'M3' : 'Ops') ?></div>
                         </div>
                     </div>
@@ -311,13 +306,13 @@ $po = mysqli_fetch_assoc(mysqli_query($koneksi,
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while ($d = mysqli_fetch_assoc($details)): 
+                    <?php while ($d = mysqli_fetch_assoc($details)):
                         $nama = !empty($d['nama_master']) ? $d['nama_master'] : $d['nama_barang_manual'];
                     ?>
                     <tr>
                         <td data-label="Barang">
                             <div class="fw-bold"><?= htmlspecialchars(strtoupper($nama)) ?></div>
-                            <?php if($d['is_ban']): ?><span class="ban-badge-item mt-1">BAN</span><?php endif; ?>
+                            <?php if(!empty($d['is_ban']) && $d['is_ban']): ?><span class="ban-badge-item mt-1">BAN</span><?php endif; ?>
                         </td>
                         <td data-label="Unit" class="text-center"><?= $d['plat_nomor'] ?: '-' ?></td>
                         <td data-label="Tipe" class="text-center small"><?= $d['tipe_request'] ?></td>
@@ -339,81 +334,80 @@ $po = mysqli_fetch_assoc(mysqli_query($koneksi,
         </div>
     </div>
 
-<?php if ($po): ?>
-<div class="card shadow-sm border-0 mb-4" style="border-radius:16px; border:1px solid #bae6fd;">
-    <div class="card-header fw-bold py-3 d-flex justify-content-between align-items-center flex-wrap gap-2" style="background:#f0f9ff; color:#0369a1; border-radius:16px 16px 0 0;">
-        <div>
-            <i class="fas fa-file-invoice me-2"></i> Preview Purchase Order (PO)
-            <span class="badge ms-2 fw-normal" style="font-size:.7rem; background:<?= $po['status_po']==='OPEN'?'#dcfce7;color:#166534':($po['status_po']==='CLOSE'?'#f1f5f9;color:#475569':'#fef9c3;color:#854d0e') ?>;">
-                <?= $po['status_po'] ?>
-            </span>
+    <?php if ($po): ?>
+    <div class="card shadow-sm border-0 mb-4" style="border-radius:16px; border:1px solid #bae6fd;">
+        <div class="card-header fw-bold py-3 d-flex justify-content-between align-items-center flex-wrap gap-2" style="background:#f0f9ff; color:#0369a1; border-radius:16px 16px 0 0;">
+            <div>
+                <i class="fas fa-file-invoice me-2"></i> Preview Purchase Order (PO)
+                <span class="badge ms-2 fw-normal" style="font-size:.7rem; background:<?= $po['status_po']==='OPEN'?'#dcfce7;color:#166534':($po['status_po']==='CLOSE'?'#f1f5f9;color:#475569':'#fef9c3;color:#854d0e') ?>;">
+                    <?= $po['status_po'] ?>
+                </span>
+            </div>
+            <span class="fw-normal small">No. PO: <strong><?= htmlspecialchars($po['no_po']) ?></strong></span>
         </div>
-        <span class="fw-normal small">No. PO: <strong><?= htmlspecialchars($po['no_po']) ?></strong></span>
+        <div class="card-body p-4">
+            <div class="row g-4 mb-4">
+                <div class="col-6 col-md-4">
+                    <div class="info-label">Supplier</div>
+                    <div class="info-value text-primary">
+                        <?= !empty($po['nama_supplier']) ? strtoupper(htmlspecialchars($po['nama_supplier'])) : '<span class="text-muted fst-italic fw-normal" style="font-size:.8rem;">Belum ditentukan</span>' ?>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="info-label">Tanggal PO</div>
+                    <div class="info-value"><?= date('d/m/Y', strtotime($po['tgl_po'])) ?></div>
+                </div>
+                <div class="col-12 col-md-5">
+                    <div class="info-label">U/P (Atas Nama)</div>
+                    <div class="info-value"><?= htmlspecialchars($po['atas_nama'] ?: '-') ?></div>
+                </div>
+            </div>
+            <div class="row g-2">
+                <div class="col-6 col-md-3">
+                    <div class="p-3 bg-light rounded-3 text-center border">
+                        <div class="info-label">Subtotal</div>
+                        <div class="fw-bold">Rp <?= number_format($po['subtotal'], 0, ',', '.') ?></div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-3 bg-light rounded-3 text-center border">
+                        <div class="info-label">Diskon</div>
+                        <div class="fw-bold text-danger"><?= $po['diskon'] > 0 ? '(Rp '.number_format($po['diskon'], 0, ',', '.').')' : '-' ?></div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-3 bg-light rounded-3 text-center border">
+                        <div class="info-label">PPN (<?= (float)$po['ppn_persen'] ?>%)</div>
+                        <div class="fw-bold text-dark">Rp <?= number_format($po['ppn_nominal'], 0, ',', '.') ?></div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-3 rounded-3 text-center text-white shadow-sm" style="background:#1e3a8a;">
+                        <div class="info-label text-white-50">Grand Total</div>
+                        <div class="fw-bold fs-6">Rp <?= number_format($po['grand_total'], 0, ',', '.') ?></div>
+                    </div>
+                </div>
+            </div>
+            <?php if ($po['catatan']): ?>
+            <div class="mt-3 p-3 bg-light rounded-3 small border-start border-4 border-primary">
+                <strong>Catatan PO:</strong><br><?= nl2br(htmlspecialchars($po['catatan'])) ?>
+            </div>
+            <?php endif; ?>
+            <?php if ($status_app === 'APPROVED'): ?>
+            <div class="mt-3">
+                <a href="cetak_po.php?id_po=<?= $po['id_po'] ?>" target="_blank" class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3">
+                    <i class="fas fa-print me-1"></i> Cetak Dokumen PO
+                </a>
+            </div>
+            <?php endif; ?>
+        </div>
     </div>
-    <div class="card-body p-4">
-        <div class="row g-4 mb-4">
-            <div class="col-6 col-md-4">
-                <div class="info-label">Supplier</div>
-                <div class="info-value text-primary"><?= strtoupper(htmlspecialchars($po['nama_supplier'] ?? '-')) ?></div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="info-label">Tanggal PO</div>
-                <div class="info-value"><?= date('d/m/Y', strtotime($po['tgl_po'])) ?></div>
-            </div>
-            <div class="col-12 col-md-5">
-                <div class="info-label">U/P (Atas Nama)</div>
-                <div class="info-value"><?= htmlspecialchars($po['atas_nama'] ?: '-') ?></div>
-            </div>
-        </div>
-
-        <div class="row g-2">
-            <div class="col-6 col-md-3">
-                <div class="p-3 bg-light rounded-3 text-center border">
-                    <div class="info-label">Subtotal</div>
-                    <div class="fw-bold">Rp <?= number_format($po['subtotal'], 0, ',', '.') ?></div>
-                </div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="p-3 bg-light rounded-3 text-center border">
-                    <div class="info-label">Diskon</div>
-                    <div class="fw-bold text-danger"><?= $po['diskon'] > 0 ? '(Rp '.number_format($po['diskon'], 0, ',', '.').')' : '-' ?></div>
-                </div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="p-3 bg-light rounded-3 text-center border">
-                    <div class="info-label">PPN (<?= (float)$po['ppn_persen'] ?>%)</div>
-                    <div class="fw-bold text-dark">Rp <?= number_format($po['ppn_nominal'], 0, ',', '.') ?></div>
-                </div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="p-3 rounded-3 text-center text-white shadow-sm" style="background:#1e3a8a;">
-                    <div class="info-label text-white-50">Grand Total</div>
-                    <div class="fw-bold fs-6">Rp <?= number_format($po['grand_total'], 0, ',', '.') ?></div>
-                </div>
-            </div>
-        </div>
-
-        <?php if ($po['catatan']): ?>
-        <div class="mt-3 p-3 bg-light rounded-3 small border-start border-4 border-primary">
-            <strong>Catatan PO:</strong><br><?= nl2br(htmlspecialchars($po['catatan'])) ?>
-        </div>
-        <?php endif; ?>
-
-        <?php if ($status_app === 'APPROVED'): ?>
-        <div class="mt-3">
-            <a href="cetak_po.php?id_po=<?= $po['id_po'] ?>" target="_blank" class="btn btn-outline-primary btn-sm fw-bold rounded-pill px-3">
-                <i class="fas fa-print me-1"></i> Cetak Dokumen PO
-            </a>
-        </div>
-        <?php endif; ?>
-    </div>
-</div>
-<?php endif; ?>
+    <?php endif; ?>
 
     <?php if ($bisa_diaksi): ?>
     <div class="action-box mb-5">
         <h6 class="fw-bold mb-3"><i class="fas fa-pen-nib me-2 text-primary"></i>Form Persetujuan</h6>
-        
+
         <?php if ($giliran_m2): ?>
         <div class="m3-select-box mb-4">
             <div class="form-check form-switch mb-2">
@@ -433,13 +427,13 @@ $po = mysqli_fetch_assoc(mysqli_query($koneksi,
 
         <div class="row g-3">
             <div class="col-md-6">
-                <button class="btn-approve w-100" onclick="approvePR(<?= $id ?>, '<?= $pr['no_request'] ?>')">
-                    <i class="fas fa-check-circle me-2"></i> 
+                <button class="btn-approve w-100" onclick="approvePR(<?= $id ?>, '<?= htmlspecialchars($pr['no_request'], ENT_QUOTES) ?>')">
+                    <i class="fas fa-check-circle me-2"></i>
                     <?= $giliran_m3 ? 'APPROVE SEKARANG (FINAL)' : 'SETUJUI & LANJUTKAN' ?>
                 </button>
             </div>
             <div class="col-md-6">
-                <button class="btn-reject w-100" onclick="rejectPR(<?= $id ?>, '<?= $pr['no_request'] ?>')">
+                <button class="btn-reject w-100" onclick="rejectPR(<?= $id ?>, '<?= htmlspecialchars($pr['no_request'], ENT_QUOTES) ?>')">
                     <i class="fas fa-times-circle me-2"></i> TOLAK PERMINTAAN
                 </button>
             </div>
@@ -459,17 +453,17 @@ function toggleM3Select(){
 }
 
 function approvePR(id, no) {
-    var needM3 = IS_GILIRAN_M2 && document.getElementById('chkNeedM3').checked;
+    var needM3   = IS_GILIRAN_M2 && document.getElementById('chkNeedM3') && document.getElementById('chkNeedM3').checked;
     var m3Target = needM3 ? document.getElementById('selectM3').value : '';
 
-    if(needM3 && !m3Target){
+    if (needM3 && !m3Target) {
         Swal.fire('Pilih Manager','Silakan pilih nama Manager ke-3 terlebih dahulu.','warning');
         return;
     }
 
     Swal.fire({
         title: 'Konfirmasi Approval',
-        text: 'Apakah Anda yakin menyetujui PR ' + no + '?',
+        text: 'Apakah Anda yakin menyetujui ' + no + '?',
         icon: 'question',
         input: 'textarea',
         inputPlaceholder: 'Tulis catatan Anda di sini (opsional)...',
@@ -480,10 +474,10 @@ function approvePR(id, no) {
     }).then((result) => {
         if (result.isConfirmed) {
             Swal.fire({title:'Memproses...', didOpen:()=>{Swal.showLoading()}});
-            window.location.href = 'proses_approval_besar.php?action=approve&id=' + id 
-                                    + '&catatan=' + encodeURIComponent(result.value || '')
-                                    + '&need_m3=' + (needM3 ? '1' : '0')
-                                    + '&m3_target=' + encodeURIComponent(m3Target);
+            window.location.href = 'proses_approval_besar.php?action=approve&id=' + id
+                                 + '&catatan=' + encodeURIComponent(result.value || '')
+                                 + '&need_m3='  + (needM3 ? '1' : '0')
+                                 + '&m3_target=' + encodeURIComponent(m3Target);
         }
     });
 }
@@ -491,7 +485,7 @@ function approvePR(id, no) {
 function rejectPR(id, no) {
     Swal.fire({
         title: 'Tolak Permintaan?',
-        text: 'PR ' + no + ' akan dibatalkan dan tim pembelian tidak bisa memprosesnya.',
+        text: no + ' akan dibatalkan dan tidak bisa diproses lebih lanjut.',
         icon: 'warning',
         input: 'textarea',
         inputPlaceholder: 'Wajib isi alasan penolakan...',
@@ -501,7 +495,8 @@ function rejectPR(id, no) {
         confirmButtonText: 'Ya, Tolak PR'
     }).then((result) => {
         if (result.isConfirmed) {
-            window.location.href = 'proses_approval_besar.php?action=reject&id=' + id + '&catatan=' + encodeURIComponent(result.value);
+            window.location.href = 'proses_approval_besar.php?action=reject&id=' + id
+                                 + '&catatan=' + encodeURIComponent(result.value);
         }
     });
 }
