@@ -146,7 +146,7 @@ $rak_list_for_jump = array_values($rak_list_for_jump);
         .table-scroll-container { max-height: none !important; overflow: visible !important; }
         
         /* 1. Reset font body */
-        body { font-size: 8px !important; line-height: 1.1 !important; }
+        body { font-size: 8px !important; line-height: 1.1 !important; font-weight: bold !important;}
         
         /* 2. Kunci Utama: Merapatkan Tabel (Crystal Report Style) */
         table { 
@@ -344,7 +344,7 @@ $rak_list_for_jump = array_values($rak_list_for_jump);
 								<td class="text-center bg-light"><?= $row['lokasi_rak'] ?: '-' ?></td>
 								<td class="text-center"><?= $row['satuan'] ?></td>
 								
-								<td class="text-center text-danger fw-bold">
+								<td class="text-center text-dark fw-bold">
 									<?php 
 										$stok_raw = number_format($row['stok_akhir'], 4, ',', '.');
 										echo rtrim(rtrim($stok_raw, '0'), ','); 
