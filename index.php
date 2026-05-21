@@ -323,6 +323,10 @@ if ($is_finance) {
                     <li class="nav-item"><a href="modul/transaksi/pengambilan.php" class="nav-link text-warning fw-bold"><i class="fas fa-dolly me-2"></i> Bon Pengambilan</a></li>
                     <li class="nav-item"><a href="modul/transaksi/retur.php" class="nav-link text-warning fw-bold"><i class="fas fa-undo me-2"></i> Retur Barang</a></li>
 
+                    <div class="nav-category">-- Stok Ban Luar (Bekas) --</div>
+                    <li class="nav-item"><a href="modul/ban/cek_status_ban_luar.php" class="nav-link text-warning fw-bold"><i class="fas fa-car me-2"></i> Cek Status Ban</a></li>
+                     <li class="nav-item"><a href="modul/ban/laporan_stok_ban_luar.php" class="nav-link text-warning fw-bold"><i class="fas fa-file-invoice-dollar me-2"></i> Laporan Stok Ban Luar</a></li>
+
                     <div class="nav-category">-- Penyesuaian --</div>
                     <li class="nav-item"><a href="modul/transaksi/koreksi.php" class="nav-link text-warning fw-bold"><i class="fas fa-sync me-2"></i> Koreksi Stok</a></li>
                     <li class="nav-item"><a href="modul/transaksi/pemusnahan.php" class="nav-link text-warning fw-bold"><i class="fas fa-trash-alt me-2"></i> Pemusnahan</a></li>

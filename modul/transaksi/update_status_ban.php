@@ -2,11 +2,13 @@
 // ============================================================
 // modul/transaksi/update_status_ban.php
 // Update status pembelian item & pemasangan ban
-// PO otomatis CLOSE bila semua item dibeli + semua ban terpasang
+// PO otomatis CLOSE bila:
+// - Untuk NON-BAN: semua item sudah dibeli
+// - Untuk BAN: semua item sudah dibeli DAN semua ban terpasang
 // ============================================================
 session_start();
-require_once __DIR__ . '/../../config/koneksi.php';
-require_once __DIR__ . '/../../auth/check_session.php';
+include '../../config/koneksi.php';
+include '../../auth/check_session.php';
 
 if ($_SESSION['status'] !== 'login') {
     header('location:../../login.php?pesan=belum_login');
@@ -40,9 +42,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $today    = date('Y-m-d');
     $nama_esc = mysqli_real_escape_string($koneksi, $nama_login);
     $user_esc = mysqli_real_escape_string($koneksi, $username_login);
+    
+    $po_jadi_close = false;
+    $is_ban_item = false;
 
     mysqli_begin_transaction($koneksi);
     try {
+        // Ambil informasi item (apakah ban atau bukan)
+        $item_info = mysqli_fetch_assoc(mysqli_query($koneksi,
+            "SELECT is_ban FROM tr_request_detail WHERE id_detail = $id_detail"));
+        $is_ban_item = ($item_info && $item_info['is_ban'] == 1);
+        
         if ($aksi === 'beli') {
             // Ambil data dari tabel pembelian
             $cek = mysqli_fetch_assoc(mysqli_query($koneksi,
@@ -90,26 +100,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Cek apakah PO bisa otomatis CLOSE
         if ($id_req_redir > 0) {
-            $belum_beli = (int)(mysqli_fetch_assoc(mysqli_query($koneksi,
+            // Cek item NON-BAN yang belum dibeli
+            $non_ban_belum_beli = (int)(mysqli_fetch_assoc(mysqli_query($koneksi,
                 "SELECT COUNT(*) AS jml FROM tr_request_detail
-                 WHERE id_request = $id_req_redir AND is_dibeli = 0 AND status_item != 'REJECTED'"))['jml'] ?? 1);
-
-            $ban_belum = (int)(mysqli_fetch_assoc(mysqli_query($koneksi,
+                 WHERE id_request = $id_req_redir 
+                   AND is_ban = 0
+                   AND is_dibeli = 0 
+                   AND status_item != 'REJECTED'"))['jml'] ?? 0);
+            
+            // Cek item BAN yang belum dibeli
+            $ban_belum_beli = (int)(mysqli_fetch_assoc(mysqli_query($koneksi,
                 "SELECT COUNT(*) AS jml FROM tr_request_detail
-                 WHERE id_request = $id_req_redir AND is_ban = 1 AND status_pasang = 'BELUM_TERPASANG'"))['jml'] ?? 0);
+                 WHERE id_request = $id_req_redir 
+                   AND is_ban = 1
+                   AND is_dibeli = 0 
+                   AND status_item != 'REJECTED'"))['jml'] ?? 0);
+            
+            // Cek ban yang sudah dibeli tapi belum terpasang
+            $ban_belum_pasang = (int)(mysqli_fetch_assoc(mysqli_query($koneksi,
+                "SELECT COUNT(*) AS jml FROM tr_request_detail
+                 WHERE id_request = $id_req_redir 
+                   AND is_ban = 1 
+                   AND is_dibeli = 1
+                   AND status_pasang = 'BELUM_TERPASANG'"))['jml'] ?? 0);
 
-            if ($belum_beli === 0 && $ban_belum === 0) {
+            // LOGIKA CLOSE:
+            // 1. Semua item NON-BAN sudah dibeli ($non_ban_belum_beli === 0)
+            // 2. Semua item BAN sudah dibeli ($ban_belum_beli === 0)
+            // 3. Semua ban yang sudah dibeli sudah terpasang ($ban_belum_pasang === 0)
+            $semua_non_ban_selesai = ($non_ban_belum_beli === 0);
+            $semua_ban_selesai = ($ban_belum_beli === 0 && $ban_belum_pasang === 0);
+            
+            if ($semua_non_ban_selesai && $semua_ban_selesai) {
                 mysqli_query($koneksi,
                     "UPDATE tr_purchase_order SET status_po = 'CLOSE'
                      WHERE id_request = $id_req_redir AND status_po = 'OPEN'");
                 mysqli_query($koneksi,
                     "UPDATE tr_request SET status_request = 'SELESAI', updated_by = '$user_esc', updated_at = '$now'
                      WHERE id_request = $id_req_redir AND status_request != 'SELESAI'");
+                $po_jadi_close = true;
             }
         }
 
         mysqli_commit($koneksi);
-        header("location:update_status_ban.php?id_po=$id_po_redir&tab=open&pesan=berhasil");
+        
+        // Redirect berdasarkan status PO
+        $tab_redir = $po_jadi_close ? 'close' : 'open';
+        $close_param = $po_jadi_close ? '&is_close=1' : '';
+        header("location:update_status_ban.php?id_po=$id_po_redir&tab=$tab_redir&pesan=berhasil$close_param");
         exit;
 
     } catch (Exception $e) {
@@ -202,13 +240,20 @@ if ($id_po_filter) {
 
 // Hitung summary item
 $total_item = $item_beli = $item_pending = 0;
+$total_ban = $ban_terpasang = 0;
 $rows_item  = [];
+
 if ($detail_items) {
     while ($d = mysqli_fetch_assoc($detail_items)) {
         if (($d['status_item'] ?? '') === 'REJECTED') continue;
         $total_item++;
         if ((int)($d['is_dibeli'] ?? 0)) $item_beli++;
-        else                              $item_pending++;
+        else $item_pending++;
+        
+        if ((int)($d['is_ban'] ?? 0)) {
+            $total_ban++;
+            if (($d['status_pasang'] ?? '') === 'TERPASANG') $ban_terpasang++;
+        }
         $rows_item[] = $d;
     }
 }
@@ -228,7 +273,7 @@ $pct = $total_item > 0 ? round($item_beli / $total_item * 100) : 0;
 
 <style>
 /* ══════════════════════════════════════════
-   TOKENS
+   TOKENS (SAMA SEPERTI SEBELUMNYA)
 ══════════════════════════════════════════ */
 :root {
     --navy      : #1e3a8a;
@@ -587,6 +632,9 @@ body {
     <div class="alert-bar success">
         <i class="fas fa-check-circle"></i>
         <strong>Berhasil!</strong> Status berhasil diperbarui.
+        <?php if (isset($_GET['is_close']) && $_GET['is_close'] == 1): ?>
+        <br><small>✅ PO telah otomatis CLOSE karena semua item sudah selesai.</small>
+        <?php endif; ?>
         <button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:inherit;font-size:.9rem;">✕</button>
     </div>
     <?php elseif ($pesan === 'gagal'): ?>
@@ -719,6 +767,9 @@ body {
                     <div style="text-align:right;">
                         <div style="font-family:'JetBrains Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--teal-dk);"><?= $pct ?>%</div>
                         <div style="font-size:.65rem;color:var(--slate);"><?= $item_beli ?>/<?= $total_item ?> item selesai</div>
+                        <?php if ($total_ban > 0): ?>
+                        <div style="font-size:.65rem;color:var(--amber);">Ban: <?= $ban_terpasang ?>/<?= $total_ban ?> terpasang</div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -790,7 +841,7 @@ body {
                             <th width="140">Status Beli</th>
                             <th width="140">Status Ban</th>
                             <?php if (!$is_close_view): ?>
-                            <th width="155">Aksi</th>
+                            <th width="180">Aksi</th>
                             <?php endif; ?>
                         </tr>
                     </thead>
@@ -890,21 +941,32 @@ body {
                                 <?php if (!$is_dibeli): ?>
                                     <?php if ($sudah_nota): ?>
                                         <div style="font-size:.63rem;color:var(--teal-dk);font-weight:700;margin-bottom:2px;">
-                                            <i class="fas fa-check-circle me-1"></i>Nota ada
+                                            <i class="fas fa-check-circle me-1"></i>Nota sudah diinput
                                         </div>
-                                        <form method="POST" onsubmit="return konfirmBeli(event, '<?= htmlspecialchars(strtoupper($nama), ENT_QUOTES) ?>')">
+                                        <form method="POST" onsubmit="return konfirmBeli(event, '<?= htmlspecialchars(strtoupper($nama), ENT_QUOTES) ?>', <?= $is_ban ? 'true' : 'false' ?>)">
                                             <input type="hidden" name="id_detail"  value="<?= (int)$d['id_detail'] ?>">
                                             <input type="hidden" name="id_po"      value="<?= $id_po_filter ?>">
                                             <input type="hidden" name="id_request" value="<?= $id_request_sel ?>">
                                             <input type="hidden" name="aksi"       value="beli">
                                             <button type="submit" class="btn-beli">
-                                                <i class="fas fa-shopping-bag"></i> DONE
+                                                <i class="fas fa-shopping-bag"></i> 
+                                                <?= $is_ban ? 'DONE (Sudah Dibeli)' : 'DONE' ?>
                                             </button>
                                         </form>
+                                        <?php if (!$is_ban): ?>
+                                        <small style="color: #059669; font-size: 0.6rem;">
+                                            <i class="fas fa-info-circle"></i> 
+                                            Item non-ban akan langsung CLOSE PO
+                                        </small>
+                                        <?php endif; ?>
                                     <?php else: ?>
                                         <span class="nota-warning">
                                             <i class="fas fa-exclamation-triangle"></i> Nota belum diinput
                                         </span>
+                                        <small style="color: #d97706; font-size: 0.6rem;">
+                                            <i class="fas fa-info-circle"></i> 
+                                            Input nota pembelian terlebih dahulu
+                                        </small>
                                     <?php endif; ?>
                                 <?php endif; ?>
 
@@ -914,9 +976,22 @@ body {
                                         <input type="hidden" name="id_po"      value="<?= $id_po_filter ?>">
                                         <input type="hidden" name="id_request" value="<?= $id_request_sel ?>">
                                         <input type="hidden" name="aksi"       value="pasang">
-                                        <button type="submit" class="btn-pasang">
-                                            <i class="fas fa-circle"></i> Tandai Terpasang
-                                        </button>
+                                        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+                                            <div style="display:flex;gap:5px;align-items:center;">
+                                                <input type="date" 
+                                                       name="tgl_pasang" 
+                                                       value="<?= date('Y-m-d') ?>"
+                                                       style="padding:4px 8px; font-size:.72rem; border:1px solid var(--border); border-radius:6px;"
+                                                       required>
+                                                <button type="submit" class="btn-pasang">
+                                                    <i class="fas fa-circle"></i> Tandai Terpasang
+                                                </button>
+                                            </div>
+                                            <small style="color: #d97706; font-size: 0.6rem;">
+                                                <i class="fas fa-exclamation-circle"></i> 
+                                                Jangan lupa isi tanggal pemasangan!
+                                            </small>
+                                        </div>
                                     </form>
                                 <?php endif; ?>
 
@@ -989,12 +1064,18 @@ function filterItems(val) {
 }
 
 // ── Konfirmasi beli ───────────────────────────────────────────
-function konfirmBeli(e, nama) {
+function konfirmBeli(e, nama, isBan) {
     e.preventDefault();
     var form = e.target;
+    var message = 'Item: <strong>' + nama + '</strong><br>';
+    if (!isBan) {
+        message += '<br><span style="color: #059669;">⚠️ Item NON-BAN: PO akan langsung CLOSE jika semua item selesai.</span>';
+    }
+    message += '<br><small class="text-muted">Tindakan ini tidak bisa dibatalkan.</small>';
+    
     Swal.fire({
         title: 'Tandai sudah dibeli?',
-        html: 'Item: <strong>' + nama + '</strong><br><small class="text-muted">Tindakan ini tidak bisa dibatalkan.</small>',
+        html: message,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#0f766e',
@@ -1014,13 +1095,31 @@ function konfirmBeli(e, nama) {
 function konfirmPasang(e, nama, plat) {
     e.preventDefault();
     var form = e.target;
+    var tglPasang = form.querySelector('input[name="tgl_pasang"]').value;
+    
+    if (!tglPasang) {
+        Swal.fire({
+            title: 'Tanggal Wajib Diisi!',
+            text: 'Silakan isi tanggal pemasangan ban terlebih dahulu.',
+            icon: 'warning',
+            confirmButtonColor: '#d97706'
+        });
+        return false;
+    }
+    
     Swal.fire({
         title: 'Tandai ban sudah terpasang?',
-        html: 'Ban: <strong>' + nama + '</strong><br>Kendaraan: <strong>' + plat + '</strong><br><small class="text-muted">Pastikan ban sudah benar-benar terpasang.</small>',
+        html: '<div style="text-align:left;">' +
+              '<strong>Informasi Pemasangan:</strong><br><br>' +
+              '📅 <strong>Tanggal Pasang:</strong> ' + tglPasang + '<br>' +
+              '🔧 <strong>Ban:</strong> ' + nama + '<br>' +
+              '🚗 <strong>Kendaraan:</strong> ' + plat + '<br><br>' +
+              '<small style="color: #d97706;">⚠️ Setelah ini, PO akan CLOSE jika semua ban sudah terpasang.</small>' +
+              '</div>',
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#d97706',
-        confirmButtonText: '<i class="fas fa-circle me-1"></i> Ya, Sudah Terpasang',
+        confirmButtonText: '<i class="fas fa-calendar-check me-1"></i> Ya, Konfirmasi Pasang',
         cancelButtonText: 'Batal'
     }).then(function(r) {
         if (r.isConfirmed) {
