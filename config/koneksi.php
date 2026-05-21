@@ -6,7 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 $host = "localhost";
 $user = "root";
 $pass = "";
-$db   = "mutiarac_db_purchase_system_dummy";
+$db   = "mutiarac_db_purchase_system";
 $port = 3306;
 
 // Melakukan koneksi
