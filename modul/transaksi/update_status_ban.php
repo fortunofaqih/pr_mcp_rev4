@@ -935,14 +935,13 @@ body {
                                     <span style="color:var(--slate);">—</span>
                                 <?php endif; ?>
                             </td>
-                            <?php if (!$is_close_view): ?>
+                           <?php if (!$is_close_view): ?>
                             <td style="text-align:center;">
                                 <div style="display:flex;flex-direction:column;gap:5px;align-items:center;">
+                                
                                 <?php if (!$is_dibeli): ?>
+                                    <!-- ===== ITEM BELUM DIBELI ===== -->
                                     <?php if ($sudah_nota): ?>
-                                        <div style="font-size:.63rem;color:var(--teal-dk);font-weight:700;margin-bottom:2px;">
-                                            <i class="fas fa-check-circle me-1"></i>Nota sudah diinput
-                                        </div>
                                         <form method="POST" onsubmit="return konfirmBeli(event, '<?= htmlspecialchars(strtoupper($nama), ENT_QUOTES) ?>', <?= $is_ban ? 'true' : 'false' ?>)">
                                             <input type="hidden" name="id_detail"  value="<?= (int)$d['id_detail'] ?>">
                                             <input type="hidden" name="id_po"      value="<?= $id_po_filter ?>">
@@ -950,56 +949,70 @@ body {
                                             <input type="hidden" name="aksi"       value="beli">
                                             <button type="submit" class="btn-beli">
                                                 <i class="fas fa-shopping-bag"></i> 
-                                                <?= $is_ban ? 'DONE (Sudah Dibeli)' : 'DONE' ?>
+                                                Tandai Dibeli
                                             </button>
                                         </form>
-                                        <?php if (!$is_ban): ?>
-                                        <small style="color: #059669; font-size: 0.6rem;">
-                                            <i class="fas fa-info-circle"></i> 
-                                            Item non-ban akan langsung CLOSE PO
-                                        </small>
-                                        <?php endif; ?>
                                     <?php else: ?>
                                         <span class="nota-warning">
                                             <i class="fas fa-exclamation-triangle"></i> Nota belum diinput
                                         </span>
-                                        <small style="color: #d97706; font-size: 0.6rem;">
-                                            <i class="fas fa-info-circle"></i> 
-                                            Input nota pembelian terlebih dahulu
-                                        </small>
                                     <?php endif; ?>
+                                
+                                <?php else: ?>
+                                    <!-- ===== ITEM SUDAH DIBELI ===== -->
+                                    <?php if ($is_ban && $status_pasang !== 'TERPASANG'): ?>
+                                        <!-- Ban: Belum dipasang -->
+                                        <span class="bdg bdg-ban-no mb-1">
+                                            <i class="fas fa-clock"></i> Sudah Dibeli (Menunggu Pasang)
+                                        </span>
+                                    <?php else: ?>
+                                        <!-- Item sudah selesai (Non-Ban atau Ban sudah terpasang) -->
+                                        <span class="bdg bdg-done mb-2">
+                                            <i class="fas fa-check-circle"></i> ✓ Selesai
+                                        </span>
+                                        
+                                        <!-- ✅ TOMBOL DONE UNTUK CLOSE PO -->
+                                        <?php if ($po_detail['status_po'] === 'OPEN'): ?>
+                                        <button type="button" 
+                                                class="btn-beli" 
+                                                onclick="closePO(<?= $id_po_filter ?>, <?= $id_request_sel ?>)"
+                                                style="background: #059669; width: 100%;">
+                                            <i class="fas fa-check-double"></i> DONE - CLOSE PO
+                                        </button>
+                                        <small style="color: #0f766e; font-size: 0.6rem; margin-top: 2px;">
+                                            <i class="fas fa-arrow-right"></i> PO akan pindah ke tab CLOSE
+                                        </small>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                    
                                 <?php endif; ?>
 
+                                <!-- Tombol Pasang Ban -->
                                 <?php if ($is_ban && $is_dibeli && $status_pasang === 'BELUM_TERPASANG'): ?>
                                     <form method="POST" onsubmit="return konfirmPasang(event, '<?= htmlspecialchars(strtoupper($nama), ENT_QUOTES) ?>', '<?= htmlspecialchars($unit, ENT_QUOTES) ?>')">
                                         <input type="hidden" name="id_detail"  value="<?= (int)$d['id_detail'] ?>">
                                         <input type="hidden" name="id_po"      value="<?= $id_po_filter ?>">
                                         <input type="hidden" name="id_request" value="<?= $id_request_sel ?>">
                                         <input type="hidden" name="aksi"       value="pasang">
-                                        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
-                                            <div style="display:flex;gap:5px;align-items:center;">
+                                        <div style="display:flex;flex-direction:column;gap:4px;align-items:center; width: 100%;">
+                                            <div style="display:flex;gap:5px;align-items:center; flex-wrap: wrap; justify-content: center;">
                                                 <input type="date" 
-                                                       name="tgl_pasang" 
-                                                       value="<?= date('Y-m-d') ?>"
-                                                       style="padding:4px 8px; font-size:.72rem; border:1px solid var(--border); border-radius:6px;"
-                                                       required>
+                                                    name="tgl_pasang" 
+                                                    value="<?= date('Y-m-d') ?>"
+                                                    style="padding:4px 8px; font-size:.72rem; border:1px solid var(--border); border-radius:6px;"
+                                                    required>
                                                 <button type="submit" class="btn-pasang">
                                                     <i class="fas fa-circle"></i> Tandai Terpasang
                                                 </button>
                                             </div>
                                             <small style="color: #d97706; font-size: 0.6rem;">
                                                 <i class="fas fa-exclamation-circle"></i> 
-                                                Jangan lupa isi tanggal pemasangan!
+                                                Setelah pasang, akan muncul tombol DONE
                                             </small>
                                         </div>
                                     </form>
                                 <?php endif; ?>
 
-                                <?php if ($is_dibeli && (!$is_ban || $status_pasang === 'TERPASANG')): ?>
-                                    <span style="font-size:.72rem;color:var(--teal-dk);font-weight:700;">
-                                        <i class="fas fa-check-circle me-1"></i>Selesai
-                                    </span>
-                                <?php endif; ?>
                                 </div>
                             </td>
                             <?php endif; ?>
@@ -1129,6 +1142,74 @@ function konfirmPasang(e, nama, plat) {
         }
     });
     return false;
+}
+</script>
+<script>
+    // ===== FUNGSI CLOSE PO MANUAL =====
+function closePO(id_po, id_request) {
+    Swal.fire({
+        title: 'Tutup Purchase Order?',
+        html: `
+            <div style="text-align: left;">
+                <p><strong>⚠️ Konfirmasi Tindakan</strong></p>
+                <p>Anda akan mengubah status PO menjadi <strong class="text-danger">CLOSE</strong>.</p>
+                <p>PO akan dipindahkan ke tab <strong>CLOSE</strong> dan tidak dapat diubah lagi.</p>
+                <hr>
+                <small class="text-muted">Pastikan semua item sudah selesai sebelum melanjutkan.</small>
+            </div>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#059669',
+        confirmButtonText: '<i class="fas fa-check-double"></i> Ya, CLOSE PO',
+        cancelButtonText: 'Batal',
+        reverseButtons: true
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Tampilkan loading
+            Swal.fire({
+                title: 'Memproses...',
+                text: 'Mengubah status PO menjadi CLOSE',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+            
+            // Kirim request AJAX
+            fetch('ajax_close_po.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `id_po=${id_po}&id_request=${id_request}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        title: 'Berhasil!',
+                        text: 'PO telah ditutup dan dipindahkan ke tab CLOSE',
+                        icon: 'success',
+                        confirmButtonColor: '#059669'
+                    }).then(() => {
+                        // Refresh halaman ke tab close
+                        window.location.href = `update_status_ban.php?tab=close&id_po=${id_po}&pesan=po_closed`;
+                    });
+                } else {
+                    throw new Error(data.message || 'Gagal menutup PO');
+                }
+            })
+            .catch(error => {
+                Swal.fire({
+                    title: 'Error!',
+                    text: error.message,
+                    icon: 'error',
+                    confirmButtonColor: '#dc2626'
+                });
+            });
+        }
+    });
 }
 </script>
 </body>
