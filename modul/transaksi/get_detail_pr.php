@@ -1,6 +1,6 @@
 <?php
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 if (!isset($_REQUEST['id'])) {
     exit("<div class='p-4 text-center text-danger'>ID tidak ditemukan.</div>");
