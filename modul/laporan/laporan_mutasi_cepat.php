@@ -115,7 +115,7 @@ $rak_list_for_jump = array_values($rak_list_for_jump);
     <link rel="icon" type="image/png" href="/pr_mcp/assets/img/logo_mcp.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
+    <style>
     html { scroll-behavior: smooth; }
     body { background:#f4f7f6; font-size: 11px; }
     .table-mcp { background-color: #0d6efd !important; color: #ffffff !important; }
@@ -141,16 +141,16 @@ $rak_list_for_jump = array_values($rak_list_for_jump);
     }
     .rak-checkbox-item input { margin-right: 4px; }
     
-  @media print {
+   @media print {
         .no-print { display: none !important; }
         .table-scroll-container { max-height: none !important; overflow: visible !important; }
         
         /* 1. Reset font body */
-        body { font-size: 8px !important; line-height: 1.1 !important; font-weight: bold !important;}
+        body { font-size: 10px !important; line-height: 1.1 !important; font-weight: bold !important;}
         
         /* 2. Kunci Utama: Merapatkan Tabel (Crystal Report Style) */
         table { 
-            font-size: 8px !important; 
+            font-size: 10px !important; 
             border-collapse: collapse !important; /* Menghilangkan celah antar border */
             width: 100% !important;
             margin-bottom: 0px !important;
@@ -158,7 +158,7 @@ $rak_list_for_jump = array_values($rak_list_for_jump);
         
         /* 3. Atur Padding TH (Header) Jadi Sangat Minim */
         thead th { 
-            font-size: 8px !important; 
+            font-size: 10px !important; 
             font-weight: bold !important; 
             padding: 1px 2px !important; /* Atas-bawah 1px, kiri-kanan 2px */
             line-height: 1.1 !important;
@@ -167,10 +167,10 @@ $rak_list_for_jump = array_values($rak_list_for_jump);
         
         /* 4. Atur Padding TD (Isi Kolom) Jadi Sangat Minim */
         tbody td { 
-            font-size: 8px !important; 
+            font-size: 10px !important; 
             font-weight: bold !important; 
-            padding: 1px 2px !important; /* Atas-bawah 1px, kiri-kanan 2px */
-            line-height: 1.1 !important; /* Jarak antar baris teks sangat rapat */
+            padding: 0.5px 2px !important; /* Atas-bawah 1px, kiri-kanan 2px */
+            line-height: 1.0 !important; /* Jarak antar baris teks sangat rapat */
             border: 1px solid #000 !important; 
         }
         
@@ -180,12 +180,12 @@ $rak_list_for_jump = array_values($rak_list_for_jump);
         }
         
         /* Perkecil judul & subjudul */
-        h4 { font-size: 11px !important; font-weight: bold !important; margin-bottom: 2px !important; }
+        h6 { font-size: 8px !important; font-weight: bold !important; margin-bottom: 2px !important; }
         .text-muted.fw-bold { font-size: 8px !important; }
         
         /* Tanda tangan lebih kompak */
         .ttd-container { margin-top: 10px !important; }
-        .ttd-container p { font-size: 8px !important; font-weight: bold !important; margin: 0 !important; }
+        .ttd-container p { font-size: 8.5px !important; font-weight: bold !important; margin: 0 !important; }
         
         /* Margin kertas minimal agar muat banyak */
         @page { margin: 5mm; }
@@ -273,18 +273,9 @@ $rak_list_for_jump = array_values($rak_list_for_jump);
     <div class="card shadow-sm border-0">
         <div class="card-body">
             <div class="text-center mb-2">
-                <h4 class="fw-bold mb-0">LAPORAN MUTASI & STOK OPNAME</h4>
+                <h6 class="fw-bold mb-0">LAPORAN MUTASI & STOK OPNAME</h6>
                 <p class="text-muted fw-bold">Periode: <?= date('d/m/Y', strtotime($tgl_mulai)) ?> s/d <?= date('d/m/Y', strtotime($tgl_selesai)) ?></p>
-                
-                <!-- Info Filter Aktif -->
-                <?php if (!empty($rak_terpilih) || $huruf_awal != 'A' || $huruf_akhir != 'Z' || $search_nama != ''): ?>
-                <div class="alert alert-info py-1 mb-2" style="font-size: 10px;">
-                    <i class="fas fa-info-circle me-1"></i> Filter Aktif: 
-                    <?php if(!empty($rak_terpilih)) echo "<strong>".count($rak_terpilih)." Rak dipilih</strong> "; ?>
-                    <?php if($huruf_awal != 'A' || $huruf_akhir != 'Z') echo "<strong>Nama: $huruf_awal-$huruf_akhir</strong> "; ?>
-                    <?php if($search_nama != '') echo "<strong>Cari: '$search_nama'</strong>"; ?>
-                </div>
-                <?php endif; ?>
+               
 
                 <div class="no-print mt-2 d-flex justify-content-center gap-2">
                     <button type="button" onclick="window.print()" class="btn btn-sm btn-primary px-4 fw-bold">
