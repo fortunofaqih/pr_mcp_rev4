@@ -104,6 +104,19 @@ if ($flash_error): ?>
         </h5>
     </div>
     <div class="d-flex gap-2 flex-wrap">
+       <a href="report_excel_aset.php?id=<?= $id ?>"
+            class="btn btn-success btn-sm fw-bold">
+                <i class="fas fa-file-excel me-1"></i> Export Excel
+            </a>
+            
+            <!-- ✅ Tombol Cetak PDF — tambahkan ke toolbar detail_aset.php -->
+            <a href="cetak_pdf_aset.php?id=<?= $id ?>"
+            class="btn btn-danger btn-sm fw-bold"
+            target="_blank"
+            title="Cetak atau simpan sebagai PDF">
+                <i class="fas fa-file-pdf me-1"></i> Cetak PDF
+            </a>
+ 
         <a href="form_asset.php?id=<?= $id ?>" class="btn btn-warning btn-sm fw-bold">
             <i class="fas fa-pencil me-1"></i> Edit
         </a>
