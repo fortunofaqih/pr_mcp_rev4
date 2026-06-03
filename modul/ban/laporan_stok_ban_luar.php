@@ -431,10 +431,20 @@ mysqli_free_result($res_per_nama);
                     <tbody class="small">
                     <?php if (empty($list_log)): ?>
                         <tr>
-                            <td colspan="11" class="text-center text-muted py-5">
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td class="text-center text-muted py-5" colspan="1">
                                 <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
                                 Tidak ada data transaksi pada periode yang dipilih.
                             </td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
                         </tr>
                     <?php else: ?>
                         <?php $no = 1; foreach ($list_log as $l):

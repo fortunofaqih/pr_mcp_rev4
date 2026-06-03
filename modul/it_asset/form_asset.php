@@ -46,6 +46,8 @@ $kode_baru = $is_edit ? $data['kode_asset'] : generateKodeAsset($koneksi);
 
 // Daftar lokasi
 $q_lokasi = mysqli_query($koneksi, "SELECT * FROM master_it_lokasi ORDER BY nama_lokasi");
+// Daftar kondisi
+$q_kondisi = mysqli_query($koneksi, "SELECT * FROM master_it_kondisi ORDER BY nama_kondisi");
 // Tambahkan ini di bagian atas setelah query lokasi
 $q_barang = mysqli_query($koneksi, "SELECT id_barang, nama_barang, merk, kategori FROM master_barang WHERE status_aktif = 'AKTIF' ORDER BY nama_barang ASC");
 
@@ -232,13 +234,19 @@ $additional_css = '
                     <i class="fas fa-heartbeat me-2"></i> Status & Kondisi
                 </div>
                 <div class="card-body">
-                    <div class="mb-3">
+                     <div class="mb-3">
                         <label class="form-label fw-bold small">Kondisi Saat Ini <span class="required-star">*</span></label>
                         <select name="kondisi" class="form-select" required>
-                            <?php foreach(['BAGUS','RUSAK','DI-SERVICE','TIDAK AKTIF','HILANG'] as $k): ?>
-                            <option value="<?= $k ?>" <?= ($data['kondisi'] ?? 'BAGUS') == $k ? 'selected' : '' ?>><?= $k ?></option>
-                            <?php endforeach; ?>
+                            <?php while($kondisi = mysqli_fetch_assoc($q_kondisi)): ?>
+                            <option value="<?= $kondisi['nama_kondisi'] ?>"
+                                <?= ($data['kondisi'] ?? '') == $kondisi['nama_kondisi'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($kondisi['nama_kondisi']) ?>
+                            </option>
+                            <?php endwhile; ?>
+                            <option value="_manual_">-- Isi Manual --</option>
                         </select>
+                        <input type="text" id="kondisi_manual" class="form-control mt-2 d-none"
+                               name="kondisi_manual" placeholder="Ketik nama kondisi...">
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Status Aset <span class="required-star">*</span></label>
@@ -350,6 +358,37 @@ document.querySelector("[name=lokasi]").addEventListener("change", function() {
         manual.required = false;
     }
 });
+// kondisi manual
+document.querySelector("[name=kondisi]").addEventListener("change", function() {
+    const manual = document.getElementById("kondisi_manual");
+    if (this.value === "_manual_") {
+        manual.classList.remove("d-none");
+        manual.required = true;
+    } else {
+        manual.classList.add("d-none");
+        manual.required = false;
+    }
+});
+document.querySelector("[name=lokasi]").addEventListener("change", function() {
+    const manual = document.getElementById("lokasi_manual");
+    if (this.value === "_manual_") {
+        manual.classList.remove("d-none");
+        manual.required = true;
+    } else {
+        manual.classList.add("d-none");
+        manual.required = false;
+    }
+});
+document.querySelector("[name=kondisi]").addEventListener("change", function() {
+    const manual = document.getElementById("kondisi_manual");
+    if (this.value === "_manual_") {
+        manual.classList.remove("d-none");
+        manual.required = true;
+    } else {
+        manual.classList.add("d-none");
+        manual.required = false;
+    }
+});
 
 </script>';
 <script>
@@ -432,6 +471,18 @@ $('#harga_perolehan').on('keyup', function() {
     // Lokasi manual
     $("[name=lokasi]").on('change', function() {
         const manual = document.getElementById("lokasi_manual");
+        if (this.value === "_manual_") {
+            manual.classList.remove("d-none");
+            manual.required = true;
+        } else {
+            manual.classList.add("d-none");
+            manual.required = false;
+        }
+    });
+
+    // kondisi manual
+    $("[name=kondisi]").on('change', function() {
+        const manual = document.getElementById("kondisi_manual");
         if (this.value === "_manual_") {
             manual.classList.remove("d-none");
             manual.required = true;

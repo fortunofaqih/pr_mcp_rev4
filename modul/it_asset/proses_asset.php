@@ -106,6 +106,23 @@ if ($aksi == 'simpan') {
     } else {
         $lokasi = mysqli_real_escape_string($koneksi, $lokasi_sel);
     }
+     // --- LOGIKA KONDISI ---
+    $kondisi_sel = $_POST['kondisi'] ?? '';
+    $kondisi_man = $_POST['kondisi_manual'] ?? '';
+
+    if ($kondisi_sel == '_manual_' && !empty($kondisi_man)) {
+        $kondisi = mysqli_real_escape_string($koneksi, $kondisi_man);
+        
+        // CEK: Apakah kondisi ini sudah ada di master_it_kondisi?
+        $cek_kondisi = mysqli_query($koneksi, "SELECT id_kondisi FROM master_it_kondisi WHERE nama_kondisi = '$kondisi'");
+        
+        if (mysqli_num_rows($cek_kondisi) == 0) {
+            // Jika belum ada, masukkan ke tabel master_it_kondisi agar besok muncul di dropdown
+            mysqli_query($koneksi, "INSERT INTO master_it_kondisi (nama_kondisi) VALUES ('$kondisi')");
+        }
+    } else {
+        $kondisi = mysqli_real_escape_string($koneksi, $kondisi_sel);
+    }
 
     // Upload foto
     $foto = '';

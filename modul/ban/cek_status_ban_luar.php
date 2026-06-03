@@ -329,11 +329,22 @@ $total_sudah   = $row_sudah['jml'] ?? 0;
                     <tbody class="small">
                     <?php if (empty($list_ban)): ?>
                         <tr>
-                            <td colspan="11" class="text-center text-muted py-5">
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td class="text-center text-muted py-5">
                                 <i class="fas fa-check-circle fa-2x text-success mb-2 d-block"></i>
                                 Semua pembelian ban luar sudah masuk ke stok gudang.
                             </td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
                         </tr>
+
                     <?php else: ?>
                         <?php $no = 1; foreach ($list_ban as $b): ?>
                         <tr>
@@ -517,11 +528,26 @@ $total_sudah   = $row_sudah['jml'] ?? 0;
 $(document).ready(function () {
 
     // ── DataTable ──────────────────────────────────────────────
-    $('#tabelBan').DataTable({
+    var tabelBan = $('#tabelBan').DataTable({
         pageLength : 25,
+        autoWidth  : false,
+        processing : true,
+        destroy    : true,
         language   : { url: '//cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json' },
         order      : [[2, 'desc']],
-        columnDefs : [{ orderable: false, targets: [0, 10] }]
+        columnDefs : [
+            { targets: 0, orderable: false, width: '4%' },
+            { targets: 1, width: 'auto' },
+            { targets: 2, width: 'auto' },
+            { targets: 3, width: 'auto' },
+            { targets: 4, width: 'auto' },
+            { targets: 5, width: 'auto', className: 'text-center' },
+            { targets: 6, width: 'auto' },
+            { targets: 7, width: 'auto' },
+            { targets: 8, width: 'auto' },
+            { targets: 9, width: 'auto', className: 'text-center' },
+            { targets: 10, orderable: false, width: '10%', className: 'text-center' }
+        ]
     });
 
     // ── Isi modal saat tombol MASUK STOK diklik ──────────────
