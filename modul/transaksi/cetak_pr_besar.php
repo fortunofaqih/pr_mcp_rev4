@@ -49,18 +49,22 @@ if (empty($h['no_form'])) {
     $h['no_form'] = $no_form;
 }
 
-// ── 3. AMBIL DETAIL BARANG ────────────────────────────────────────────────────
+// ── 3. AMBIL DETAIL BARANG (dengan Supplier dari PO) ──────────────────────────
 $items = [];
 $q = mysqli_query($koneksi,
     "SELECT d.*,
             m.plat_nomor,
             b.nama_barang as nama_barang_master,
-            p.tgl_beli_barang
+            p.tgl_beli_barang,
+            GROUP_CONCAT(DISTINCT ms.nama_supplier SEPARATOR ', ') as supplier_names
      FROM tr_request_detail d
      LEFT JOIN master_mobil  m ON d.id_mobil  = m.id_mobil
      LEFT JOIN master_barang b ON d.id_barang = b.id_barang
      LEFT JOIN pembelian     p ON p.id_request_detail = d.id_detail
+     LEFT JOIN tr_purchase_order po ON po.id_request = d.id_request
+     LEFT JOIN master_supplier ms ON po.id_supplier = ms.id_supplier
      WHERE d.id_request = '$id'
+     GROUP BY d.id_detail
      ORDER BY d.id_detail ASC");
 while ($d = mysqli_fetch_assoc($q)) { $items[] = $d; }
 
@@ -163,14 +167,16 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
             overflow: hidden;
         }
 
-        .c-no     { width: 22px;  text-align: center; }
-        .c-tgl    { width: 55px;  text-align: center; }
-        .c-unit   { width: 65px;  text-align: center; }
-        .c-tipe   { width: 60px;  text-align: center; }
-        .c-qty    { width: 45px;  text-align: center; }
-        .c-harga  { width: 80px;  text-align: right; }
-        .c-sub    { width: 85px;  text-align: right; }
-        .c-ket    { width: auto; }
+        .c-no       { width: 20px;  text-align: center; }
+        .c-barang   { width: 95px;  text-align: left; }
+        .c-supplier { width: 70px;  text-align: center; }
+        .c-tgl      { width: 48px;  text-align: center; }
+        .c-unit     { width: 55px;  text-align: center; }
+        .c-tipe     { width: 50px;  text-align: center; }
+        .c-qty      { width: 38px;  text-align: center; }
+        .c-harga    { width: 65px;  text-align: right; }
+        .c-sub      { width: 75px;  text-align: right; }
+        .c-ket      { width: auto;  text-align: left; }
 
         .ttd-section { width: 100%; border-collapse: collapse; margin-top: 10px; }
         .ttd-section td { width: 33.33%; text-align: center; vertical-align: top; padding: 0 8px; }
@@ -260,12 +266,13 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
     <?php endif; ?>
 </table>
 
-<!-- ── Tabel Barang ── -->
+<!-- ── Tabel Barang (dengan kolom Supplier) ── -->
 <table class="data">
     <thead>
         <tr>
             <th class="c-no">NO</th>
-            <th>NAMA BARANG / ITEM</th>
+            <th class="c-barang">NAMA BARANG / ITEM</th>
+            <th class="c-supplier">SUPPLIER</th>
             <th class="c-tgl">TGL BELI</th>
             <th class="c-unit">UNIT / MOBIL</th>
             <th class="c-tipe">TIPE</th>
@@ -280,6 +287,7 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
         $grand_total = 0;
         foreach ($items as $i => $d):
             $nama     = !empty($d['nama_barang_manual']) ? $d['nama_barang_manual'] : $d['nama_barang_master'];
+            $supplier = !empty($d['supplier_names']) ? $d['supplier_names'] : '-';
             $harga    = (float)($d['harga_satuan_estimasi'] ?? 0);
             $subtotal = (float)($d['subtotal_estimasi']    ?? 0);
             $grand_total += $subtotal;
@@ -287,6 +295,9 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
         <tr>
             <td style="text-align:center;"><?= $i + 1 ?></td>
             <td style="font-weight:bold;"><?= strtoupper(htmlspecialchars($nama)) ?></td>
+            <td style="font-size:6.5pt; text-align:center;">
+                <?= htmlspecialchars($supplier) ?>
+            </td>
             <td style="text-align:center;">
                 <?php if (!empty($d['tgl_beli_barang']) && $d['tgl_beli_barang'] != '0000-00-00'): ?>
                     <span style="font-weight:bold; color:#166534;"><?= date('d/m/y', strtotime($d['tgl_beli_barang'])) ?></span>
@@ -306,7 +317,7 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
         <?php endforeach; ?>
 
         <tr>
-            <td colspan="7" style="text-align:right; font-weight:bold; background:#f8fafc;">GRAND TOTAL ESTIMASI :</td>
+            <td colspan="8" style="text-align:right; font-weight:bold; background:#f8fafc;">GRAND TOTAL ESTIMASI :</td>
             <td style="text-align:right; font-weight:bold; background:#f8fafc; color:<?= $warna_badge ?>;">
                 Rp <?= number_format($grand_total, 0, ',', '.') ?>
             </td>
