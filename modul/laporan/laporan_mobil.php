@@ -8,6 +8,9 @@ if ($_SESSION['status'] != "login") {
     exit;
 }
 
+// ============================================================
+// GET PARAMETERS & SANITASI
+// ============================================================
 $tgl_awal  = isset($_GET['tgl_awal'])  ? $_GET['tgl_awal']  : date('Y-m-01');
 $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
 $search    = isset($_GET['search'])    ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
@@ -18,40 +21,32 @@ $nama_bulan = [
     '09'=>'September','10'=>'Oktober','11'=>'November','12'=>'Desember'
 ];
 
-// QUERY GABUNGAN
+// ============================================================
+// QUERY GABUNGAN - BELI + STOK
+// ============================================================
 $query_sql = "SELECT 
                 id_transaksi, driver_tetap, plat_nomor, jenis_kendaraan, 
                 nama_item, tgl_beli, harga_satuan, total_per_item, 
                 kategori, nama_barang_asli
               FROM (
+         
                 SELECT 
                     rd.id_detail as id_transaksi,
                     m.driver_tetap, 
                     m.plat_nomor, 
                     m.jenis_kendaraan,
                     CONCAT(rd.nama_barang_manual, ' (', rd.jumlah, ' ', rd.satuan, ')') as nama_item,
-                    IFNULL(p.tgl_beli_barang, r.tgl_request) as tgl_beli,
-                CASE 
-                    WHEN IFNULL(p.harga, 0) > 0 THEN p.harga 
-                    ELSE IFNULL(mb_ref.harga_barang_stok, 0) 
-                END as harga_satuan,
-                (rd.jumlah * (
-                    CASE 
-                        WHEN IFNULL(p.harga, 0) > 0 THEN p.harga 
-                        ELSE IFNULL(mb_ref.harga_barang_stok, 0) 
-                    END
-                )) as total_per_item,
+                    p.tgl_beli_barang as tgl_beli,
+                    p.harga as harga_satuan,
+                    (rd.jumlah * p.harga) as total_per_item,
                     'BELI' as kategori,
                     rd.nama_barang_manual as nama_barang_asli
                 FROM master_mobil m
-                INNER JOIN tr_request_detail rd ON m.id_mobil = rd.id_mobil
-                INNER JOIN tr_request r ON rd.id_request = r.id_request
-                -- PERBAIKAN DI SINI: Tambahkan filter status aktif
-                LEFT JOIN master_barang mb_ref ON rd.nama_barang_manual = mb_ref.nama_barang 
-                     AND mb_ref.status_aktif = 'AKTIF' 
-                LEFT JOIN pembelian p ON p.id_request_detail = rd.id_detail
-                    AND REPLACE(p.plat_nomor, ' ', '') = REPLACE(m.plat_nomor, ' ', '')
-                WHERE (IFNULL(p.tgl_beli_barang, r.tgl_request) BETWEEN '$tgl_awal' AND '$tgl_akhir')
+                    INNER JOIN tr_request_detail rd ON m.id_mobil = rd.id_mobil
+                    INNER JOIN tr_request r ON rd.id_request = r.id_request
+                    INNER JOIN pembelian p ON p.id_request_detail = rd.id_detail
+                        AND REPLACE(p.plat_nomor, ' ', '') = REPLACE(m.plat_nomor, ' ', '')
+                WHERE (p.tgl_beli_barang BETWEEN '$tgl_awal' AND '$tgl_akhir')
                 " . ($search != '' ? " AND (m.driver_tetap LIKE '%$search%' OR m.plat_nomor LIKE '%$search%')" : "") . "
 
                 UNION ALL
@@ -68,20 +63,36 @@ $query_sql = "SELECT
                     'STOK' as kategori,
                     mb.nama_barang as nama_barang_asli
                 FROM master_mobil m
-                INNER JOIN bon_permintaan b ON REPLACE(m.plat_nomor,' ','') = REPLACE(b.plat_nomor,' ','')
-                INNER JOIN master_barang mb ON b.id_barang = mb.id_barang
+                    INNER JOIN bon_permintaan b ON REPLACE(m.plat_nomor, ' ', '') = REPLACE(b.plat_nomor, ' ', '')
+                    INNER JOIN master_barang mb ON b.id_barang = mb.id_barang
                 WHERE (DATE(b.tgl_keluar) BETWEEN '$tgl_awal' AND '$tgl_akhir')
                 " . ($search != '' ? " AND (m.driver_tetap LIKE '%$search%' OR m.plat_nomor LIKE '%$search%')" : "") . "
               ) AS gabungan
               ORDER BY driver_tetap ASC, plat_nomor ASC, tgl_beli ASC, kategori DESC";
 
+// ============================================================
+// EXECUTE QUERY & FETCH DATA
+// ============================================================
 $result = mysqli_query($koneksi, $query_sql);
 
+if (!$result) {
+    die("Query Error: " . mysqli_error($koneksi));
+}
+
+// ============================================================
+// GROUPING DATA BY DRIVER -> PLAT NOMOR
+// ============================================================
 $data_by_driver = [];
 while ($row = mysqli_fetch_assoc($result)) {
-    $driver_key = ($row['driver_tetap'] != '' && $row['driver_tetap'] != null && $row['driver_tetap'] != '-') ? $row['driver_tetap'] : 'TANPA DRIVER';
+    $driver_key = ($row['driver_tetap'] != '' && $row['driver_tetap'] != null && $row['driver_tetap'] != '-') 
+                  ? $row['driver_tetap'] 
+                  : 'TANPA DRIVER';
     $plat_key = $row['plat_nomor'];
-    if (!isset($data_by_driver[$driver_key])) { $data_by_driver[$driver_key] = []; }
+    
+    if (!isset($data_by_driver[$driver_key])) { 
+        $data_by_driver[$driver_key] = []; 
+    }
+    
     if (!isset($data_by_driver[$driver_key][$plat_key])) {
         $data_by_driver[$driver_key][$plat_key] = [
             'driver' => $row['driver_tetap'],
@@ -89,50 +100,95 @@ while ($row = mysqli_fetch_assoc($result)) {
             'items'  => []
         ];
     }
+    
     $data_by_driver[$driver_key][$plat_key]['items'][] = $row;
 }
+
+// Sort: TANPA DRIVER paling belakang, sisanya alphabetical
 uksort($data_by_driver, function($a, $b) {
     if ($a === 'TANPA DRIVER') return 1;
     if ($b === 'TANPA DRIVER') return -1;
     return strcmp($a, $b);
 });
 
+// ============================================================
+// HELPER FUNCTION: CEK ITEM DUPLIKAT
+// ============================================================
+
 function isDuplicateItem($koneksi, $nama_barang, $plat_nomor) {
+    // ✅ ESCAPE parameter untuk mencegah SQL Injection
+    $nama_barang = mysqli_real_escape_string($koneksi, $nama_barang);
+    $plat_nomor = mysqli_real_escape_string($koneksi, $plat_nomor);
+    
     $query = "SELECT COUNT(*) as total FROM (
-                SELECT rd.nama_barang_manual as nama FROM tr_request_detail rd
+                SELECT rd.nama_barang_manual as nama 
+                FROM tr_request_detail rd
                 INNER JOIN master_mobil m ON rd.id_mobil = m.id_mobil
-                WHERE rd.nama_barang_manual = '$nama_barang' AND m.plat_nomor = '$plat_nomor'
+                WHERE rd.nama_barang_manual = '$nama_barang' 
+                  AND m.plat_nomor = '$plat_nomor'
+                
                 UNION ALL
-                SELECT mb.nama_barang as nama FROM bon_permintaan b
+                
+                SELECT mb.nama_barang as nama 
+                FROM bon_permintaan b
                 INNER JOIN master_barang mb ON b.id_barang = mb.id_barang
-                WHERE mb.nama_barang = '$nama_barang' AND b.plat_nomor = '$plat_nomor'
+                WHERE mb.nama_barang = '$nama_barang' 
+                  AND b.plat_nomor = '$plat_nomor'
             ) AS gabung";
+    
     $res = mysqli_query($koneksi, $query);
+    
+    if (!$res) {
+        error_log("isDuplicateItem Query Error: " . mysqli_error($koneksi));
+        return false;
+    }
+    
     $data = mysqli_fetch_assoc($res);
     return ($data['total'] > 1);
 }
 
+// ============================================================
+// HELPER FUNCTION: AMBIL TANGGAL PEMBELIAN TERAKHIR
+// ============================================================
+
 function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor) {
+    // ✅ ESCAPE parameter untuk mencegah SQL Injection
+    $nama_barang = mysqli_real_escape_string($koneksi, $nama_barang);
+    $tgl_sekarang = mysqli_real_escape_string($koneksi, $tgl_sekarang);
+    $plat_nomor = mysqli_real_escape_string($koneksi, $plat_nomor);
+    
     $query = "SELECT MAX(tgl_beli) as tgl_terakhir FROM (
                 SELECT IFNULL(p.tgl_beli_barang, r.tgl_request) as tgl_beli
                 FROM tr_request_detail rd
                 INNER JOIN tr_request r ON rd.id_request = r.id_request
-                LEFT JOIN pembelian p ON rd.id_request = p.id_request AND rd.nama_barang_manual = p.nama_barang_beli
+                LEFT JOIN pembelian p ON rd.id_request = p.id_request 
+                    AND rd.nama_barang_manual = p.nama_barang_beli
                 WHERE rd.nama_barang_manual = '$nama_barang'
-                AND rd.id_mobil = (SELECT id_mobil FROM master_mobil WHERE plat_nomor = '$plat_nomor' LIMIT 1)
-                AND IFNULL(p.tgl_beli_barang, r.tgl_request) < '$tgl_sekarang'
+                  AND rd.id_mobil = (SELECT id_mobil FROM master_mobil 
+                                     WHERE plat_nomor = '$plat_nomor' LIMIT 1)
+                  AND IFNULL(p.tgl_beli_barang, r.tgl_request) < '$tgl_sekarang'
+                
                 UNION ALL
+                
                 SELECT DATE(b.tgl_keluar) as tgl_beli
                 FROM bon_permintaan b
                 INNER JOIN master_barang mb ON b.id_barang = mb.id_barang
                 WHERE mb.nama_barang = '$nama_barang'
-                AND b.plat_nomor = '$plat_nomor'
-                AND DATE(b.tgl_keluar) < '$tgl_sekarang'
+                  AND b.plat_nomor = '$plat_nomor'
+                  AND DATE(b.tgl_keluar) < '$tgl_sekarang'
             ) AS history";
+    
     $res = mysqli_query($koneksi, $query);
+    
+    if (!$res) {
+        error_log("getLastPurchaseDate Query Error: " . mysqli_error($koneksi));
+        return null;
+    }
+    
     $row = mysqli_fetch_assoc($res);
     return $row['tgl_terakhir'];
 }
+
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -286,28 +342,12 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
         ========================================================= */
         @media print {
             @page {
-                    size: 210mm 330mm portrait;
-                    margin-top: 10mm;
-                    margin-bottom: 10mm;
-                    margin-left: 12mm;
-                    margin-right: 10mm;
-                    
-                    /* Instruksi duplex ke printer */
-                    -webkit-print-color-adjust: exact;
-                    print-color-adjust: exact;
-                }
-                
-                /* Halaman genap (belakang) — mirror margin untuk jilid */
-                @page :left {
-                    margin-left: 15mm;
-                    margin-right: 10mm;
-                }
-                
-                /* Halaman ganjil (depan) */
-                @page :right {
-                    margin-left: 10mm;
-                    margin-right: 15mm;
-                }
+                size: 210mm 330mm portrait; /* F4 / Folio */
+                margin-top: 10mm;
+                margin-bottom: 10mm;
+                margin-left: 12mm;
+                margin-right: 10mm;
+            }
 
             html, body {
                 width: 210mm;
@@ -418,9 +458,6 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                     <button type="button" onclick="window.print()" class="btn btn-sm btn-dark">
                         <i class="fas fa-print me-1"></i>Cetak Laporan
                     </button>
-                    <button type="button" onclick="cetakDuplex()" class="btn btn-sm btn-dark">
-                        <i class="fas fa-print me-1"></i>Cetak Laporan (Bolak-Balik)
-                    </button>
                     <a href="../../index.php" class="btn btn-sm btn-danger">
                         <i class="fas fa-arrow-left me-1"></i>Kembali
                     </a>
@@ -451,7 +488,7 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
             <col class="c-tgllast">
             <col class="c-harga">
             <col class="c-subtotal">
-            
+           <!-- <col class="c-aksi no-print">-->
         </colgroup>
         <thead>
             <tr>
@@ -462,7 +499,7 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                 <th>TGL TERAKHIR</th>
                 <th>HARGA SATUAN</th>
                 <th>SUBTOTAL</th>
-                
+                <!--<th class="no-print">AKSI</th>-->
             </tr>
         </thead>
         <tbody>
@@ -476,7 +513,7 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                         <i class="fas fa-user me-1"></i>
                         DRIVER: <?= ($driver_name === 'TANPA DRIVER') ? '-' : strtoupper($driver_name) ?>
                     </td>
-                    
+                   <!-- <td class="no-print"></td>>-->
                 </tr>
 
                 <?php
@@ -563,7 +600,13 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                         </td>
 
                         <!-- Aksi (hanya screen) -->
-                       
+                        <!--<td class="text-center no-print">
+                            <a href="hapus_item_mobil.php?id=<?= $item['id_transaksi'] ?>&kat=<?= $item['kategori'] ?>"
+                               class="text-danger"
+                               onclick="return confirm('Yakin hapus item ini?')">
+                                <i class="fas fa-trash-alt"></i>
+                            </a>
+                        </td>-->
                     </tr>
                 <?php endforeach; ?>
 
@@ -575,7 +618,7 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                     <td class="text-end fw-bold" style="font-size:7.5pt; white-space:nowrap;">
                         Rp <?= number_format($sub_total_mobil, 0, ',', '.') ?>
                     </td>
-                  
+                    <!-- <td class="no-print"></td> -->
                 </tr>
 
             <?php endforeach; endforeach; ?>
@@ -586,7 +629,7 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                 <td class="text-end fw-bold" style="white-space:nowrap;">
                     Rp <?= number_format($grand_total, 0, ',', '.') ?>
                 </td>
-                
+               <!-- <td class="no-print"></td> -->
             </tr>
         </tbody>
     </table>
@@ -636,13 +679,6 @@ function editTanggal(id, kat, tgl) {
     document.getElementById('edit_kat').value = kat;
     document.getElementById('edit_tgl').value = tgl;
     new bootstrap.Modal(document.getElementById('modalEditTgl')).show();
-}
-</script>
-<script>
-function cetakDuplex() {
-    // Beri tahu user sebelum cetak
-    alert('Tips cetak bolak-balik:\n\nDi dialog Print browser:\n• Chrome/Edge: More settings → Two-sided → On\n• Firefox: Properties → Duplex → Long Edge\n\nKlik OK untuk lanjut cetak.');
-    window.print();
 }
 </script>
 </body>
