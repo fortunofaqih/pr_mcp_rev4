@@ -14,9 +14,6 @@ if (!in_array($role, ['administrator', 'it'])) {
 // ============================================================
 // PROSES SIMPAN PILIHAN SINKRON
 // ============================================================
-// ============================================================
-// PROSES SIMPAN PILIHAN SINKRON
-// ============================================================
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id_detail_list'])) {
     $berhasil = 0;
     $gagal    = 0;
@@ -25,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id_detail_list'])) {
     foreach ($_POST['id_detail_list'] as $id_detail) {
         $id_detail = (int)$id_detail;
 
-        // Cek sudah disinkron belum (pakai id_detail sebagai referensi unik)
+        // Cek sudah disinkron belum (Menggunakan id_detail sebagai acuan mutlak)
         $cek = mysqli_query($koneksi, "SELECT COUNT(*) as c FROM master_it_asset WHERE id_pembelian = $id_detail");
         if (mysqli_fetch_assoc($cek)['c'] > 0) continue;
 
@@ -55,10 +52,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id_detail_list'])) {
         if (!$q || mysqli_num_rows($q) == 0) continue;
         $p = mysqli_fetch_assoc($q);
 
-        // Generate kode asset
+        // Ambil counter nomor terakhir
         $q_cnt = mysqli_query($koneksi, "SELECT last_number FROM master_it_asset_counter WHERE tahun = '$tahun'");
         if (mysqli_num_rows($q_cnt) == 0) {
-            mysqli_query($koneksi, "INSERT INTO master_it_asset_counter (tahun, last_number) VALUES ('$tahun', 0)");
             $last = 0;
         } else {
             $last = mysqli_fetch_assoc($q_cnt)['last_number'];
@@ -66,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id_detail_list'])) {
         $next       = $last + 1;
         $kode_asset = 'IT-' . $tahun . '-' . str_pad($next, 3, '0', STR_PAD_LEFT);
 
-        // Nama barang: ambil dari pembelian jika ada, fallback ke nama_barang_manual
+        // Fallback data nama, no request, tanggal, dan harga
         $nama_barang = $p['nama_barang_beli'] ?: $p['nama_barang_manual'];
         $no_req      = $p['no_req_resmi'] ?: $p['no_request'];
         $tgl_beli    = $p['tgl_beli_barang'] ?: $p['tgl_beli'] ?: date('Y-m-d');
@@ -79,10 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id_detail_list'])) {
         $no_req_esc   = mysqli_real_escape_string($koneksi, $no_req ?? '');
         $spek_esc     = mysqli_real_escape_string($koneksi, $p['kwalifikasi'] ?? '');
 
-        // Gunakan id_detail sebagai referensi (simpan di id_pembelian sementara)
-        // Jika ada id_pembelian asli, gunakan itu
-        $id_pem_ref = $p['id_pembelian'] ? (int)$p['id_pembelian'] : 0;
-
+        // PERBAIKAN: Gunakan id_detail sebagai referensi utama yang disimpan di kolom id_pembelian
         $sql_insert = "INSERT INTO master_it_asset
             (kode_asset, nama_asset, merk, spesifikasi,
              sumber_perolehan, id_pembelian, no_request,
@@ -90,14 +83,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id_detail_list'])) {
              kondisi, status_asset, created_by, created_at)
             VALUES
             ('$kode_esc', '$nama_esc', '$merk_esc', '$spek_esc',
-             'PEMBELIAN', " . ($id_pem_ref ?: 'NULL') . ", '$no_req_esc',
+             'PEMBELIAN', $id_detail, '$no_req_esc',
              '$tgl_beli', $harga, '$supplier_esc',
              'BAGUS', 'AKTIF', '$nama', NOW())";
 
         if (mysqli_query($koneksi, $sql_insert)) {
             $id_baru = mysqli_insert_id($koneksi);
+            
+            // Update counter aset
             mysqli_query($koneksi, "INSERT INTO master_it_asset_counter (tahun, last_number) VALUES ('$tahun', $next)
                 ON DUPLICATE KEY UPDATE last_number = $next");
+            
+            // Catat ke history aset
             $ket = mysqli_real_escape_string($koneksi, "Aset disinkronkan dari PR. No. Request: " . ($no_req ?? '-'));
             mysqli_query($koneksi, "INSERT INTO tr_it_asset_history
                 (id_asset, tgl_kejadian, jenis_history, kondisi_sesudah, keterangan, created_by)
@@ -110,13 +107,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id_detail_list'])) {
 
     if ($berhasil > 0) $_SESSION['flash_success'] = "<strong>$berhasil barang</strong> berhasil disinkronkan sebagai aset IT!";
     if ($gagal > 0)    $_SESSION['flash_error']   = "$gagal barang gagal disinkronkan.";
-    header("Location: index.php");
+    header("Location: sinkron_pembelian.php"); // Diubah ke halaman ini lagi agar lurus kinerjanya
     exit;
 }
 
 // ============================================================
-// QUERY: tr_request_detail dengan kategori_barang = 'INVESTASI IT'
-// yang belum terdaftar sebagai aset IT
+// QUERY PENDING: Menggunakan NOT EXISTS berbasis `rd.id_detail`
 // ============================================================
 $filter_keyword = isset($_GET['keyword']) ? $_GET['keyword'] : '';
 $filter_tahun   = isset($_GET['tahun'])   ? $_GET['tahun']   : date('Y');
@@ -125,7 +121,7 @@ $where = "WHERE rd.kategori_barang = 'INVESTASI IT'
           AND rd.is_dibeli = 1
           AND NOT EXISTS (
               SELECT 1 FROM master_it_asset a
-              WHERE a.id_pembelian = p.id_pembelian
+              WHERE a.id_pembelian = rd.id_detail
           )";
 
 if ($filter_keyword) {
@@ -161,13 +157,14 @@ $q_pending = mysqli_query($koneksi, "
     ORDER BY COALESCE(p.tgl_beli_barang, rd.tgl_dibeli) DESC
 ");
 
-// Sudah tersinkron — join ke tr_request_detail via pembelian
+// QUERY SYNCED: Menyesuaikan join dengan `rd.id_detail`
 $q_synced = mysqli_query($koneksi, "
     SELECT a.id_asset, a.kode_asset, a.nama_asset, a.kondisi, a.created_at,
-           p.tgl_beli_barang, p.supplier, p.no_request, p.harga
+           COALESCE(p.tgl_beli_barang, a.tgl_perolehan) as tgl_beli_barang, 
+           a.supplier, a.no_request, a.harga_perolehan as harga
     FROM master_it_asset a
-    JOIN pembelian p ON a.id_pembelian = p.id_pembelian
-    JOIN tr_request_detail rd ON p.id_request_detail = rd.id_detail
+    JOIN tr_request_detail rd ON a.id_pembelian = rd.id_detail
+    LEFT JOIN pembelian p ON p.id_request_detail = rd.id_detail
     WHERE rd.kategori_barang = 'INVESTASI IT'
     ORDER BY a.created_at DESC
     LIMIT 20
@@ -182,11 +179,9 @@ $additional_css = '<style>
 .checked-row { background: #e8f5e9 !important; }
 </style>';
 require_once __DIR__ . '/../../header_it.php';
-
 ?>
 
 <div class="d-flex align-items-center gap-2 mb-4">
-    
     <h5 class="fw-bold mb-0 text-primary">
         <i class="fas fa-sync me-2"></i> Sinkronisasi Aset IT dari Pembelian
     </h5>
@@ -201,46 +196,12 @@ require_once __DIR__ . '/../../header_it.php';
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
 <?php endif; ?>
 
-<!-- Penjelasan -->
 <div class="alert alert-info shadow-sm mb-4">
     <i class="fas fa-info-circle me-2"></i>
     Halaman ini menampilkan seluruh transaksi pembelian dengan kategori <strong>INVESTASI IT</strong>
     yang belum terdaftar sebagai aset IT. Centang barang yang ingin didaftarkan, lalu klik <strong>Sinkronkan</strong>.
-    Kode aset akan digenerate otomatis.
 </div>
 
-<!-- Filter -->
-<!--<div class="card mb-4">
-    <div class="card-body">
-        <form method="GET" class="row g-2 align-items-end">
-            <div class="col-md-5">
-                <label class="form-label small fw-bold">Cari Barang</label>
-                <input type="text" name="keyword" class="form-control form-control-sm"
-                       value="<?= htmlspecialchars($filter_keyword) ?>"
-                       placeholder="Nama barang, merk, no. request, supplier...">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label small fw-bold">Tahun</label>
-                <select name="tahun" class="form-select form-select-sm">
-                    <?php for ($y = date('Y'); $y >= date('Y')-5; $y--): ?>
-                    <option value="<?= $y ?>" <?= $filter_tahun==$y?'selected':'' ?>><?= $y ?></option>
-                    <?php endfor; ?>
-                    <option value="">-- Semua Tahun --</option>
-                </select>
-            </div>
-            <div class="col-md-4 d-flex gap-2">
-                <button type="submit" class="btn btn-primary btn-sm flex-fill">
-                    <i class="fas fa-search me-1"></i> Filter
-                </button>
-                <a href="sinkron_pembelian.php" class="btn btn-secondary btn-sm flex-fill">
-                    <i class="fas fa-times me-1"></i> Reset
-                </a>
-            </div>
-        </form>
-    </div>
-</div>-->
-
-<!-- Tabel Pending Sinkron -->
 <form method="POST">
 <div class="card mb-4">
     <div class="card-header d-flex align-items-center justify-content-between bg-warning text-dark py-2">
@@ -281,10 +242,10 @@ require_once __DIR__ . '/../../header_it.php';
                         </td>
                     </tr>
                 <?php else: while($p = mysqli_fetch_assoc($q_pending)): ?>
-                    <tr id="row_<?= $p['id_pembelian'] ?>">
+                    <tr id="row_<?= $p['id_detail'] ?>">
                         <td class="text-center">
                             <input type="checkbox" name="id_detail_list[]"
-                                    value="<?= $p['id_detail'] ?>"
+                                   value="<?= $p['id_detail'] ?>"
                                    class="form-check-input chk-item"
                                    onchange="highlightRow(this)">
                         </td>
@@ -314,7 +275,6 @@ require_once __DIR__ . '/../../header_it.php';
 </div>
 </form>
 
-<!-- Sudah Tersinkron -->
 <div class="card">
     <div class="card-header bg-success text-white fw-bold py-2 small">
         <i class="fas fa-check-double me-2"></i> Sudah Terdaftar sebagai Aset (20 Terakhir)
@@ -333,7 +293,7 @@ require_once __DIR__ . '/../../header_it.php';
                     </tr>
                 </thead>
                 <tbody>
-                <?php if (mysqli_num_rows($q_synced) == 0): ?>
+                <?php if (mysqli_query($koneksi, "SELECT 1") && mysqli_num_rows($q_synced) == 0): ?>
                     <tr><td colspan="6" class="text-center text-muted py-3">Belum ada data tersinkron</td></tr>
                 <?php else: while($s = mysqli_fetch_assoc($q_synced)): ?>
                     <tr>
@@ -344,7 +304,7 @@ require_once __DIR__ . '/../../header_it.php';
                                 <?= $s['kondisi'] ?>
                             </span>
                         </td>
-                        <td class="d-none d-md-table-cell"><?= date('d/m/Y', strtotime($s['tgl_beli_barang'])) ?></td>
+                        <td class="d-none d-md-table-cell"><?= $s['tgl_beli_barang'] ? date('d/m/Y', strtotime($s['tgl_beli_barang'])) : '-' ?></td>
                         <td class="d-none d-md-table-cell text-end">Rp <?= number_format($s['harga'], 0, ',', '.') ?></td>
                         <td class="text-center">
                             <a href="detail_asset.php?id=<?= $s['id_asset'] ?>" class="btn btn-info btn-sm text-white">

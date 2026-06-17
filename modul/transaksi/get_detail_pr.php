@@ -32,21 +32,31 @@ function badge_status_item($status) {
 }
 
 $summary = [
-    'PENDING'            => 0,
-    'APPROVED'           => 0,
+    'PENDING'             => 0,
+    'APPROVED'            => 0,
     'MENUNGGU VERIFIKASI'  => 0,
-    'REJECTED'           => 0,
-    'TERBELI'            => 0,
+    'REJECTED'            => 0,
+    'TERBELI'             => 0,
 ];
 
-$sql_detail = "SELECT d.*, m.plat_nomor, b.nama_barang as nama_barang_master
+// PERBAIKAN QUERY: Menghapus GROUP BY dan menggunakan LEFT JOIN yang lebih spesifik ke tabel pembelian
+$sql_detail = "SELECT d.*, m.plat_nomor, b.nama_barang as nama_barang_master,
+                      COALESCE(p.supplier, ms.nama_supplier, '-') as nama_supplier
                FROM tr_request_detail d
                LEFT JOIN master_mobil m ON d.id_mobil = m.id_mobil
                LEFT JOIN master_barang b ON d.id_barang = b.id_barang
+               LEFT JOIN pembelian p ON d.id_detail = p.id_request_detail
+               LEFT JOIN tr_purchase_order po ON d.id_request = po.id_request
+               LEFT JOIN master_supplier ms ON po.id_supplier = ms.id_supplier
                WHERE d.id_request = '$id' 
                ORDER BY d.id_detail ASC";
 
 $query_detail = mysqli_query($koneksi, $sql_detail);
+
+// Jika query gagal, tampilkan pesan error MySQL asli untuk mempermudah debug
+if (!$query_detail) {
+    exit("<div class='p-4 text-center text-danger'>Gagal mengambil data. Error: " . mysqli_error($koneksi) . "</div>");
+}
 
 $rows = [];
 while ($d = mysqli_fetch_array($query_detail)) {
@@ -81,7 +91,7 @@ while ($d = mysqli_fetch_array($query_detail)) {
             <tr>
                 <th class="text-center" width="40">NO</th>
                 <th>Nama Barang</th>
-                <th>Kategori</th>
+                <th>Supplier</th> <th>Kategori</th>
                 <th class="text-center">Unit/Mobil</th>
                 <th class="text-center">Tipe</th>
                 <th class="text-center">Qty</th>
@@ -96,7 +106,7 @@ while ($d = mysqli_fetch_array($query_detail)) {
             $total_estimasi = 0;
 
             if (empty($rows)) {
-                echo '<tr><td colspan="9" class="text-center py-3">Tidak ada detail item.</td></tr>';
+                echo '<tr><td colspan="10" class="text-center py-3">Tidak ada detail item.</td></tr>';
             }
 
             foreach ($rows as $d):
@@ -104,10 +114,7 @@ while ($d = mysqli_fetch_array($query_detail)) {
                 $unit_tampil = (!empty($d['plat_nomor'])) ? $d['plat_nomor'] : "-";
                 $status_item = $d['status_item'] ?? 'PENDING';
                 
-                // Hitung Total Keseluruhan
                 $total_estimasi += (float)$d['subtotal_estimasi'];
-
-                // Format Harga Per Baris
                 $harga_est = ($d['harga_satuan_estimasi'] > 0) ? "Rp " . number_format($d['harga_satuan_estimasi'], 0, ',', '.') : "-";
 
                 $row_class = '';
@@ -122,7 +129,7 @@ while ($d = mysqli_fetch_array($query_detail)) {
             <tr class="<?= $row_class ?>">
                 <td class="text-center text-muted"><?= $no++ ?></td>
                 <td class="fw-bold text-dark"><?= strtoupper($nama_tampil) ?></td>
-                <td><small><?= strtoupper($d['kategori_barang']) ?></small></td>
+                <td><span class="text-muted"><?= strtoupper($d['nama_supplier']) ?></span></td> <td><small><?= strtoupper($d['kategori_barang']) ?></small></td>
                 <td class="text-center">
                     <?php if ($unit_tampil != "-"): ?>
                         <span class="badge bg-light text-dark border"><?= $unit_tampil ?></span>
@@ -148,7 +155,7 @@ while ($d = mysqli_fetch_array($query_detail)) {
         </tbody>
         <tfoot class="table-light fw-bold">
             <tr>
-                <td colspan="6" class="text-end">TOTAL ESTIMASI KESELURUHAN</td>
+                <td colspan="7" class="text-end">TOTAL ESTIMASI KESELURUHAN</td>
                 <td class="text-end text-primary">
                     Rp <?= number_format($total_estimasi, 0, ',', '.') ?>
                 </td>
@@ -187,6 +194,7 @@ var pendingItems = <?= json_encode(array_values(array_filter(array_map(function(
     
     return [
         'nama'       => $nama_tampil,
+        'supplier'   => $d['nama_supplier'] ?: '-',
         'kategori'   => $d['kategori_barang'] ?: '-',
         'unit'       => !empty($d['plat_nomor']) ? $d['plat_nomor'] : '-',
         'tipe'       => $d['tipe_request'],
@@ -231,7 +239,7 @@ function printPendingItems() {
             '</table>';
 
     html += '<table><thead><tr>' +
-            '<th>NO</th><th>Nama Barang</th><th>Kategori</th><th>Unit</th><th>Tipe</th><th>Qty</th><th>Harga Est.</th><th>Subtotal</th>' +
+            '<th>NO</th><th>Nama Barang</th><th>Supplier</th><th>Kategori</th><th>Unit</th><th>Tipe</th><th>Qty</th><th>Harga Est.</th><th>Subtotal</th>' +
             '</tr></thead><tbody>';
 
     pendingItems.forEach(function(item, index) {
@@ -239,6 +247,7 @@ function printPendingItems() {
         html += '<tr>' +
             '<td class="text-center">' + (index + 1) + '</td>' +
             '<td class="fw-bold">' + item.nama.toUpperCase() + '</td>' +
+            '<td>' + item.supplier.toUpperCase() + '</td>' +
             '<td>' + item.kategori.toUpperCase() + '</td>' +
             '<td class="text-center">' + item.unit + '</td>' +
             '<td class="text-center">' + item.tipe + '</td>' +
@@ -249,7 +258,7 @@ function printPendingItems() {
     });
 
     html += '</tbody><tfoot><tr class="fw-bold">' +
-            '<td colspan="7" class="text-right">TOTAL ESTIMASI PENDING</td>' +
+            '<td colspan="8" class="text-right">TOTAL ESTIMASI PENDING</td>' +
             '<td class="text-right">Rp ' + totalCetak.toLocaleString('id-ID') + '</td>' +
             '</tr></tfoot></table></body></html>';
 

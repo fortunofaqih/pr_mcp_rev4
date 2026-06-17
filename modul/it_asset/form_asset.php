@@ -93,23 +93,28 @@ $additional_css = '
                     <div class="row g-3">
                        <div class="col-12">
                                     <label class="form-label fw-bold small">Pilih Barang dari Master <span class="required-star">*</span></label>
-                                    <select name="id_barang" id="select_barang" class="form-select select2-barang" required>
-                                                <option value="">-- Ketik Nama Barang / Merk --</option>
-                                                <?php 
-                                                $q_barang = mysqli_query($koneksi, "SELECT id_barang, nama_barang, merk FROM master_barang WHERE status_aktif = 'AKTIF' ORDER BY nama_barang ASC");
-                                                while($brg = mysqli_fetch_assoc($q_barang)): 
-                                                ?>
-                                                    <option value="<?= $brg['id_barang'] ?>" 
-                                                        data-nama="<?= htmlspecialchars($brg['nama_barang']) ?>"
-                                                        data-merk="<?= htmlspecialchars($brg['merk']) ?>"
-                                                        <?= ($data['id_barang'] ?? '') == $brg['id_barang'] ? 'selected' : '' ?>>
-                                                        
-                                                        <!-- HANYA TAMPILKAN NAMA BARANG SAJA -->
-                                                        <?= htmlspecialchars($brg['nama_barang']) ?>
-                                                        
-                                                    </option>
-                                                <?php endwhile; ?>
-                                            </select>
+                                   <select name="id_barang" id="select_barang" class="form-select select2-barang" required>
+                                        <option value="">-- Ketik Nama Barang / Merk --</option>
+                                        <?php 
+                                        // Menambahkan kondisi AND kategori = 'INVENTARIS IT' pada query SQL
+                                        $q_barang = mysqli_query($koneksi, "SELECT id_barang, nama_barang, merk 
+                                                                            FROM master_barang 
+                                                                            WHERE status_aktif = 'AKTIF' 
+                                                                            AND kategori = 'INVESTASI IT' 
+                                                                            ORDER BY nama_barang ASC");
+                                        
+                                        while($brg = mysqli_fetch_assoc($q_barang)): 
+                                        ?>
+                                            <option value="<?= $brg['id_barang'] ?>" 
+                                                data-nama="<?= htmlspecialchars($brg['nama_barang']) ?>"
+                                                data-merk="<?= htmlspecialchars($brg['merk']) ?>"
+                                                <?= ($data['id_barang'] ?? '') == $brg['id_barang'] ? 'selected' : '' ?>>
+                                                
+                                                <?= htmlspecialchars($brg['nama_barang']) ?>
+                                                
+                                            </option>
+                                        <?php endwhile; ?>
+                                    </select>
                                     <!-- Hidden input untuk menyimpan nama asset ke proses_asset.php -->
                                     <input type="hidden" name="nama_asset" id="nama_asset_hidden" value="<?= htmlspecialchars($data['nama_asset'] ?? '') ?>">
                                 </div>

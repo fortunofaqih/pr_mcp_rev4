@@ -52,10 +52,31 @@ if (empty($h['no_form'])) {
 // ── 3. AMBIL DETAIL BARANG (dengan Supplier dari PO) ──────────────────────────
 $items = [];
 $q = mysqli_query($koneksi,
-    "SELECT d.*,
-            m.plat_nomor,
-            b.nama_barang as nama_barang_master,
-            p.tgl_beli_barang,
+    "SELECT 
+            d.id_detail,
+            d.id_request,
+            d.nama_barang_manual,
+            d.id_barang,
+            d.id_mobil,
+            d.jumlah,
+            d.satuan,
+            d.harga_satuan_estimasi,
+            d.status_item,
+            d.subtotal_estimasi,
+            d.kategori_barang,
+            d.kwalifikasi,
+            d.tipe_request,
+            d.keterangan,
+            d.is_ban,
+            d.status_pasang,
+            d.tgl_pasang,
+            d.pasang_oleh,
+            d.is_dibeli,
+            d.tgl_dibeli,
+            d.dibeli_oleh,
+            ANY_VALUE(m.plat_nomor) as plat_nomor,
+            ANY_VALUE(b.nama_barang) as nama_barang_master,
+            ANY_VALUE(p.tgl_beli_barang) as tgl_beli_barang,
             GROUP_CONCAT(DISTINCT ms.nama_supplier SEPARATOR ', ') as supplier_names
      FROM tr_request_detail d
      LEFT JOIN master_mobil  m ON d.id_mobil  = m.id_mobil
@@ -241,7 +262,7 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
 <!-- ── Header ── -->
 <div class="header">
     <h2><?= $judul_cetak ?></h2>
-    <h4>PT. Mutiara Cahaya Plastindo</h4>
+    <h4>PT. Mutiaracahaya Plastindo</h4>
 </div>
 
 <!-- ── Info PR ── -->
