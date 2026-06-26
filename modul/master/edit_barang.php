@@ -3,14 +3,21 @@ session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
 require_once __DIR__ . '/../../auth/check_session.php';
 
+// 1. Proteksi session
 if ($_SESSION['status'] != "login") {
     header("location:../../login.php?pesan=belum_login");
     exit;
 }
 
-$id = mysqli_real_escape_string($koneksi, $_GET['id']);
+// Validasi parameter ID (Pastikan ada dan merupakan angka)
+if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
+    header("location:data_barang.php?pesan=error");
+    exit;
+}
 
-// 1. Ambil data barang utama
+$id = (int)$_GET['id'];
+
+// 2. Ambil data barang utama
 $sql = "SELECT b.*, 
         (SELECT qty FROM tr_stok_log WHERE id_barang = b.id_barang ORDER BY id_log ASC LIMIT 1) as stok_awal_log
         FROM master_barang b 
@@ -18,7 +25,13 @@ $sql = "SELECT b.*,
 $query = mysqli_query($koneksi, $sql);
 $data = mysqli_fetch_array($query);
 
-// 2. Ambil data dari tabel-tabel master untuk dropdown
+// Jika data tidak ditemukan di database
+if (!$data) {
+    header("location:data_barang.php?pesan=tidak_ditemukan");
+    exit;
+}
+
+// 3. Ambil data dari tabel-tabel master untuk dropdown
 $q_kat = mysqli_query($koneksi, "SELECT nama_kategori FROM master_kategori ORDER BY nama_kategori ASC");
 $q_rak = mysqli_query($koneksi, "SELECT nama_rak FROM master_rak ORDER BY nama_rak ASC");
 $q_sat = mysqli_query($koneksi, "SELECT nama_satuan FROM master_satuan ORDER BY nama_satuan ASC");
@@ -34,6 +47,7 @@ $harga_tampil = number_format($data['harga_barang_stok'], 0, ',', '.');
     <link rel="icon" type="image/png" href="/pr_mcp/assets/img/logo_mcp.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
         body { background-color: #f4f7f6; }
         .card { border-radius: 15px; border: none; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
@@ -99,16 +113,20 @@ $harga_tampil = number_format($data['harga_barang_stok'], 0, ',', '.');
                                     <?php endwhile; ?>
                                 </select>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">SATUAN UTAMA</label>
-                                <select name="satuan" class="form-select">
-                                    <?php while($s = mysqli_fetch_array($q_sat)): ?>
-                                        <option value="<?= $s['nama_satuan'] ?>" <?= ($data['satuan'] == $s['nama_satuan']) ? 'selected' : '' ?>>
-                                            <?= $s['nama_satuan'] ?>
-                                        </option>
-                                    <?php endwhile; ?>
-                                </select>
-                            </div>
+                       <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted">SATUAN UTAMA</label>
+                            <input type="text" name="satuan" class="form-control" list="list_satuan" value="<?= $data['satuan']; ?>" placeholder="KETIK ATAU PILIH SATUAN" required>
+                            
+                            <datalist id="list_satuan">
+                                <?php 
+                                // Pastikan query $q_sat bersih dan dieksekusi tepat sebelum ini
+                                $q_sat = mysqli_query($koneksi, "SELECT nama_satuan FROM master_satuan ORDER BY nama_satuan ASC");
+                                while($s = mysqli_fetch_array($q_sat)): 
+                                ?>
+                                    <option value="<?= $s['nama_satuan'] ?>"></option>
+                                <?php endwhile; ?>
+                            </datalist>
+                        </div>
                         </div>
 
                         <hr>

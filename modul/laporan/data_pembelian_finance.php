@@ -2,7 +2,7 @@
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
 require_once __DIR__ . '/../../auth/check_session.php';
-require_once __DIR__ . '/../../auth/keep_alive.php';
+//require_once __DIR__ . '/../../auth/keep_alive.php';
 
 if ($_SESSION['status'] != "login") {
     header("location:../../login.php?pesan=belum_login");
@@ -13,8 +13,10 @@ $nama_user = $_SESSION['nama'] ?? $_SESSION['username'] ?? 'ADMIN';
 
 // 1. TANGKAP FILTER
 $abjad_filter   = isset($_GET['abjad'])         ? mysqli_real_escape_string($koneksi, strtoupper($_GET['abjad'])) : '';
-$tgl_min        = isset($_GET['tgl_min'])        ? $_GET['tgl_min']  : '';
-$tgl_max        = isset($_GET['tgl_max'])        ? $_GET['tgl_max']  : '';
+// DEFAULT: Hari ini untuk kedua rentang tanggal
+$today          = date('Y-m-d');
+$tgl_min        = isset($_GET['tgl_min']) && !empty($_GET['tgl_min']) ? $_GET['tgl_min'] : $today;
+$tgl_max        = isset($_GET['tgl_max']) && !empty($_GET['tgl_max']) ? $_GET['tgl_max'] : $today;
 $keyword        = isset($_GET['keyword'])        ? mysqli_real_escape_string($koneksi, strtoupper($_GET['keyword'])) : '';
 $filter_petugas = isset($_GET['id_user_beli'])   ? (int)$_GET['id_user_beli'] : 0;
 
@@ -95,6 +97,8 @@ if ($filter_petugas > 0) {
 	<link rel="icon" type="image/png" href="/pr_mcp/assets/img/logo_mcp.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Flatpickr Date Picker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <style>
         :root { --mcp-blue: #0000FF; }
         body { background-color: #f8f9fa; font-family: 'Inter', sans-serif; font-size: 0.82rem; }
@@ -113,6 +117,10 @@ if ($filter_petugas > 0) {
 
         /* Info mobil terpilih di modal */
         #info_mobil_terpilih { font-size: 10px; color: #555; min-height: 14px; }
+
+        /* Styling Flatpickr */
+        .flatpickr-input { font-family: 'Inter', sans-serif; }
+        .flatpickr-calendar { box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important; }
 
         /* CSS untuk Cetak */
         @media print {
@@ -190,12 +198,22 @@ if ($filter_petugas > 0) {
     <div class="search-box mb-4">
         <form action="" method="GET">
             <div class="row g-3">
-                <!-- Filter Tanggal -->
+                <!-- Filter Tanggal (dengan Flatpickr) -->
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted">RENTANG TANGGAL NOTA</label>
-                    <div class="input-group input-group-sm">
-                        <input type="date" name="tgl_min" class="form-control" value="<?= $tgl_min ?>">
-                        <input type="date" name="tgl_max" class="form-control" value="<?= $tgl_max ?>">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <small class="text-primary fw-bold d-block mb-1">START DATE</small>
+                            <input type="text" id="tgl_min_display" class="form-control form-control-sm date-picker" 
+                                   value="<?= date('d-M-Y', strtotime($tgl_min)) ?>" placeholder="DD-Mon-YYYY">
+                            <input type="hidden" name="tgl_min" id="tgl_min_hidden" value="<?= $tgl_min ?>">
+                        </div>
+                        <div class="col-6">
+                            <small class="text-success fw-bold d-block mb-1">END DATE</small>
+                            <input type="text" id="tgl_max_display" class="form-control form-control-sm date-picker" 
+                                   value="<?= date('d-M-Y', strtotime($tgl_max)) ?>" placeholder="DD-Mon-YYYY">
+                            <input type="hidden" name="tgl_max" id="tgl_max_hidden" value="<?= $tgl_max ?>">
+                        </div>
                     </div>
                 </div>
 
@@ -322,7 +340,7 @@ if ($filter_petugas > 0) {
                       
                     </tr>
                     <?php endforeach; else: ?>
-                        <tr><td colspan="10" class="text-center p-4 text-muted">Data tidak ditemukan sesuai filter.</td></tr>
+                        <tr><td colspan="9" class="text-center p-4 text-muted">Data tidak ditemukan sesuai filter.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -389,7 +407,34 @@ foreach ($data_tampil as $row) {
 <script src="https://code.jquery.com/jquery-3.7.0.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<!-- Flatpickr JS -->
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
+// ── Setup Flatpickr Date Pickers ────────────────────────
+var tglMinPicker = flatpickr("#tgl_min_display", {
+    dateFormat: "d-M-Y",
+    defaultDate: "<?= date('d-M-Y', strtotime($tgl_min)) ?>",
+    onChange: function(selectedDates, dateStr, instance) {
+        // Update hidden input dengan format database (YYYY-MM-DD)
+        if (selectedDates.length > 0) {
+            var dbFormat = selectedDates[0].toISOString().split('T')[0];
+            document.getElementById('tgl_min_hidden').value = dbFormat;
+        }
+    }
+});
+
+var tglMaxPicker = flatpickr("#tgl_max_display", {
+    dateFormat: "d-M-Y",
+    defaultDate: "<?= date('d-M-Y', strtotime($tgl_max)) ?>",
+    onChange: function(selectedDates, dateStr, instance) {
+        // Update hidden input dengan format database (YYYY-MM-DD)
+        if (selectedDates.length > 0) {
+            var dbFormat = selectedDates[0].toISOString().split('T')[0];
+            document.getElementById('tgl_max_hidden').value = dbFormat;
+        }
+    }
+});
+
 var PRINT_DATA = {
     rows       : <?php echo json_encode($print_rows, JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
     grandTotal : "Rp <?php echo number_format($grand_total_print, 0, ',', '.'); ?>",
@@ -410,8 +455,6 @@ function updateInfoMobil(opt) {
         info.html('');
     }
 }
-
-
 
 $(document).ready(function() {
 

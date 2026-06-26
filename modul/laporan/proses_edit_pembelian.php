@@ -95,7 +95,7 @@ try {
                                 subtotal_estimasi = $subtotal,
                                 tipe_request = '$tipe_request',
                                 status_item = 'TERBELI',
-                                keterangan   = '$keterangan',
+								keterangan   = '$keterangan',
                                 is_dibeli = 1
                             WHERE id_detail = $id_req_detail";
         
