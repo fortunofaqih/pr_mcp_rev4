@@ -85,10 +85,10 @@ try {
     if ($nama != $nama_lama || $satuan != $satuan_lama) {
         
         // Update tabel pembelian (melalui detail request) -> Tetap update Nama & Satuan
+       // SESUDAH (DIPERBAIKI)
         mysqli_query($koneksi, "UPDATE pembelian SET 
-                                nama_barang_beli = '$nama', 
-                                satuan_barang = '$satuan' 
-                                WHERE id_request_detail IN (SELECT id_detail FROM tr_request_detail WHERE id_barang = '$id')");
+                        nama_barang_beli = '$nama' 
+                        WHERE id_request_detail IN (SELECT id_detail FROM tr_request_detail WHERE id_barang = '$id')");
 
         // Update tabel pembelian_staging -> HANYA NAMA
         mysqli_query($koneksi, "UPDATE pembelian_staging SET nama_barang_beli = '$nama' WHERE id_barang = '$id'");
