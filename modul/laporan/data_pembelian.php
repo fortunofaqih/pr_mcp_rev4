@@ -554,13 +554,19 @@ foreach ($data_tampil as $row) {
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
 // ── Setup Flatpickr Date Pickers ────────────────────────
+// FIX: Gunakan format manual YYYY-MM-DD tanpa .toISOString() untuk menghindari timezone conversion
 var tglMinPicker = flatpickr("#tgl_min_display", {
     dateFormat: "d-M-Y",
     defaultDate: "<?= date('d-M-Y', strtotime($tgl_min)) ?>",
     onChange: function(selectedDates, dateStr, instance) {
         // Update hidden input dengan format database (YYYY-MM-DD)
+        // TANPA toISOString() untuk menghindari timezone conversion
         if (selectedDates.length > 0) {
-            var dbFormat = selectedDates[0].toISOString().split('T')[0];
+            var d = selectedDates[0];
+            var year = d.getFullYear();
+            var month = String(d.getMonth() + 1).padStart(2, '0');
+            var day = String(d.getDate()).padStart(2, '0');
+            var dbFormat = year + '-' + month + '-' + day;
             document.getElementById('tgl_min_hidden').value = dbFormat;
         }
     }
@@ -571,8 +577,13 @@ var tglMaxPicker = flatpickr("#tgl_max_display", {
     defaultDate: "<?= date('d-M-Y', strtotime($tgl_max)) ?>",
     onChange: function(selectedDates, dateStr, instance) {
         // Update hidden input dengan format database (YYYY-MM-DD)
+        // TANPA toISOString() untuk menghindari timezone conversion
         if (selectedDates.length > 0) {
-            var dbFormat = selectedDates[0].toISOString().split('T')[0];
+            var d = selectedDates[0];
+            var year = d.getFullYear();
+            var month = String(d.getMonth() + 1).padStart(2, '0');
+            var day = String(d.getDate()).padStart(2, '0');
+            var dbFormat = year + '-' + month + '-' + day;
             document.getElementById('tgl_max_hidden').value = dbFormat;
         }
     }
