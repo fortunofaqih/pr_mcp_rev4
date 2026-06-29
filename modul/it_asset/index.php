@@ -21,7 +21,7 @@ if ($filter_lokasi)   $where .= " AND a.lokasi      = '" . mysqli_real_escape_st
 if ($filter_keyword)  $where .= " AND (a.kode_asset LIKE '%" . mysqli_real_escape_string($koneksi, $filter_keyword) . "%'
                                     OR a.nama_asset  LIKE '%" . mysqli_real_escape_string($koneksi, $filter_keyword) . "%'
                                     OR a.merk        LIKE '%" . mysqli_real_escape_string($koneksi, $filter_keyword) . "%'
-                                    OR a.serial_number LIKE '%" . mysqli_real_escape_string($koneksi, $filter_keyword) . "%'
+                                    OR a.keterangan LIKE '%" . mysqli_real_escape_string($koneksi, $filter_keyword) . "%'
                                     OR a.pengguna    LIKE '%" . mysqli_real_escape_string($koneksi, $filter_keyword) . "%')";
 
 $query = "SELECT a.* FROM master_it_asset a $where ORDER BY a.created_at DESC";
@@ -211,7 +211,7 @@ require_once __DIR__ . '/../../header_it.php';
                         <th class="text-center" style="width:40px;">No</th>
                         <th>Kode Aset</th>
                         <th>Nama Barang / Merk</th>
-                        <th class="d-none d-md-table-cell">Serial Number</th>
+                        <th class="d-none d-md-table-cell">Keterangan</th>
                         <th class="d-none d-md-table-cell">Lokasi / Pengguna</th>
                         <th class="text-center">Kondisi</th>
                         <th class="d-none d-lg-table-cell text-center">Garansi</th>
@@ -276,7 +276,7 @@ require_once __DIR__ . '/../../header_it.php';
                             <?php endif; ?>
                         </td>
                         <td class="d-none d-md-table-cell text-muted">
-                            <?= $row['serial_number'] ? htmlspecialchars($row['serial_number']) : '-' ?>
+                            <?= $row['keterangan'] ? htmlspecialchars($row['keterangan']) : '-' ?>
                         </td>
                         <td class="d-none d-md-table-cell">
                             <?php if ($row['lokasi']): ?>
