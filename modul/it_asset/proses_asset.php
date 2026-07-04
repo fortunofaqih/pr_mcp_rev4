@@ -301,7 +301,8 @@ if ($aksi == 'update') {
         }
         
         $_SESSION['flash_success'] = "Aset IT berhasil diperbarui!";
-        header("Location: detail_asset.php?id=$id_asset");
+        //header("Location: detail_asset.php?id=$id_asset");
+		header("Location: index.php");
     } else {
         $_SESSION['flash_error'] = "Gagal update: " . mysqli_error($koneksi);
         header("Location: form_asset.php?id=$id_asset");
