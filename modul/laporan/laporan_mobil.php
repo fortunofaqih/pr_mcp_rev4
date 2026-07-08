@@ -11,15 +11,21 @@ if ($_SESSION['status'] != "login") {
 // ============================================================
 // GET PARAMETERS & SANITASI
 // ============================================================
-$tgl_awal  = isset($_GET['tgl_awal'])  ? $_GET['tgl_awal']  : date('Y-m-01');
-$tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
-$search    = isset($_GET['search'])    ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
+$tgl_awal    = isset($_GET['tgl_awal'])  ? $_GET['tgl_awal']  : date('Y-m-01');
+$tgl_akhir   = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
+$search      = isset($_GET['search'])    ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
+// 💡 Cek apakah checkbox "Khusus Tambal Ban" dicentang
+$tambal_ban  = isset($_GET['tambal_ban']) ? $_GET['tambal_ban'] : ''; 
 
 $nama_bulan = [
     '01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April',
     '05'=>'Mei','06'=>'Juni','07'=>'Juli','08'=>'Agustus',
     '09'=>'September','10'=>'Oktober','11'=>'November','12'=>'Desember'
 ];
+
+// Kondisi dinamis untuk filter Tambal Ban
+$filter_tambal_beli = ($tambal_ban == '1') ? " AND rd.nama_barang_manual LIKE '%TAMBAL BAN%' " : "";
+$filter_tambal_stok = ($tambal_ban == '1') ? " AND mb.nama_barang LIKE '%TAMBAL BAN%' " : "";
 
 // ============================================================
 // QUERY GABUNGAN - BELI + STOK
@@ -47,6 +53,7 @@ $query_sql = "SELECT
                     INNER JOIN pembelian p ON p.id_request_detail = rd.id_detail
                         AND REPLACE(p.plat_nomor, ' ', '') = REPLACE(m.plat_nomor, ' ', '')
                 WHERE (p.tgl_beli_barang BETWEEN '$tgl_awal' AND '$tgl_akhir')
+                $filter_tambal_beli
                 " . ($search != '' ? " AND (m.driver_tetap LIKE '%$search%' OR m.plat_nomor LIKE '%$search%')" : "") . "
 
                 UNION ALL
@@ -66,6 +73,7 @@ $query_sql = "SELECT
                     INNER JOIN bon_permintaan b ON REPLACE(m.plat_nomor, ' ', '') = REPLACE(b.plat_nomor, ' ', '')
                     INNER JOIN master_barang mb ON b.id_barang = mb.id_barang
                 WHERE (DATE(b.tgl_keluar) BETWEEN '$tgl_awal' AND '$tgl_akhir')
+                $filter_tambal_stok
                 " . ($search != '' ? " AND (m.driver_tetap LIKE '%$search%' OR m.plat_nomor LIKE '%$search%')" : "") . "
               ) AS gabungan
               ORDER BY driver_tetap ASC, plat_nomor ASC, tgl_beli ASC, kategori DESC";
@@ -114,11 +122,9 @@ uksort($data_by_driver, function($a, $b) {
 // ============================================================
 // HELPER FUNCTION: CEK ITEM DUPLIKAT
 // ============================================================
-
 function isDuplicateItem($koneksi, $nama_barang, $plat_nomor) {
-    // ✅ ESCAPE parameter untuk mencegah SQL Injection
     $nama_barang = mysqli_real_escape_string($koneksi, $nama_barang);
-    $plat_nomor = mysqli_real_escape_string($koneksi, $plat_nomor);
+    $plat_nomor  = mysqli_real_escape_string($koneksi, $plat_nomor);
     
     $query = "SELECT COUNT(*) as total FROM (
                 SELECT rd.nama_barang_manual as nama 
@@ -150,12 +156,10 @@ function isDuplicateItem($koneksi, $nama_barang, $plat_nomor) {
 // ============================================================
 // HELPER FUNCTION: AMBIL TANGGAL PEMBELIAN TERAKHIR
 // ============================================================
-
 function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor) {
-    // ✅ ESCAPE parameter untuk mencegah SQL Injection
-    $nama_barang = mysqli_real_escape_string($koneksi, $nama_barang);
+    $nama_barang  = mysqli_real_escape_string($koneksi, $nama_barang);
     $tgl_sekarang = mysqli_real_escape_string($koneksi, $tgl_sekarang);
-    $plat_nomor = mysqli_real_escape_string($koneksi, $plat_nomor);
+    $plat_nomor   = mysqli_real_escape_string($koneksi, $plat_nomor);
     
     $query = "SELECT MAX(tgl_beli) as tgl_terakhir FROM (
                 SELECT IFNULL(p.tgl_beli_barang, r.tgl_request) as tgl_beli
@@ -188,41 +192,33 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
     $row = mysqli_fetch_assoc($res);
     return $row['tgl_terakhir'];
 }
-
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<link rel="icon" type="image/png" href="/pr_mcp/assets/img/logo_mcp.png">
+    <link rel="icon" type="image/png" href="/pr_mcp/assets/img/logo_mcp.png">
     <title>Laporan Rincian Mobil - MCP</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* =========================================================
-           SCREEN STYLE
-        ========================================================= */
         body {
             background-color: #f0f2f5;
             font-family: 'Times New Roman', Times, serif;
             font-size: 11pt;
         }
-
         .wrap-laporan {
             width: 100%;
             background: white;
             padding: 15px 20px;
         }
-
         .table-laporan {
             width: 100%;
             border-collapse: collapse !important;
             background: white;
-            table-layout: fixed; /* ⬅️ KUNCI: lebar kolom terkontrol */
+            table-layout: fixed;
         }
-
-        /* Lebar kolom — total = 100% dari 190mm (210mm - 2x10mm margin) */
         .table-laporan col.c-no       { width: 4%; }
         .table-laporan col.c-kendaraan { width: 15%; }
         .table-laporan col.c-barang   { width: 31%; }
@@ -240,22 +236,18 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
             color: #000 !important;
             word-wrap: break-word;
             overflow-wrap: break-word;
-            /* Cegah sel melar keluar batas */
             overflow: hidden;
         }
-
         .table-laporan th {
             background-color: #e8e8e8 !important;
             text-align: center;
             font-size: 8.5pt;
             font-weight: bold;
         }
-
         .table-laporan td {
             font-size: 8.5pt;
             line-height: 1.3;
         }
-
         .badge-stok {
             color: #198754;
             font-weight: bold;
@@ -302,15 +294,11 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
             background-color: #f5f5f5 !important;
             font-size: 8.5pt;
         }
-
-        /* HIGHLIGHT KUNING */
         .highlight-pernah {
             background-color: #ffff99 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
-
-        /* Judul */
         .judul-laporan {
             font-size: 13pt;
             font-weight: bold;
@@ -324,8 +312,6 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
             text-align: center;
             margin-bottom: 8px;
         }
-
-        /* INFO LEGENDA */
         .info-legenda {
             border: 1px solid #000;
             padding: 4px 8px;
@@ -337,103 +323,44 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
             margin-top: 6px;
         }
 
-        /* =========================================================
-           PRINT STYLE — Override semua untuk F4 portrait
-        ========================================================= */
         @media print {
             @page {
-                size: 210mm 330mm portrait; /* F4 / Folio */
-                margin-top: 10mm;
-                margin-bottom: 10mm;
-                margin-left: 12mm;
-                margin-right: 10mm;
+                size: 210mm 330mm portrait;
+                margin-top: 10mm; margin-bottom: 10mm; margin-left: 12mm; margin-right: 10mm;
             }
-
             html, body {
                 width: 210mm;
                 background: white !important;
                 font-size: 8pt;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
-                color-adjust: exact;
             }
-
             .wrap-laporan {
-                max-width: 100%;
-                width: 100%;
-                padding: 0;
-                box-shadow: none;
-                margin: 0;
+                max-width: 100%; width: 100%; padding: 0; box-shadow: none; margin: 0;
             }
-
-            .no-print {
-                display: none !important;
+            .no-print { display: none !important; }
+            .table-laporan th, .table-laporan td {
+                font-size: 7.5pt !important; padding: 3px 4px !important; line-height: 1.25 !important;
             }
-
-            /* Ukuran font print sedikit lebih kecil agar muat */
-            .table-laporan th,
-            .table-laporan td {
-                font-size: 7.5pt !important;
-                padding: 3px 4px !important;
-                line-height: 1.25 !important;
-            }
-            .driver-header td {
-                font-size: 8pt !important;
-            }
-            .baris-total td {
-                font-size: 8pt !important;
-            }
-
+            .driver-header td { font-size: 8pt !important; }
+            .baris-total td { font-size: 8pt !important; }
             .judul-laporan { font-size: 11pt; }
             .periode-laporan { font-size: 8.5pt; }
-
-            /* Warna tetap terjaga saat print */
-            .highlight-pernah {
-                background-color: #ffff99 !important;
-            }
-            .driver-header {
-                background-color: #d0d7de !important;
-            }
-            .baris-total {
-                background-color: #343a40 !important;
-            }
-            .baris-total td {
-                color: #fff !important;
-            }
-            .badge-jenis {
-                background-color: #333 !important;
-                color: #fff !important;
-            }
-            .info-legenda {
-                background: #ffff99 !important;
-            }
-
-            /* Hindari baris terpotong antar halaman */
-            tr {
-                page-break-inside: avoid;
-            }
-            .driver-header {
-                page-break-before: auto;
-                page-break-after: avoid; /* header driver tidak sendirian di bawah */
-            }
-
-            /* Tanda tangan hanya muncul di print */
-            .ttd-block {
-                display: block !important;
-            }
+            .highlight-pernah { background-color: #ffff99 !important; }
+            .driver-header { background-color: #d0d7de !important; }
+            .baris-total { background-color: #343a40 !important; }
+            .baris-total td { color: #fff !important; }
+            .badge-jenis { background-color: #333 !important; color: #fff !important; }
+            .info-legenda { background: #ffff99 !important; }
+            tr { page-break-inside: avoid; }
+            .driver-header { page-break-before: auto; page-break-after: avoid; }
+            .ttd-block { display: block !important; }
         }
-
-        /* Sembunyikan ttd di screen */
-        .ttd-block {
-            display: none;
-        }
+        .ttd-block { display: none; }
     </style>
 </head>
 <body>
 
-<!-- ============================================================
-     FORM FILTER — hanya tampil di screen
-============================================================ -->
 <div class="container-fluid py-2 no-print">
     <div class="card mb-3 shadow-sm border-0">
         <div class="card-body bg-light p-2">
@@ -446,12 +373,20 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                         <input type="date" name="tgl_akhir" class="form-control" value="<?= $tgl_akhir ?>">
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="small fw-bold">Cari</label>
                     <input type="text" name="search" class="form-control form-control-sm"
                            value="<?= htmlspecialchars($search) ?>" placeholder="Plat / Driver...">
                 </div>
-                <div class="col-md-4 d-flex gap-2 align-items-end">
+                
+                <div class="col-md-2 mb-1">
+                    <div class="form-check form-switch small">
+                        <input class="form-check-input" type="checkbox" name="tambal_ban" id="checkTambal" value="1" <?= ($tambal_ban == '1') ? 'checked' : '' ?>>
+                        <label class="form-check-label fw-bold text-danger" for="checkTambal">Khusus Tambal Ban</label>
+                    </div>
+                </div>
+
+                <div class="col-md-5 d-flex gap-2 align-items-end">
                     <button type="submit" class="btn btn-sm btn-primary">
                         <i class="fas fa-search me-1"></i>Tampilkan
                     </button>
@@ -467,18 +402,13 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
     </div>
 </div>
 
-<!-- ============================================================
-     AREA CETAK — dibungkus .wrap-laporan
-============================================================ -->
 <div class="wrap-laporan" id="area-cetak">
 
-    <!-- Judul -->
-    <div class="judul-laporan">Laporan Kendaraan PT. MCP</div>
+    <div class="judul-laporan">Laporan Kendaraan <?= ($tambal_ban == '1') ? '(Khusus Tambal Ban)' : '' ?> PT. MCP</div>
     <div class="periode-laporan">
         Periode: <?= date('d/m/Y', strtotime($tgl_awal)) ?> s/d <?= date('d/m/Y', strtotime($tgl_akhir)) ?>
     </div>
 
-    <!-- Tabel Laporan -->
     <table class="table-laporan">
         <colgroup>
             <col class="c-no">
@@ -488,7 +418,6 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
             <col class="c-tgllast">
             <col class="c-harga">
             <col class="c-subtotal">
-           <!-- <col class="c-aksi no-print">-->
         </colgroup>
         <thead>
             <tr>
@@ -499,160 +428,131 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                 <th>TGL TERAKHIR</th>
                 <th>HARGA SATUAN</th>
                 <th>SUBTOTAL</th>
-                <!--<th class="no-print">AKSI</th>-->
             </tr>
         </thead>
         <tbody>
             <?php
             $no = 0; $grand_total = 0;
-            foreach ($data_by_driver as $driver_name => $data_mobil) :
+            if(!empty($data_by_driver)) :
+                foreach ($data_by_driver as $driver_name => $data_mobil) :
             ?>
-                <!-- Baris Header Driver -->
-                <tr class="driver-header">
-                    <td colspan="7" class="ps-2">
-                        <i class="fas fa-user me-1"></i>
-                        DRIVER: <?= ($driver_name === 'TANPA DRIVER') ? '-' : strtoupper($driver_name) ?>
-                    </td>
-                   <!-- <td class="no-print"></td>>-->
-                </tr>
-
-                <?php
-                foreach ($data_mobil as $plat => $m) :
-                    $sub_total_mobil = 0;
-                    $rowspan = count($m['items']);
-                    foreach ($m['items'] as $index => $item) :
-                        $sub_total_mobil += $item['total_per_item'];
-                        $grand_total     += $item['total_per_item'];
-
-                        $is_duplikat     = isDuplicateItem($koneksi, $item['nama_barang_asli'], $plat);
-                        $class_highlight = $is_duplikat ? 'highlight-pernah' : '';
-
-                        $tgl_terakhir_db = getLastPurchaseDate($koneksi, $item['nama_barang_asli'], $item['tgl_beli'], $plat);
-                        $tgl_tampil  = '-';
-                        $badge_periode = '';
-                        if ($tgl_terakhir_db) {
-                            $tgl_tampil    = date('d/m/y', strtotime($tgl_terakhir_db));
-                            $diff          = (new DateTime($item['tgl_beli']))->diff(new DateTime($tgl_terakhir_db))->days;
-                            $badge_periode = '<br><span class="badge-periode">' . $diff . ' Hari</span>';
-                        }
-                ?>
-                    <tr class="<?= $class_highlight ?>">
-                        <?php if ($index === 0) : ?>
-                            <!-- Kolom nomor & kendaraan — rowspan -->
-                            <td rowspan="<?= $rowspan ?>" class="text-center fw-bold align-middle">
-                                <?= ++$no ?>
-                            </td>
-                            <td rowspan="<?= $rowspan ?>" class="align-top" style="font-size:7.5pt;">
-                                <span class="badge-jenis"><?= htmlspecialchars($m['jenis']) ?></span><br>
-                                <b><?= htmlspecialchars($plat) ?></b><br>
-                                <span class="text-muted" style="font-size:7pt;"><?= htmlspecialchars($m['driver']) ?></span>
-                            </td>
-                        <?php endif; ?>
-
-                        <!-- Nama barang -->
-                       <td style="font-size:7.5pt;">
-							<?php 
-								// Ambil teks item asal
-								$tampil_item = htmlspecialchars($item['nama_item']);
-								
-								// Bersihkan tanda [STOK]
-								$tampil_item = str_replace('[STOK]', '<span class="badge-stok">STOK</span>', $tampil_item);
-								
-								/**
-								 * REGEX MAGIC: 
-								 * Mencari angka desimal (misal 2.0000) dan menghapus nol yang tidak perlu.
-								 * Hasilnya: 2.0000 -> 2 | 2.5000 -> 2.5 | 0.0110 -> 0.011
-								 */
-								$tampil_item = preg_replace_callback('/(\d+\.\d+)/', function($m) {
-									return rtrim(rtrim($m[1], '0'), '.');
-								}, $tampil_item);
-
-								echo $tampil_item;
-							?>
-						</td>
-
-                        <!-- Tanggal Beli -->
-                        <td class="text-center" style="font-size:7.5pt; white-space:nowrap;">
-                            <span class="no-print">
-                                <a href="javascript:void(0)" class="text-decoration-none"
-                                   onclick="editTanggal('<?= $item['id_transaksi'] ?>','<?= $item['kategori'] ?>','<?= $item['tgl_beli'] ?>')">
-                                    <?= date('d/m/y', strtotime($item['tgl_beli'])) ?>
-                                </a>
-                            </span>
-                            <span class="d-none d-print-inline">
-                                <?= date('d/m/y', strtotime($item['tgl_beli'])) ?>
-                            </span>
+                    <tr class="driver-header">
+                        <td colspan="7" class="ps-2">
+                            <i class="fas fa-user me-1"></i>
+                            DRIVER: <?= ($driver_name === 'TANPA DRIVER') ? '-' : strtoupper($driver_name) ?>
                         </td>
-
-                        <!-- Tanggal Terakhir -->
-                        <td class="text-center" style="font-size:7.5pt;">
-                            <?= $tgl_tampil . $badge_periode ?>
-                        </td>
-
-                        <!-- Harga Satuan -->
-                        <td class="text-end" style="font-size:7.5pt; white-space:nowrap;">
-                            Rp <?= number_format($item['harga_satuan'], 0, ',', '.') ?>
-                        </td>
-
-                        <!-- Subtotal -->
-                        <td class="text-end fw-bold" style="font-size:7.5pt; white-space:nowrap;">
-                            Rp <?= number_format($item['total_per_item'], 0, ',', '.') ?>
-                        </td>
-
-                        <!-- Aksi (hanya screen) -->
-                        <!--<td class="text-center no-print">
-                            <a href="hapus_item_mobil.php?id=<?= $item['id_transaksi'] ?>&kat=<?= $item['kategori'] ?>"
-                               class="text-danger"
-                               onclick="return confirm('Yakin hapus item ini?')">
-                                <i class="fas fa-trash-alt"></i>
-                            </a>
-                        </td>-->
                     </tr>
-                <?php endforeach; ?>
 
-                <!-- Subtotal per plat -->
-                <tr class="subtotal-row">
-                    <td colspan="6" class="text-end small fw-bold" style="font-size:7.5pt;">
-                        SUBTOTAL <?= htmlspecialchars($plat) ?> :
-                    </td>
-                    <td class="text-end fw-bold" style="font-size:7.5pt; white-space:nowrap;">
-                        Rp <?= number_format($sub_total_mobil, 0, ',', '.') ?>
-                    </td>
-                    <!-- <td class="no-print"></td> -->
+                    <?php
+                    foreach ($data_mobil as $plat => $m) :
+                        $sub_total_mobil = 0;
+                        $rowspan = count($m['items']);
+                        foreach ($m['items'] as $index => $item) :
+                            $sub_total_mobil += $item['total_per_item'];
+                            $grand_total     += $item['total_per_item'];
+
+                            $is_duplikat     = isDuplicateItem($koneksi, $item['nama_barang_asli'], $plat);
+                            $class_highlight = $is_duplikat ? 'highlight-pernah' : '';
+
+                            $tgl_terakhir_db = getLastPurchaseDate($koneksi, $item['nama_barang_asli'], $item['tgl_beli'], $plat);
+                            $tgl_tampil  = '-';
+                            $badge_periode = '';
+                            if ($tgl_terakhir_db) {
+                                $tgl_tampil    = date('d/m/y', strtotime($tgl_terakhir_db));
+                                $diff          = (new DateTime($item['tgl_beli']))->diff(new DateTime($tgl_terakhir_db))->days;
+                                $badge_periode = '<br><span class="badge-periode">' . $diff . ' Hari</span>';
+                            }
+                    ?>
+                        <tr class="<?= $class_highlight ?>">
+                            <?php if ($index === 0) : ?>
+                                <td rowspan="<?= $rowspan ?>" class="text-center fw-bold align-middle">
+                                    <?= ++$no ?>
+                                </td>
+                                <td rowspan="<?= $rowspan ?>" class="align-top" style="font-size:7.5pt;">
+                                    <span class="badge-jenis"><?= htmlspecialchars($m['jenis']) ?></span><br>
+                                    <b><?= htmlspecialchars($plat) ?></b><br>
+                                    <span class="text-muted" style="font-size:7pt;"><?= htmlspecialchars($m['driver']) ?></span>
+                                </td>
+                            <?php endif; ?>
+
+                            <td style="font-size:7.5pt;">
+                                <?php 
+                                    $tampil_item = htmlspecialchars($item['nama_item']);
+                                    $tampil_item = str_replace('[STOK]', '<span class="badge-stok">STOK</span>', $tampil_item);
+                                    
+                                    $tampil_item = preg_replace_callback('/(\d+\.\d+)/', function($m) {
+                                        return rtrim(rtrim($m[1], '0'), '.');
+                                    }, $tampil_item);
+
+                                    echo $tampil_item;
+                                ?>
+                            </td>
+
+                            <td class="text-center" style="font-size:7.5pt; white-space:nowrap;">
+                                <span class="no-print">
+                                    <a href="javascript:void(0)" class="text-decoration-none"
+                                       onclick="editTanggal('<?= $item['id_transaksi'] ?>','<?= $item['kategori'] ?>','<?= $item['tgl_beli'] ?>')">
+                                        <?= date('d/m/y', strtotime($item['tgl_beli'])) ?>
+                                    </a>
+                                </span>
+                                <span class="d-none d-print-inline">
+                                    <?= date('d/m/y', strtotime($item['tgl_beli'])) ?>
+                                </span>
+                            </td>
+
+                            <td class="text-center" style="font-size:7.5pt;">
+                                <?= $tgl_tampil . $badge_periode ?>
+                            </td>
+
+                            <td class="text-end" style="font-size:7.5pt; white-space:nowrap;">
+                                Rp <?= number_format($item['harga_satuan'], 0, ',', '.') ?>
+                            </td>
+
+                            <td class="text-end fw-bold" style="font-size:7.5pt; white-space:nowrap;">
+                                Rp <?= number_format($item['total_per_item'], 0, ',', '.') ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+
+                    <tr class="subtotal-row">
+                        <td colspan="6" class="text-end small fw-bold" style="font-size:7.5pt;">
+                            SUBTOTAL <?= htmlspecialchars($plat) ?> :
+                        </td>
+                        <td class="text-end fw-bold" style="font-size:7.5pt; white-space:nowrap;">
+                            Rp <?= number_format($sub_total_mobil, 0, ',', '.') ?>
+                        </td>
+                    </tr>
+
+            <?php endforeach; endforeach; 
+            else: ?>
+                <tr>
+                    <td colspan="7" class="text-center py-3 text-muted">Tidak ada data transaksi yang ditemukan.</td>
                 </tr>
+            <?php endif; ?>
 
-            <?php endforeach; endforeach; ?>
-
-            <!-- Grand Total -->
             <tr class="baris-total">
                 <td colspan="6" class="text-end fw-bold">TOTAL KESELURUHAN :</td>
                 <td class="text-end fw-bold" style="white-space:nowrap;">
                     Rp <?= number_format($grand_total, 0, ',', '.') ?>
                 </td>
-               <!-- <td class="no-print"></td> -->
             </tr>
         </tbody>
     </table>
 
-    <!-- Legenda & TTD -->
     <div class="row mt-2">
         <div class="col-7">
             <div class="info-legenda">
                 <strong>INFO:</strong> Baris kuning = barang/jasa yang pernah dibeli sebelumnya (pengulangan).
             </div>
         </div>
-        <!-- TTD — hanya tampil saat print -->
         <div class="col-5 text-end ttd-block" style="font-size: 8.5pt; font-family: 'Times New Roman', serif;">
             Surabaya, <?= date('d') ?> <?= $nama_bulan[date('m')] ?> <?= date('Y') ?><br><br><br><br>
             <strong>( ____________________ )</strong><br>Manager
         </div>
     </div>
 
-</div><!-- /.wrap-laporan -->
+</div>
 
-<!-- ============================================================
-     MODAL EDIT TANGGAL
-============================================================ -->
 <div class="modal fade no-print" id="modalEditTgl" tabindex="-1">
     <div class="modal-dialog modal-sm">
         <form action="update_tgl_laporan.php" method="POST" class="modal-content">
