@@ -1,5 +1,5 @@
 <?php
-session_start();
+// Hapus session_start() karena sudah ada di check_session.php
 require_once __DIR__ . '/../../config/koneksi.php';
 require_once __DIR__ . '/../../auth/check_session.php';
 
@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $id_history = isset($_POST['id_history']) ? (int)$_POST['id_history'] : 0;
 $tgl_kejadian = isset($_POST['tgl_kejadian']) ? trim($_POST['tgl_kejadian']) : '';
 $keterangan = isset($_POST['keterangan']) ? trim($_POST['keterangan']) : '';
+$nama = $_SESSION['nama'] ?? '';
 
 // Validasi
 if (!$id_history) {
@@ -35,27 +36,30 @@ if (!$tgl_kejadian) {
     exit;
 }
 
-// Escape string
-$tgl_kejadian = mysqli_real_escape_string($koneksi, $tgl_kejadian);
-$keterangan = mysqli_real_escape_string($koneksi, $keterangan);
-$nama = mysqli_real_escape_string($koneksi, $_SESSION['nama'] ?? '');
+// Gunakan prepared statement untuk keamanan
+$stmt = mysqli_prepare($koneksi, "SELECT id_history FROM tr_it_asset_history WHERE id_history = ?");
+mysqli_stmt_bind_param($stmt, "i", $id_history);
+mysqli_stmt_execute($stmt);
+mysqli_stmt_store_result($stmt);
 
-// Cek apakah data ada
-$cek = mysqli_query($koneksi, "SELECT id_history FROM tr_it_asset_history WHERE id_history = $id_history");
-if (mysqli_num_rows($cek) == 0) {
+if (mysqli_stmt_num_rows($stmt) == 0) {
     echo json_encode(['status' => 'error', 'message' => 'Riwayat tidak ditemukan']);
+    mysqli_stmt_close($stmt);
     exit;
 }
+mysqli_stmt_close($stmt);
 
-// Update data
-$sql = "UPDATE tr_it_asset_history SET 
-        tgl_kejadian = '$tgl_kejadian',
-        keterangan = '$keterangan',
-        updated_by = '$nama',
-        updated_at = NOW()
-        WHERE id_history = $id_history";
+// Update dengan prepared statement
+$stmt = mysqli_prepare($koneksi, "UPDATE tr_it_asset_history SET 
+                                tgl_kejadian = ?,
+                                keterangan = ?,
+                                updated_by = ?,
+                                updated_at = NOW()
+                                WHERE id_history = ?");
 
-if (mysqli_query($koneksi, $sql)) {
+mysqli_stmt_bind_param($stmt, "sssi", $tgl_kejadian, $keterangan, $nama, $id_history);
+
+if (mysqli_stmt_execute($stmt)) {
     echo json_encode([
         'status' => 'success', 
         'message' => 'Riwayat berhasil diperbarui',
@@ -68,7 +72,10 @@ if (mysqli_query($koneksi, $sql)) {
 } else {
     echo json_encode([
         'status' => 'error', 
-        'message' => 'Gagal update: ' . mysqli_error($koneksi)
+        'message' => 'Gagal update: ' . mysqli_stmt_error($stmt)
     ]);
 }
+
+mysqli_stmt_close($stmt);
+mysqli_close($koneksi);
 ?>

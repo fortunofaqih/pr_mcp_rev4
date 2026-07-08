@@ -4,6 +4,30 @@ $page_title = "Detail Aset IT";
 require_once __DIR__ . '/../../config/koneksi.php';
 require_once __DIR__ . '/../../auth/check_session.php';
 
+// Fungsi untuk aman menggunakan htmlspecialchars dengan default value
+function safeHtml($value, $default = '') {
+    if ($value === null || $value === '') {
+        return htmlspecialchars($default, ENT_QUOTES, 'UTF-8');
+    }
+    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+}
+
+// Fungsi untuk format tanggal dengan aman
+function safeDate($date, $format = 'd/m/Y', $default = '-') {
+    if (empty($date) || $date === '0000-00-00' || $date === null) {
+        return $default;
+    }
+    try {
+        $timestamp = strtotime($date);
+        if ($timestamp === false) {
+            return $default;
+        }
+        return date($format, $timestamp);
+    } catch (Exception $e) {
+        return $default;
+    }
+}
+
 $role = $_SESSION['role'];
 $nama = $_SESSION['nama'];
 
@@ -60,31 +84,50 @@ while ($row = mysqli_fetch_assoc($q_kondisi)) {
 // AMBIL DATA ASET
 // ============================================================
 $q = mysqli_query($koneksi, "SELECT * FROM master_it_asset WHERE id_asset = $id");
-if (!$q || mysqli_num_rows($q) == 0) { header("Location: index.php"); exit; }
+if (!$q || mysqli_num_rows($q) == 0) { 
+    header("Location: index.php"); 
+    exit; 
+}
 $asset = mysqli_fetch_assoc($q);
 
+// ============================================================
+// AMBIL DATA HISTORY
+// ============================================================
 $q_hist = mysqli_query($koneksi, "SELECT * FROM tr_it_asset_history WHERE id_asset = $id ORDER BY tgl_kejadian DESC, id_history DESC");
+
+// DEBUG: Cek apakah query berhasil
+if (!$q_hist) {
+    $error_history = mysqli_error($koneksi);
+} else {
+    $total_history = mysqli_num_rows($q_hist);
+}
 
 // Hitung garansi
 $garansi_info  = '-';
 $garansi_class = 'text-muted';
-if ($asset['tgl_garansi_selesai']) {
-    $tgl_garansi = new DateTime($asset['tgl_garansi_selesai']);
-    $today = new DateTime();
-    $diff  = $today->diff($tgl_garansi);
-    $sisa  = $tgl_garansi > $today ? $diff->days : -$diff->days;
-    if ($sisa < 0) {
-        $garansi_info  = 'Expired ' . abs($sisa) . ' hari lalu';
-        $garansi_class = 'text-danger fw-bold';
-    } elseif ($sisa <= 30) {
-        $garansi_info  = 'Sisa ' . $sisa . ' hari lagi!';
-        $garansi_class = 'text-warning fw-bold';
-    } else {
-        $garansi_info  = 'Aktif (sisa ' . $sisa . ' hari)';
-        $garansi_class = 'text-success';
+if (!empty($asset['tgl_garansi_selesai']) && $asset['tgl_garansi_selesai'] !== '0000-00-00') {
+    try {
+        $tgl_garansi = new DateTime($asset['tgl_garansi_selesai']);
+        $today = new DateTime();
+        $diff  = $today->diff($tgl_garansi);
+        $sisa  = $tgl_garansi > $today ? $diff->days : -$diff->days;
+        if ($sisa < 0) {
+            $garansi_info  = 'Expired ' . abs($sisa) . ' hari lalu';
+            $garansi_class = 'text-danger fw-bold';
+        } elseif ($sisa <= 30) {
+            $garansi_info  = 'Sisa ' . $sisa . ' hari lagi!';
+            $garansi_class = 'text-warning fw-bold';
+        } else {
+            $garansi_info  = 'Aktif (sisa ' . $sisa . ' hari)';
+            $garansi_class = 'text-success';
+        }
+    } catch (Exception $e) {
+        $garansi_info = '-';
+        $garansi_class = 'text-muted';
     }
 }
 
+// Mapping kondisi ke class Bootstrap
 $kondisi_class = [
     'BAGUS'       => 'success',
     'RUSAK'       => 'danger',
@@ -151,6 +194,16 @@ $additional_css = '
     .timeline-item .card:hover {
         box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
     }
+    /* Style untuk tombol edit kondisi di card */
+    .btn-edit-kondisi {
+        font-size: 0.75rem;
+        padding: 2px 10px;
+        transition: all 0.2s ease;
+    }
+    .btn-edit-kondisi:hover {
+        transform: scale(1.05);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
 </style>';
 
 // ✅ INCLUDE HEADER DI SINI — setelah semua variabel siap
@@ -173,32 +226,28 @@ if ($flash_error): ?>
 <!-- Breadcrumb & Toolbar -->
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
     <div class="d-flex align-items-center gap-2">
-        
         <h5 class="fw-bold mb-0 text-primary">
             <i class="fas fa-laptop me-2"></i> Detail Aset IT
         </h5>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-       <a href="report_excel_aset.php?id=<?= $id ?>"
+        <a href="report_excel_aset.php?id=<?= $id ?>"
             class="btn btn-success btn-sm fw-bold">
-                <i class="fas fa-file-excel me-1"></i> Export Excel
-            </a>
-            
-            <!-- ✅ Tombol Cetak PDF — tambahkan ke toolbar detail_aset.php -->
-            <a href="cetak_pdf_aset.php?id=<?= $id ?>"
+            <i class="fas fa-file-excel me-1"></i> Export Excel
+        </a>
+        <a href="cetak_pdf_aset.php?id=<?= $id ?>"
             class="btn btn-danger btn-sm fw-bold"
             target="_blank"
             title="Cetak atau simpan sebagai PDF">
-                <i class="fas fa-file-pdf me-1"></i> Cetak PDF
-            </a>
- 
+            <i class="fas fa-file-pdf me-1"></i> Cetak PDF
+        </a>
         <a href="form_asset.php?id=<?= $id ?>" class="btn btn-warning btn-sm fw-bold">
             <i class="fas fa-pencil me-1"></i> Edit
         </a>
         <button class="btn btn-success btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalHistory">
             <i class="fas fa-plus me-1"></i> Tambah Riwayat
         </button>
-        <button onclick="konfirmasiHapus(<?= $id ?>, '<?= htmlspecialchars($asset['nama_asset'], ENT_QUOTES) ?>')"
+        <button onclick="konfirmasiHapus(<?= $id ?>, '<?= safeHtml($asset['nama_asset']) ?>')"
                 class="btn btn-danger btn-sm fw-bold">
             <i class="fas fa-trash me-1"></i> Hapus
         </button>
@@ -213,99 +262,101 @@ if ($flash_error): ?>
         <div class="card mb-4">
             <div class="card-body text-center py-4">
                 <?php if (!empty($asset['foto'])): ?>
-                <img src="../../uploads/it_asset/<?= $asset['foto'] ?>"
+                <img src="../../uploads/it_asset/<?= safeHtml($asset['foto']) ?>"
                      class="img-fluid rounded mb-3" style="max-height:200px; object-fit:contain;">
                 <?php else: ?>
                 <div class="bg-light rounded p-4 mb-3 d-inline-block">
                     <i class="fas fa-laptop fa-4x text-muted"></i>
                 </div>
                 <?php endif; ?>
-                <div class="fw-bold fs-5"><?= htmlspecialchars($asset['nama_asset']) ?></div>
-                <?php if ($asset['merk']): ?>
-                <div class="text-muted"><?= htmlspecialchars($asset['merk']) ?> <?= htmlspecialchars($asset['model'] ?? '') ?></div>
+                <div class="fw-bold fs-5"><?= safeHtml($asset['nama_asset']) ?></div>
+                <?php if (!empty($asset['merk']) || !empty($asset['model'])): ?>
+                <div class="text-muted">
+                    <?= safeHtml($asset['merk']) ?> <?= safeHtml($asset['model']) ?>
+                </div>
                 <?php endif; ?>
                 <div class="mt-2">
-                    <span class="badge bg-<?= $kondisi_class ?> fs-6 px-3 py-2"><?= $asset['kondisi'] ?></span>
+                    <span class="badge bg-<?= $kondisi_class ?> fs-6 px-3 py-2"><?= safeHtml($asset['kondisi']) ?></span>
                 </div>
                 <div class="mt-2">
                     <span class="bg-primary text-white px-3 py-1 rounded fw-bold" style="font-family:monospace; letter-spacing:1px;">
-                        <?= htmlspecialchars($asset['kode_asset']) ?>
+                        <?= safeHtml($asset['kode_asset']) ?>
                     </span>
                 </div>
             </div>
         </div>
 
         <!-- Informasi Detail -->
-        <div class="card mb-4 ">
+        <div class="card mb-4">
             <div class="card-header bg-primary text-white fw-bold py-2 small">
                 <i class="fas fa-info-circle me-2"></i> Identitas Aset
             </div>
             <div class="info-row">
                 <div class="info-item">
                     <div class="info-label">Serial Number</div>
-                    <div class="info-value"><?= $asset['serial_number'] ?: '-' ?></div>
-                    
+                    <div class="info-value"><?= safeHtml($asset['serial_number'], '-') ?></div>
                 </div>
                 <div class="info-item">
-                     <div class="info-label">No. IMEI</div>
-                    <div class="info-value"><?= $asset['no_imei'] ?: '-' ?></div>
+                    <div class="info-label">No. IMEI</div>
+                    <div class="info-value"><?= safeHtml($asset['no_imei'], '-') ?></div>
                 </div>
                 <div class="info-item info-item-full">
-                   <div class="info-label">Spesifikasi</div>
-                    <div class="info-value small"><?= nl2br(htmlspecialchars($asset['spesifikasi'] ?: '-')) ?></div>
-                    
+                    <div class="info-label">Spesifikasi</div>
+                    <div class="info-value small">
+                        <?= !empty($asset['spesifikasi']) ? nl2br(safeHtml($asset['spesifikasi'])) : '-' ?>
+                    </div>
                 </div>
-				<div class="info-item info-item-full">
-					<div class="info-label">Keterangan Barang</div>
-					<div class="info-value">
-						<?php if (!empty($asset['keterangan_barang'])): ?>
-							<div class="keterangan-box">
-								<?= nl2br(htmlspecialchars($asset['keterangan_barang'])) ?>
-							</div>
-						<?php else: ?>
-							<div class="keterangan-box text-muted">
-								<i class="fas fa-minus me-1"></i> Tidak ada keterangan
-							</div>
-						<?php endif; ?>
-					</div>
+                <div class="info-item info-item-full">
+                    <div class="info-label">Keterangan Barang</div>
+                    <div class="info-value">
+                        <?php if (!empty($asset['keterangan_barang'])): ?>
+                            <div class="keterangan-box">
+                                <?= nl2br(safeHtml($asset['keterangan_barang'])) ?>
+                            </div>
+                        <?php else: ?>
+                            <div class="keterangan-box text-muted">
+                                <i class="fas fa-minus me-1"></i> Tidak ada keterangan
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
         </div>
-		</div>
 
-        <!-- ============================================================ -->
-        <!-- CARD STATUS & KONDISI - DENGAN KETERANGAN KONDISI -->
-        <!-- ============================================================ -->
+        <!-- CARD STATUS & KONDISI -->
         <div class="card mb-4">
-            <div class="card-header bg-danger text-white fw-bold py-2 small">
-                <i class="fas fa-heartbeat me-2"></i> Status & Kondisi
+            <div class="card-header bg-danger text-white fw-bold py-2 small d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-heartbeat me-2"></i> Status & Kondisi</span>
+                <button type="button" class="btn btn-sm btn-light fw-bold" 
+                        data-bs-toggle="modal" data-bs-target="#modalEditKondisi"
+                        onclick="openEditKondisi(<?= $id ?>, '<?= safeHtml($asset['nama_asset']) ?>', '<?= safeHtml($asset['kondisi']) ?>', '<?= safeHtml($asset['keterangan_kondisi']) ?>')">
+                    <i class="fas fa-pencil me-1"></i> Edit Kondisi
+                </button>
             </div>
             <div class="info-row">
                 <div class="info-item">
                     <div class="info-label">Kondisi Saat Ini</div>
                     <div class="info-value">
-                        <span class="badge bg-<?= $kondisi_class ?> fs-6 px-3 py-2"><?= $asset['kondisi'] ?></span>
+                        <span class="badge bg-<?= $kondisi_class ?> fs-6 px-3 py-2"><?= safeHtml($asset['kondisi']) ?></span>
                     </div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Status Aset</div>
                     <div class="info-value">
                         <span class="badge bg-<?= $asset['status_asset'] == 'AKTIF' ? 'success' : ($asset['status_asset'] == 'TIDAK AKTIF' ? 'warning' : 'secondary') ?>">
-                            <?= $asset['status_asset'] ?>
+                            <?= safeHtml($asset['status_asset']) ?>
                         </span>
                     </div>
                 </div>
-                <!-- ============================================================ -->
-                <!-- TAMBAH: KETERANGAN KONDISI - FULL WIDTH -->
-                <!-- ============================================================ -->
                 <div class="info-item info-item-full">
                     <div class="info-label">Keterangan Kondisi</div>
                     <div class="info-value">
                         <?php if (!empty($asset['keterangan_kondisi'])): ?>
-                            <div class="keterangan-box">
-                                <?= nl2br(htmlspecialchars($asset['keterangan_kondisi'])) ?>
+                            <div class="keterangan-box" id="display_keterangan_kondisi">
+                                <?= nl2br(safeHtml($asset['keterangan_kondisi'])) ?>
                             </div>
                         <?php else: ?>
-                            <div class="keterangan-box text-muted">
+                            <div class="keterangan-box text-muted" id="display_keterangan_kondisi">
                                 <i class="fas fa-minus me-1"></i> Tidak ada keterangan
                             </div>
                         <?php endif; ?>
@@ -321,30 +372,28 @@ if ($flash_error): ?>
             </div>
             <div class="info-row">
                 <div class="info-item">
-                   <div class="info-label">Sumber</div>
+                    <div class="info-label">Sumber</div>
                     <div class="info-value">
-                        <span class="badge bg-<?= $asset['sumber_perolehan']=='PEMBELIAN'?'info text-dark':'secondary' ?>">
-                            <?= $asset['sumber_perolehan'] ?>
+                        <span class="badge bg-<?= $asset['sumber_perolehan'] == 'PEMBELIAN' ? 'info text-dark' : 'secondary' ?>">
+                            <?= safeHtml($asset['sumber_perolehan']) ?>
                         </span>
                     </div>
-                   
                 </div>
                 <div class="info-item">
                     <div class="info-label">Tgl Perolehan</div>
-                    <div class="info-value"><?= $asset['tgl_perolehan'] ? date('d/m/Y', strtotime($asset['tgl_perolehan'])) : '-' ?></div>
-                  
+                    <div class="info-value"><?= safeDate($asset['tgl_perolehan']) ?></div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Harga Perolehan</div>
-                    <div class="info-value">Rp <?= number_format($asset['harga_perolehan'], 0, ',', '.') ?></div>
+                    <div class="info-value">Rp <?= number_format($asset['harga_perolehan'] ?? 0, 0, ',', '.') ?></div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Supplier</div>
-                    <div class="info-value"><?= $asset['supplier'] ?: '-' ?></div>
+                    <div class="info-value"><?= safeHtml($asset['supplier'], '-') ?></div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">No. PR</div>
-                    <div class="info-value"><?= $asset['no_request'] ?: '-' ?></div>
+                    <div class="info-value"><?= safeHtml($asset['no_request'], '-') ?></div>
                 </div>
             </div>
         </div>
@@ -357,23 +406,20 @@ if ($flash_error): ?>
             <div class="info-row">
                 <div class="info-item">
                     <div class="info-label">Mulai</div>
-                    <div class="info-value"><?= $asset['tgl_garansi_mulai'] ? date('d/m/Y', strtotime($asset['tgl_garansi_mulai'])) : '-' ?></div>
+                    <div class="info-value"><?= safeDate($asset['tgl_garansi_mulai']) ?></div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Selesai</div>
-                    <div class="info-value"><?= $asset['tgl_garansi_selesai'] ? date('d/m/Y', strtotime($asset['tgl_garansi_selesai'])) : '-' ?></div>
+                    <div class="info-value"><?= safeDate($asset['tgl_garansi_selesai']) ?></div>
                 </div>
                 <div class="info-item info-item-full">
                     <div class="info-label">Status Garansi</div>
-                    <div class="info-value <?= $garansi_class ?>"><?= $garansi_info ?> </div>
-                  
+                    <div class="info-value <?= $garansi_class ?>"><?= safeHtml($garansi_info) ?></div>
                 </div>
             </div>
         </div>
 
-        <!-- ============================================================ -->
-        <!-- CARD PENEMPATAN - DENGAN KETERANGAN PENEMPATAN -->
-        <!-- ============================================================ -->
+        <!-- CARD PENEMPATAN -->
         <div class="card mb-4">
             <div class="card-header bg-info text-white fw-bold py-2 small">
                 <i class="fas fa-map-marker-alt me-2"></i> Penempatan
@@ -381,17 +427,14 @@ if ($flash_error): ?>
             <div class="info-row">
                 <div class="info-item info-item-full">
                     <div class="info-label">Lokasi / Ruangan</div>
-                    <div class="info-value"><?= $asset['lokasi'] ?: '-' ?></div>
+                    <div class="info-value"><?= safeHtml($asset['lokasi'], '-') ?></div>
                 </div>
-                <!-- ============================================================ -->
-                <!-- TAMBAH: KETERANGAN PENEMPATAN - FULL WIDTH -->
-                <!-- ============================================================ -->
                 <div class="info-item info-item-full">
                     <div class="info-label">Keterangan Penempatan</div>
                     <div class="info-value">
                         <?php if (!empty($asset['keterangan_penempatan'])): ?>
                             <div class="keterangan-box">
-                                <?= nl2br(htmlspecialchars($asset['keterangan_penempatan'])) ?>
+                                <?= nl2br(safeHtml($asset['keterangan_penempatan'])) ?>
                             </div>
                         <?php else: ?>
                             <div class="keterangan-box text-muted">
@@ -402,11 +445,11 @@ if ($flash_error): ?>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Pengguna / PIC</div>
-                    <div class="info-value"><?= $asset['pengguna'] ?: '-' ?></div>
+                    <div class="info-value"><?= safeHtml($asset['pengguna'], '-') ?></div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Departemen</div>
-                    <div class="info-value"><?= $asset['departemen'] ?: '-' ?></div>
+                    <div class="info-value"><?= safeHtml($asset['departemen'], '-') ?></div>
                 </div>
             </div>
         </div>
@@ -418,18 +461,25 @@ if ($flash_error): ?>
             <div class="card-header d-flex align-items-center justify-content-between bg-dark text-white py-2">
                 <div class="fw-bold small">
                     <i class="fas fa-history me-2"></i> Riwayat Aset IT
+                    <span class="badge bg-light text-dark ms-2"><?= $total_history ?? 0 ?></span>
                 </div>
-               
             </div>
             <div class="card-body" style="max-height:75vh; overflow-y:auto;">
-                <?php if (mysqli_num_rows($q_hist) == 0): ?>
+                <?php if (!isset($q_hist) || mysqli_num_rows($q_hist) == 0): ?>
                 <div class="text-center text-muted py-4">
                     <i class="fas fa-history fa-3x mb-2 opacity-25"></i>
-                    <p>Belum ada riwayat tercatat.</p>
+                    <p>Belum ada riwayat tercatat untuk aset ini.</p>
+                    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalHistory">
+                        <i class="fas fa-plus me-1"></i> Tambah Riwayat Pertama
+                    </button>
                 </div>
                 <?php else: ?>
                 <div class="timeline">
-                <?php while($hist = mysqli_fetch_assoc($q_hist)):
+                <?php 
+                while($hist = mysqli_fetch_assoc($q_hist)):
+                    // Skip jika data kosong
+                    if (empty($hist['jenis_history'])) continue;
+                    
                     $jenis = $hist['jenis_history'];
                     $item_class_map = [
                         'PENERIMAAN'    => 'penerimaan',
@@ -440,6 +490,7 @@ if ($flash_error): ?>
                         'PINDAH PENGGUNA' => 'pindah',
                         'DISPOSE'       => 'dispose',
                         'HILANG'        => 'rusak',
+                        'KONDISI UPDATE' => 'penerimaan',
                     ];
                     $item_class = $item_class_map[$jenis] ?? '';
 
@@ -476,52 +527,95 @@ if ($flash_error): ?>
                                 <div class="d-flex align-items-start justify-content-between flex-wrap gap-1">
                                     <div>
                                         <span class="badge bg-<?= $badge ?> text-<?= $badge=='light'?'dark':'white' ?> mb-1">
-                                            <i class="fas fa-<?= $icon ?> me-1"></i><?= $jenis ?>
+                                            <i class="fas fa-<?= $icon ?> me-1"></i><?= safeHtml($jenis) ?>
                                         </span>
-                                        <?php if ($hist['kondisi_sebelum'] && $hist['kondisi_sesudah']): ?>
+                                        
+                                        <?php if (!empty($hist['kondisi_sebelum']) && !empty($hist['kondisi_sesudah'])): ?>
                                         <div class="small">
-                                            <span class="text-muted"><?= $hist['kondisi_sebelum'] ?></span>
+                                            <span class="text-muted"><?= safeHtml($hist['kondisi_sebelum']) ?></span>
                                             <i class="fas fa-arrow-right mx-1 text-primary"></i>
-                                            <span class="fw-bold"><?= $hist['kondisi_sesudah'] ?></span>
+                                            <span class="fw-bold"><?= safeHtml($hist['kondisi_sesudah']) ?></span>
                                         </div>
                                         <?php endif; ?>
-                                        <?php if ($hist['lokasi_sebelum'] || $hist['lokasi_sesudah']): ?>
+
+                                        <!-- Tampilkan keterangan kondisi sebelum dan sesudah -->
+                                        <?php if (!empty($hist['keterangan_kondisi_sebelum']) || !empty($hist['keterangan_kondisi_sesudah'])): ?>
+                                        <div class="small text-muted">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            <?php if (!empty($hist['keterangan_kondisi_sebelum'])): ?>
+                                                Sebelum: "<?= safeHtml($hist['keterangan_kondisi_sebelum']) ?>"
+                                            <?php endif; ?>
+                                            <?php if (!empty($hist['keterangan_kondisi_sebelum']) && !empty($hist['keterangan_kondisi_sesudah'])): ?>
+                                            →
+                                            <?php endif; ?>
+                                            <?php if (!empty($hist['keterangan_kondisi_sesudah'])): ?>
+                                                Sesudah: "<?= safeHtml($hist['keterangan_kondisi_sesudah']) ?>"
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php endif; ?>
+
+                                        <?php if (!empty($hist['lokasi_sebelum']) || !empty($hist['lokasi_sesudah'])): ?>
                                         <div class="small text-muted">
                                             <i class="fas fa-map-marker-alt me-1"></i>
-                                            <?= $hist['lokasi_sebelum'] ?: '-' ?> → <?= $hist['lokasi_sesudah'] ?: '-' ?>
+                                            <?= safeHtml($hist['lokasi_sebelum'] ?? '-') ?> → <?= safeHtml($hist['lokasi_sesudah'] ?? '-') ?>
                                         </div>
                                         <?php endif; ?>
-                                        <?php if ($hist['pengguna_sebelum'] || $hist['pengguna_sesudah']): ?>
+
+                                        <!-- Tampilkan keterangan penempatan sebelum dan sesudah -->
+                                        <?php if (!empty($hist['keterangan_penempatan_sebelum']) || !empty($hist['keterangan_penempatan_sesudah'])): ?>
+                                        <div class="small text-muted">
+                                            <i class="fas fa-map-pin me-1"></i>
+                                            <?php if (!empty($hist['keterangan_penempatan_sebelum'])): ?>
+                                                Sebelum: "<?= safeHtml($hist['keterangan_penempatan_sebelum']) ?>"
+                                            <?php endif; ?>
+                                            <?php if (!empty($hist['keterangan_penempatan_sebelum']) && !empty($hist['keterangan_penempatan_sesudah'])): ?>
+                                            →
+                                            <?php endif; ?>
+                                            <?php if (!empty($hist['keterangan_penempatan_sesudah'])): ?>
+                                                Sesudah: "<?= safeHtml($hist['keterangan_penempatan_sesudah']) ?>"
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php endif; ?>
+
+                                        <?php if (!empty($hist['pengguna_sebelum']) || !empty($hist['pengguna_sesudah'])): ?>
                                         <div class="small text-muted">
                                             <i class="fas fa-user me-1"></i>
-                                            <?= $hist['pengguna_sebelum'] ?: '-' ?> → <?= $hist['pengguna_sesudah'] ?: '-' ?>
+                                            <?= safeHtml($hist['pengguna_sebelum'] ?? '-') ?> → <?= safeHtml($hist['pengguna_sesudah'] ?? '-') ?>
                                         </div>
                                         <?php endif; ?>
-                                        <?php if ($hist['vendor_servis']): ?>
-                                        <div class="small"><i class="fas fa-wrench me-1 text-warning"></i>Vendor: <?= htmlspecialchars($hist['vendor_servis']) ?></div>
+                                        
+                                        <?php if (!empty($hist['vendor_servis'])): ?>
+                                        <div class="small"><i class="fas fa-wrench me-1 text-warning"></i>Vendor: <?= safeHtml($hist['vendor_servis']) ?></div>
                                         <?php endif; ?>
-                                        <?php if ($hist['biaya_servis'] > 0): ?>
-                                        <div class="small text-danger"><i class="fas fa-money-bill me-1"></i>Biaya: Rp <?= number_format($hist['biaya_servis'], 0, ',', '.') ?></div>
+                                        
+                                        <?php if (!empty($hist['biaya_servis']) && $hist['biaya_servis'] > 0): ?>
+                                        <div class="small text-danger"><i class="fas fa-money-bill me-1"></i>Biaya: Rp <?= number_format($hist['biaya_servis'] ?? 0, 0, ',', '.') ?></div>
                                         <?php endif; ?>
-                                        <?php if ($hist['keterangan']): ?>
-                                        <div class="small text-muted mt-1 fst-italic">"<?= htmlspecialchars($hist['keterangan']) ?>"</div>
+                                        
+                                        <?php if (!empty($hist['tgl_estimasi_selesai']) && $hist['tgl_estimasi_selesai'] !== '0000-00-00'): ?>
+                                        <div class="small text-muted"><i class="fas fa-calendar me-1"></i>Estimasi Selesai: <?= safeDate($hist['tgl_estimasi_selesai']) ?></div>
+                                        <?php endif; ?>
+                                        
+                                        <?php if (!empty($hist['tgl_selesai_servis']) && $hist['tgl_selesai_servis'] !== '0000-00-00'): ?>
+                                        <div class="small text-success"><i class="fas fa-check-circle me-1"></i>Selesai Servis: <?= safeDate($hist['tgl_selesai_servis']) ?></div>
+                                        <?php endif; ?>
+
+                                        <?php if (!empty($hist['keterangan'])): ?>
+                                        <div class="small text-muted mt-1 fst-italic">"<?= safeHtml($hist['keterangan']) ?>"</div>
                                         <?php endif; ?>
                                     </div>
                                     <div class="text-end">
-                                        <div class="small fw-bold"><?= date('d/m/Y', strtotime($hist['tgl_kejadian'])) ?></div>
-                                        <div class="small text-muted"><?= htmlspecialchars($hist['created_by'] ?? '-') ?></div>
+                                        <div class="small fw-bold"><?= safeDate($hist['tgl_kejadian'] ?? null) ?></div>
+                                        <div class="small text-muted"><?= safeHtml($hist['created_by'] ?? '-') ?></div>
                                         <div class="d-flex gap-1 justify-content-end mt-1">
-                                            <!-- ============================================================ -->
-                                            <!-- TOMBOL EDIT - MEMBUKA MODAL EDIT HISTORY -->
-                                            <!-- ============================================================ -->
                                             <button type="button" class="btn btn-outline-primary btn-edit-history"
-												data-bs-toggle="modal" data-bs-target="#modalEditHistory"
-												data-id="<?= $hist['id_history'] ?>"
-												data-tgl="<?= $hist['tgl_kejadian'] ?>"
-												data-keterangan="<?= htmlspecialchars($hist['keterangan'], ENT_QUOTES) ?>"
-												title="Edit tanggal atau keterangan">
-											<i class="fas fa-pencil"></i>
-										</button>
+                                                data-bs-toggle="modal" data-bs-target="#modalEditHistory"
+                                                data-id="<?= $hist['id_history'] ?>"
+                                                data-tgl="<?= $hist['tgl_kejadian'] ?? '' ?>"
+                                                data-keterangan="<?= safeHtml($hist['keterangan'] ?? '') ?>"
+                                                title="Edit tanggal atau keterangan">
+                                                <i class="fas fa-pencil"></i>
+                                            </button>
                                             <a href="proses_history.php?aksi=hapus&id=<?= $hist['id_history'] ?>&id_asset=<?= $id ?>"
                                                class="btn btn-outline-danger btn-edit-history"
                                                onclick="return confirm('Hapus riwayat ini?')"
@@ -545,7 +639,6 @@ if ($flash_error): ?>
 <!-- ============================================================ -->
 <!-- MODAL EDIT HISTORY -->
 <!-- ============================================================ -->
-
 <div class="modal fade" id="modalEditHistory" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -573,6 +666,63 @@ if ($flash_error): ?>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
                     <button type="submit" class="btn btn-primary fw-bold" id="btnSaveEditHistory">
                         <i class="fas fa-save me-1"></i> Simpan Perubahan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- MODAL EDIT KONDISI -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalEditKondisi" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h6 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>Edit Kondisi Aset</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formEditKondisi">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Nama Aset</label>
+                        <input type="text" class="form-control" id="edit_kondisi_nama_asset" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Kondisi Saat Ini</label>
+                        <input type="text" class="form-control" id="edit_kondisi_saat_ini" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Kondisi Baru <span class="text-danger">*</span></label>
+                        <select name="kondisi" id="edit_kondisi_baru" class="form-select" required>
+                            <option value="">-- Pilih Kondisi --</option>
+                            <?php 
+                            // Ambil data kondisi dari database
+                            $q_kondisi_dropdown = mysqli_query($koneksi, "SELECT id_kondisi, nama_kondisi FROM master_it_kondisi ORDER BY nama_kondisi ASC");
+                            while ($kondisi_row = mysqli_fetch_assoc($q_kondisi_dropdown)): 
+                            ?>
+                            <option value="<?= safeHtml($kondisi_row['nama_kondisi']) ?>">
+                                <?= safeHtml($kondisi_row['nama_kondisi']) ?>
+                            </option>
+                            <?php endwhile; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Keterangan Kondisi</label>
+                        <textarea name="keterangan_kondisi" id="edit_keterangan_kondisi" class="form-control" rows="3" 
+                                  placeholder="Deskripsikan kondisi aset secara detail..."></textarea>
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Contoh: "Keyboard rusak, layar retak", "Baru saja service", dll.
+                        </small>
+                    </div>
+                    <input type="hidden" name="id_asset" id="edit_kondisi_id_asset" value="">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-warning fw-bold" id="btnSaveEditKondisi">
+                        <i class="fas fa-save me-1"></i> Update Kondisi
                     </button>
                 </div>
             </form>
@@ -609,39 +759,55 @@ if ($flash_error): ?>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                      <div class="col-md-6 row-kondisi">
-								<label class="form-label fw-bold small">Kondisi Sebelum</label>
-								<select name="kondisi_sebelum" class="form-select">
-									<option value="">-- Pilih --</option>
-									<?php foreach ($list_kondisi as $k): ?>
-									<option value="<?= htmlspecialchars($k['nama_kondisi']) ?>" <?= $asset['kondisi'] == $k['nama_kondisi'] ? 'selected' : '' ?>>
-										<?= htmlspecialchars($k['nama_kondisi']) ?>
-									</option>
-									<?php endforeach; ?>
-								</select>
-							</div>
-							<div class="col-md-6 row-kondisi">
-								<label class="form-label fw-bold small">Kondisi Sesudah</label>
-								<select name="kondisi_sesudah" class="form-select">
-									<option value="">-- Pilih --</option>
-									<?php foreach ($list_kondisi as $k): ?>
-									<option value="<?= htmlspecialchars($k['nama_kondisi']) ?>">
-										<?= htmlspecialchars($k['nama_kondisi']) ?>
-									</option>
-									<?php endforeach; ?>
-								</select>
-							</div>
+                        <div class="col-md-6 row-kondisi">
+                            <label class="form-label fw-bold small">Kondisi Sebelum</label>
+                            <select name="kondisi_sebelum" class="form-select">
+                                <option value="">-- Pilih --</option>
+                                <?php foreach ($list_kondisi as $k): ?>
+                                <option value="<?= safeHtml($k['nama_kondisi']) ?>" <?= $asset['kondisi'] == $k['nama_kondisi'] ? 'selected' : '' ?>>
+                                    <?= safeHtml($k['nama_kondisi']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6 row-kondisi">
+                            <label class="form-label fw-bold small">Kondisi Sesudah</label>
+                            <select name="kondisi_sesudah" class="form-select">
+                                <option value="">-- Pilih --</option>
+                                <?php foreach ($list_kondisi as $k): ?>
+                                <option value="<?= safeHtml($k['nama_kondisi']) ?>">
+                                    <?= safeHtml($k['nama_kondisi']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6 row-kondisi">
+                            <label class="form-label fw-bold small">Keterangan Kondisi Sebelum</label>
+                            <textarea name="keterangan_kondisi_sebelum" class="form-control" rows="2" placeholder="Keterangan kondisi sebelum..."></textarea>
+                        </div>
+                        <div class="col-md-6 row-kondisi">
+                            <label class="form-label fw-bold small">Keterangan Kondisi Sesudah</label>
+                            <textarea name="keterangan_kondisi_sesudah" class="form-control" rows="2" placeholder="Keterangan kondisi sesudah..."></textarea>
+                        </div>
                         <div class="col-md-6 row-lokasi">
                             <label class="form-label fw-bold small">Lokasi Sebelum</label>
-                            <input type="text" name="lokasi_sebelum" class="form-control" value="<?= htmlspecialchars($asset['lokasi'] ?? '') ?>" placeholder="Lokasi asal...">
+                            <input type="text" name="lokasi_sebelum" class="form-control" value="<?= safeHtml($asset['lokasi'] ?? '') ?>" placeholder="Lokasi asal...">
                         </div>
                         <div class="col-md-6 row-lokasi">
                             <label class="form-label fw-bold small">Lokasi Sesudah</label>
                             <input type="text" name="lokasi_sesudah" class="form-control" placeholder="Lokasi tujuan...">
                         </div>
+                        <div class="col-md-6 row-lokasi">
+                            <label class="form-label fw-bold small">Keterangan Penempatan Sebelum</label>
+                            <textarea name="keterangan_penempatan_sebelum" class="form-control" rows="2" placeholder="Keterangan penempatan sebelum..."></textarea>
+                        </div>
+                        <div class="col-md-6 row-lokasi">
+                            <label class="form-label fw-bold small">Keterangan Penempatan Sesudah</label>
+                            <textarea name="keterangan_penempatan_sesudah" class="form-control" rows="2" placeholder="Keterangan penempatan sesudah..."></textarea>
+                        </div>
                         <div class="col-md-6 row-pengguna">
                             <label class="form-label fw-bold small">Pengguna Sebelum</label>
-                            <input type="text" name="pengguna_sebelum" class="form-control" value="<?= htmlspecialchars($asset['pengguna'] ?? '') ?>">
+                            <input type="text" name="pengguna_sebelum" class="form-control" value="<?= safeHtml($asset['pengguna'] ?? '') ?>">
                         </div>
                         <div class="col-md-6 row-pengguna">
                             <label class="form-label fw-bold small">Pengguna Sesudah</label>
@@ -703,6 +869,7 @@ if ($flash_error): ?>
         </div>
     </div>
 </div>
+
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
@@ -727,10 +894,7 @@ if (jenisSel) {
 }
 
 // ============================================================
-// EDIT HISTORY - DENGAN EVENT DELEGASI
-// ============================================================
-// ============================================================
-// EDIT HISTORY - VERSION 2 (DENGAN FILE TERPISAH)
+// EDIT HISTORY
 // ============================================================
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM Ready - Edit History initialized');
@@ -800,12 +964,11 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(response => {
                 console.log('Response status:', response.status);
-                return response.text(); // Ambil text dulu untuk debug
+                return response.text();
             })
             .then(text => {
                 console.log('Raw response:', text);
                 
-                // Coba parse JSON
                 try {
                     const data = JSON.parse(text);
                     
@@ -828,7 +991,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 } catch (e) {
                     console.error('JSON Parse error:', e);
-                    // Tampilkan error yang lebih informatif
                     let errorMsg = 'Response tidak valid. ';
                     if (text.includes('Fatal error')) {
                         errorMsg += 'Terjadi error pada server. Periksa log PHP.';
@@ -860,9 +1022,167 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.error('Form #formEditHistory tidak ditemukan!');
     }
+});
+
+// ============================================================
+// FUNGSI UNTUK EDIT KONDISI
+// ============================================================
+function openEditKondisi(id, nama, kondisiSaatIni, keteranganSaatIni) {
+    document.getElementById('edit_kondisi_id_asset').value = id || '';
+    document.getElementById('edit_kondisi_nama_asset').value = nama || '';
+    document.getElementById('edit_kondisi_saat_ini').value = kondisiSaatIni || '';
+    document.getElementById('edit_keterangan_kondisi').value = keteranganSaatIni || '';
     
-    // Debug: Cek tombol edit
-    const editButtons = document.querySelectorAll('[data-bs-toggle="modal"][data-bs-target="#modalEditHistory"]');
-    console.log('Jumlah tombol edit:', editButtons.length);
+    // Set dropdown ke kondisi saat ini
+    const select = document.getElementById('edit_kondisi_baru');
+    if (select && kondisiSaatIni) {
+        for (let option of select.options) {
+            if (option.value === kondisiSaatIni) {
+                option.selected = true;
+                break;
+            }
+        }
+    }
+}
+
+// ============================================================
+// FORM EDIT KONDISI
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+    const formEditKondisi = document.getElementById('formEditKondisi');
+    if (formEditKondisi) {
+        formEditKondisi.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const id_asset = document.getElementById('edit_kondisi_id_asset').value;
+            const kondisi = document.getElementById('edit_kondisi_baru').value;
+            const keterangan_kondisi = document.getElementById('edit_keterangan_kondisi').value;
+            const btnSave = document.getElementById('btnSaveEditKondisi');
+            
+            if (!kondisi) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Perhatian',
+                    text: 'Silakan pilih kondisi baru!'
+                });
+                return;
+            }
+            
+            // Konfirmasi sebelum update
+            Swal.fire({
+                title: 'Konfirmasi Update Kondisi',
+                html: `Apakah Anda yakin ingin mengubah kondisi aset ini?<br><br>
+                       <b>Kondisi Saat Ini:</b> ${document.getElementById('edit_kondisi_saat_ini').value}<br>
+                       <b>Kondisi Baru:</b> ${kondisi}`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#ffc107',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Update!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Loading state
+                    const originalHtml = btnSave.innerHTML;
+                    btnSave.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Menyimpan...';
+                    btnSave.disabled = true;
+                    
+                    // Kirim ke server
+                    fetch('ajax_edit_kondisi.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams({
+                            id_asset: id_asset,
+                            kondisi: kondisi,
+                            keterangan_kondisi: keterangan_kondisi
+                        })
+                    })
+                    .then(response => {
+                        console.log('Response status:', response.status);
+                        if (!response.ok) {
+                            throw new Error('HTTP error! status: ' + response.status);
+                        }
+                        return response.text();
+                    })
+                    .then(text => {
+                        console.log('Raw response:', text);
+                        
+                        if (!text || text.trim() === '') {
+                            throw new Error('Response kosong dari server');
+                        }
+                        
+                        try {
+                            const data = JSON.parse(text);
+                            
+                            if (data.status === 'success') {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Berhasil!',
+                                    text: data.message,
+                                    timer: 2000,
+                                    showConfirmButton: false
+                                }).then(() => {
+                                    window.location.reload();
+                                });
+                            } else {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Gagal',
+                                    text: data.message || 'Terjadi kesalahan!'
+                                });
+                            }
+                        } catch (e) {
+                            console.error('JSON Parse error:', e);
+                            console.error('Response yang diterima:', text);
+                            
+                            let errorMsg = 'Terjadi kesalahan pada server. ';
+                            if (text.includes('Fatal error')) {
+                                errorMsg += 'Error PHP: ' + text.substring(0, 200);
+                            } else if (text.includes('Warning')) {
+                                errorMsg += 'Warning: ' + text.substring(0, 200);
+                            } else {
+                                errorMsg += 'Silakan coba lagi atau hubungi administrator.';
+                            }
+                            
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error Server',
+                                text: errorMsg
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Fetch error:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Terjadi kesalahan koneksi: ' + error.message
+                        });
+                    })
+                    .finally(() => {
+                        btnSave.innerHTML = originalHtml;
+                        btnSave.disabled = false;
+                    });
+                }
+            });
+        });
+    }
+});
+
+// Debug: Cek data history di console
+document.addEventListener('DOMContentLoaded', function() {
+    const timeline = document.querySelector('.timeline');
+    if (timeline) {
+        console.log('Timeline ditemukan, jumlah item:', timeline.children.length);
+    } else {
+        console.log('Timeline tidak ditemukan');
+    }
+    
+    const historyBadge = document.querySelector('.badge.bg-light.text-dark.ms-2');
+    if (historyBadge) {
+        console.log('Total history:', historyBadge.textContent);
+    }
 });
 </script>
