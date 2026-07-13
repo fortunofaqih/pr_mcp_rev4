@@ -28,6 +28,44 @@ $filter_tambal_beli = ($tambal_ban == '1') ? " AND rd.nama_barang_manual LIKE '%
 $filter_tambal_stok = ($tambal_ban == '1') ? " AND mb.nama_barang LIKE '%TAMBAL BAN%' " : "";
 
 // ============================================================
+// MEMBANGUN KONDISI SEARCH UNTUK SEMUA FIELD
+// ============================================================
+$search_condition = "";
+if ($search != '') {
+    // Escape string untuk keamanan
+    $search = mysqli_real_escape_string($koneksi, $search);
+    
+    // Kondisi pencarian untuk query BELI
+    $search_beli = " AND (
+        m.driver_tetap LIKE '%$search%' OR 
+        m.plat_nomor LIKE '%$search%' OR 
+        m.jenis_kendaraan LIKE '%$search%' OR 
+        rd.nama_barang_manual LIKE '%$search%' OR 
+        rd.satuan LIKE '%$search%' OR 
+        CONCAT(rd.jumlah, ' ', rd.satuan) LIKE '%$search%' OR 
+        CONCAT(rd.nama_barang_manual, ' (', rd.jumlah, ' ', rd.satuan, ')') LIKE '%$search%' OR 
+        p.harga LIKE '%$search%' OR 
+        CONCAT('Rp ', FORMAT(p.harga, 0)) LIKE '%$search%'
+    ) ";
+    
+    // Kondisi pencarian untuk query STOK
+    $search_stok = " AND (
+        m.driver_tetap LIKE '%$search%' OR 
+        m.plat_nomor LIKE '%$search%' OR 
+        m.jenis_kendaraan LIKE '%$search%' OR 
+        mb.nama_barang LIKE '%$search%' OR 
+        mb.satuan LIKE '%$search%' OR 
+        CONCAT(b.qty_keluar, ' ', mb.satuan) LIKE '%$search%' OR 
+        CONCAT('[STOK] ', mb.nama_barang, ' (', b.qty_keluar, ' ', mb.satuan, ')') LIKE '%$search%' OR 
+        IFNULL(mb.harga_barang_stok, 0) LIKE '%$search%' OR 
+        CONCAT('Rp ', FORMAT(IFNULL(mb.harga_barang_stok, 0), 0)) LIKE '%$search%'
+    ) ";
+} else {
+    $search_beli = "";
+    $search_stok = "";
+}
+
+// ============================================================
 // QUERY GABUNGAN - BELI + STOK
 // ============================================================
 $query_sql = "SELECT 
@@ -46,7 +84,9 @@ $query_sql = "SELECT
                     p.harga as harga_satuan,
                     (rd.jumlah * p.harga) as total_per_item,
                     'BELI' as kategori,
-                    rd.nama_barang_manual as nama_barang_asli
+                    rd.nama_barang_manual as nama_barang_asli,
+                    rd.jumlah as jumlah,
+                    rd.satuan as satuan
                 FROM master_mobil m
                     INNER JOIN tr_request_detail rd ON m.id_mobil = rd.id_mobil
                     INNER JOIN tr_request r ON rd.id_request = r.id_request
@@ -54,7 +94,7 @@ $query_sql = "SELECT
                         AND REPLACE(p.plat_nomor, ' ', '') = REPLACE(m.plat_nomor, ' ', '')
                 WHERE (p.tgl_beli_barang BETWEEN '$tgl_awal' AND '$tgl_akhir')
                 $filter_tambal_beli
-                " . ($search != '' ? " AND (m.driver_tetap LIKE '%$search%' OR m.plat_nomor LIKE '%$search%')" : "") . "
+                $search_beli
 
                 UNION ALL
 
@@ -68,13 +108,15 @@ $query_sql = "SELECT
                     IFNULL(mb.harga_barang_stok, 0) as harga_satuan,
                     (b.qty_keluar * IFNULL(mb.harga_barang_stok, 0)) as total_per_item,
                     'STOK' as kategori,
-                    mb.nama_barang as nama_barang_asli
+                    mb.nama_barang as nama_barang_asli,
+                    b.qty_keluar as jumlah,
+                    mb.satuan as satuan
                 FROM master_mobil m
                     INNER JOIN bon_permintaan b ON REPLACE(m.plat_nomor, ' ', '') = REPLACE(b.plat_nomor, ' ', '')
                     INNER JOIN master_barang mb ON b.id_barang = mb.id_barang
                 WHERE (DATE(b.tgl_keluar) BETWEEN '$tgl_awal' AND '$tgl_akhir')
                 $filter_tambal_stok
-                " . ($search != '' ? " AND (m.driver_tetap LIKE '%$search%' OR m.plat_nomor LIKE '%$search%')" : "") . "
+                $search_stok
               ) AS gabungan
               ORDER BY driver_tetap ASC, plat_nomor ASC, tgl_beli ASC, kategori DESC";
 
@@ -373,10 +415,11 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                         <input type="date" name="tgl_akhir" class="form-control" value="<?= $tgl_akhir ?>">
                     </div>
                 </div>
-                <div class="col-md-2">
-                    <label class="small fw-bold">Cari</label>
+                <div class="col-md-3">
+                    <label class="small fw-bold">Cari (semua field)</label>
                     <input type="text" name="search" class="form-control form-control-sm"
-                           value="<?= htmlspecialchars($search) ?>" placeholder="Plat / Driver...">
+                           value="<?= htmlspecialchars($search) ?>" 
+                           placeholder="Plat / Driver / Barang / Harga / dll...">
                 </div>
                 
                 <div class="col-md-2 mb-1">
@@ -386,7 +429,7 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
                     </div>
                 </div>
 
-                <div class="col-md-5 d-flex gap-2 align-items-end">
+                <div class="col-md-4 d-flex gap-2 align-items-end">
                     <button type="submit" class="btn btn-sm btn-primary">
                         <i class="fas fa-search me-1"></i>Tampilkan
                     </button>
@@ -407,6 +450,9 @@ function getLastPurchaseDate($koneksi, $nama_barang, $tgl_sekarang, $plat_nomor)
     <div class="judul-laporan">Laporan Kendaraan <?= ($tambal_ban == '1') ? '(Khusus Tambal Ban)' : '' ?> PT. MCP</div>
     <div class="periode-laporan">
         Periode: <?= date('d/m/Y', strtotime($tgl_awal)) ?> s/d <?= date('d/m/Y', strtotime($tgl_akhir)) ?>
+        <?php if ($search != ''): ?>
+            <br><span class="text-muted">Pencarian: "<?= htmlspecialchars($search) ?>"</span>
+        <?php endif; ?>
     </div>
 
     <table class="table-laporan">

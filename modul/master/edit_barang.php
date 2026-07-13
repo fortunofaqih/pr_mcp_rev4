@@ -54,6 +54,7 @@ $harga_tampil = number_format($data['harga_barang_stok'], 0, ',', '.');
         .header-edit { background: #00008B; color: white; border-radius: 15px 15px 0 0; padding: 20px; }
         input, select { text-transform: uppercase; }
         .input-group-text { background-color: #e9ecef; font-weight: bold; }
+        select option { text-transform: uppercase; }
     </style>
 </head>
 <body class="py-5">
@@ -113,20 +114,21 @@ $harga_tampil = number_format($data['harga_barang_stok'], 0, ',', '.');
                                     <?php endwhile; ?>
                                 </select>
                             </div>
-                       <div class="col-md-6">
-                            <label class="form-label small fw-bold text-muted">SATUAN UTAMA</label>
-                            <input type="text" name="satuan" class="form-control" list="list_satuan" value="<?= $data['satuan']; ?>" placeholder="KETIK ATAU PILIH SATUAN" required>
-                            
-                            <datalist id="list_satuan">
-                                <?php 
-                                // Pastikan query $q_sat bersih dan dieksekusi tepat sebelum ini
-                                $q_sat = mysqli_query($koneksi, "SELECT nama_satuan FROM master_satuan ORDER BY nama_satuan ASC");
-                                while($s = mysqli_fetch_array($q_sat)): 
-                                ?>
-                                    <option value="<?= $s['nama_satuan'] ?>"></option>
-                                <?php endwhile; ?>
-                            </datalist>
-                        </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">SATUAN UTAMA</label>
+                                <select name="satuan" class="form-select" required>
+                                    <option value="">- PILIH SATUAN -</option>
+                                    <?php 
+                                    // Reset pointer query agar bisa digunakan lagi
+                                    mysqli_data_seek($q_sat, 0);
+                                    while($s = mysqli_fetch_array($q_sat)): 
+                                    ?>
+                                        <option value="<?= $s['nama_satuan'] ?>" <?= ($data['satuan'] == $s['nama_satuan']) ? 'selected' : '' ?>>
+                                            <?= $s['nama_satuan'] ?>
+                                        </option>
+                                    <?php endwhile; ?>
+                                </select>
+                            </div>
                         </div>
 
                         <hr>
@@ -162,7 +164,11 @@ $harga_tampil = number_format($data['harga_barang_stok'], 0, ',', '.');
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-muted">KATEGORI BARANG</label>
                             <select name="kategori" class="form-select" required>
-                                <?php while($k = mysqli_fetch_array($q_kat)): ?>
+                                <?php 
+                                // Reset pointer query untuk kategori
+                                mysqli_data_seek($q_kat, 0);
+                                while($k = mysqli_fetch_array($q_kat)): 
+                                ?>
                                     <option value="<?= $k['nama_kategori'] ?>" <?= ($data['kategori'] == $k['nama_kategori']) ? 'selected' : '' ?>>
                                         <?= $k['nama_kategori'] ?>
                                     </option>

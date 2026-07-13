@@ -7,7 +7,6 @@
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
 require_once __DIR__ . '/../../auth/check_session.php';
-require_once __DIR__ . '/../../auth/keep_alive.php';
 
 if ($_SESSION['status'] !== 'login') {
     header('Location: ../../login.php?pesan=belum_login');
@@ -358,48 +357,50 @@ while ($row = mysqli_fetch_assoc($q_stg)) {
                     <div class="table-responsive">
                         <table class="table table-borderless">
                             <thead>
-                                <tr>
-                                    <th class="ps-4">#</th>
-                                    <th>Nama Barang</th>
-                                    <th>Toko / Supplier</th>
-                                    <th>Tgl Nota</th>
-                                    <th class="text-center">Qty</th>
-                                    <th class="text-end">Harga</th>
-                                    <th class="text-end">Subtotal</th>
-                                    <th class="text-center">Alokasi</th>
-                                    <th>Petugas</th>
-                                    <th class="text-center pe-4">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            <?php foreach ($grup['items'] as $i => $s) :
-                                $subtotal  = $s['qty'] * $s['harga'];
-                                $is_stok   = $s['alokasi_stok'] === 'MASUK STOK';
-                                $tgl_fmt   = date('d/m/Y', strtotime($s['tgl_beli_barang']));
-                            ?>
-                            <tr>
-                                <td class="ps-4 text-muted fw-bold" style="width:36px;"><?= $i + 1 ?></td>
-                                <td class="fw-bold"><?= htmlspecialchars($s['nama_barang_beli']) ?></td>
-                                <td class="text-muted"><?= htmlspecialchars($s['supplier']) ?></td>
-                                <td><?= $tgl_fmt ?></td>
-                                <td class="text-center"><?= (float) $s['qty'] ?></td>
-                                <td class="text-end">Rp <?= number_format($s['harga'], 0, ',', '.') ?></td>
-                                <td class="text-end fw-bold text-success">Rp <?= number_format($subtotal, 0, ',', '.') ?></td>
-                                <td class="text-center">
-                                    <span class="badge <?= $is_stok ? 'badge-stok' : 'badge-langsung' ?>">
-                                        <?= htmlspecialchars($s['alokasi_stok']) ?>
-                                    </span>
-                                </td>
-                                <td class="text-muted"><?= htmlspecialchars($s['driver']) ?></td>
-                                <td class="text-center pe-4">
-                                    <button class="btn-verif"
-                                            onclick="bukaVerifikasi(<?= $s['id_staging'] ?>)">
-                                        <i class="fas fa-check-double me-1"></i>Verifikasi
-                                    </button>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                            </tbody>
+								<tr>
+									<th class="ps-4">#</th>
+									<th>Nama Barang</th>
+									<th>Toko / Supplier</th>
+									<th>Tgl Nota</th>
+									<th class="text-center">Qty</th>
+									<th class="text-start">Satuan</th>
+									<th class="text-end">Harga</th>
+									<th class="text-end">Subtotal</th>
+									<th class="text-center">Alokasi</th>
+									<th>Petugas</th>
+									<th class="text-center pe-4">Aksi</th>
+								</tr>
+							</thead>
+							<tbody>
+							<?php foreach ($grup['items'] as $i => $s) :
+								$subtotal  = $s['qty'] * $s['harga'];
+								$is_stok   = $s['alokasi_stok'] === 'MASUK STOK';
+								$tgl_fmt   = date('d/m/Y', strtotime($s['tgl_beli_barang']));
+							?>
+							<tr>
+								<td class="ps-4 text-muted fw-bold" style="width:36px;"><?= $i + 1 ?></td>
+								<td class="fw-bold"><?= htmlspecialchars($s['nama_barang_beli']) ?></td>
+								<td class="text-muted"><?= htmlspecialchars($s['supplier']) ?></td>
+								<td><?= $tgl_fmt ?></td>
+								<td class="text-center fw-bold"><?= (float) $s['qty'] ?></td>
+								<td class="text-start text-muted small"><?= strtoupper(htmlspecialchars($s['satuan_barang_beli'] ?? '')) ?></td>
+								
+								<td class="text-end">Rp <?= number_format($s['harga'], 0, ',', '.') ?></td>
+								<td class="text-end fw-bold text-success">Rp <?= number_format($subtotal, 0, ',', '.') ?></td>
+								<td class="text-center">
+									<span class="badge <?= $is_stok ? 'badge-stok' : 'badge-langsung' ?>">
+										<?= htmlspecialchars($s['alokasi_stok']) ?>
+									</span>
+								</td>
+								<td class="text-muted"><?= htmlspecialchars($s['driver']) ?></td>
+								<td class="text-center pe-4">
+									<button class="btn-verif" onclick="bukaVerifikasi(<?= $s['id_staging'] ?>)">
+										<i class="fas fa-check-double me-1"></i>Verifikasi
+									</button>
+								</td>
+							</tr>
+							<?php endforeach; ?>
+							</tbody>
                         </table>
                     </div>
 
@@ -570,6 +571,7 @@ $(document).on('click', '#btnApprove', function () {
         supplier   : $('#modal_supplier').val(),
         nama_barang: $('#modal_nama_barang').val(),
         qty        : $('#modal_qty').val(),
+		satuan     : $('#modal_satuan').val(),
         harga      : $('#modal_harga').val(),
         alokasi    : $('#modal_alokasi').val(),
         keterangan : $('#modal_keterangan').val(),
@@ -668,29 +670,40 @@ $(document).ready(function () {
 </script>
 <script>
     let idleTime = 0;
-    const maxIdleMinutes = 15;
+    const maxIdleMinutes = 15; // Samakan dengan server
     let lastServerUpdate = Date.now();
+    let sessionValid = true;
 
-    // Fungsi untuk mereset timer idle
+    // Fungsi reset timer saat ada gerakan
     function resetTimer() {
         idleTime = 0;
-        
         let now = Date.now();
-        // Kirim sinyal "Keep Alive" ke server setiap 5 menit sekali jika user aktif
-        // Ini mencegah session PHP mati saat user sedang asyik mengetik/input
-        if (now - lastServerUpdate > 300000) { // 300.000 ms = 5 menit
-            const depth = window.location.pathname.split('/').length - 2;
-            const prefix = "../".repeat(Math.max(0, depth - 1));
-            
-            fetch(prefix + 'auth/keep_alive.php')
-                .then(response => console.log("Sesi diperbarui secara background"))
-                .catch(err => console.error("Gagal memperbarui sesi", err));
-            
+
+        // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
+        if (now - lastServerUpdate > 300000) {
+            fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status !== 'success') {
+                        sessionValid = false;
+                        forceLogout();
+                    }
+                })
+                .catch(err => {
+                    console.error("Koneksi ke server terputus");
+                });
             lastServerUpdate = now;
         }
     }
 
-    // Deteksi interaksi user
+    // Fungsi paksa logout
+    function forceLogout() {
+        alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
+        // Redirect ke logout.php agar session server juga dihancurkan
+        window.location.href = "http://192.168.31.200/pr_mcp/auth/logout.php?pesan=timeout";
+    }
+
+    // Pantau aktivitas user
     window.onload = resetTimer;
     document.onmousemove = resetTimer;
     document.onkeypress = resetTimer;
@@ -698,16 +711,25 @@ $(document).ready(function () {
     document.onclick = resetTimer;
     document.onscroll = resetTimer;
 
-    // Interval cek setiap 1 menit
+    // Cek status idle setiap 1 menit
     setInterval(function() {
         idleTime++;
-        if (idleTime >= maxIdleMinutes) {
-            alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
-            const depth = window.location.pathname.split('/').length - 2;
-            const prefix = "../".repeat(Math.max(0, depth - 1));
-            window.location.href = prefix + "login.php?pesan=timeout";
+        // Cek session ke server juga
+        fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status !== 'success') {
+                    sessionValid = false;
+                    forceLogout();
+                }
+            })
+            .catch(err => {
+                // Jika error koneksi, biarkan user tetap di halaman
+            });
+        if (idleTime >= maxIdleMinutes && sessionValid) {
+            forceLogout();
         }
-    }, 60000); // Cek setiap 60 detik
+    }, 60000);
 </script>
 </body>
 </html>

@@ -2,6 +2,7 @@
 /**
  * ajax_form_verifikasi.php
  * Dipanggil via AJAX GET → return HTML form verifikasi untuk 1 item staging
+ * REVISI: Mengubah inputan Satuan menjadi Dropdown dari master_satuan dengan default Satuan PR.
  */
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
@@ -35,20 +36,27 @@ $tgl_nota   = date('d-m-Y', strtotime($s['tgl_beli_barang']));
 $q_mob   = mysqli_query($koneksi, "SELECT id_mobil, plat_nomor, jenis_kendaraan FROM master_mobil WHERE status_aktif='AKTIF' ORDER BY plat_nomor ASC");
 $mobil_list = [];
 while ($m = mysqli_fetch_assoc($q_mob)) $mobil_list[] = $m;
+
+// 1. QUERY TAMBAHAN: Ambil daftar satuan dari master_satuan
+$q_sat = mysqli_query($koneksi, "SELECT nama_satuan FROM master_satuan ORDER BY nama_satuan ASC");
+$satuan_list = [];
+while ($sat = mysqli_fetch_assoc($q_sat)) {
+    $satuan_list[] = $sat['nama_satuan'];
+}
+
+// Tentukan satuan yang saat ini terpilih/dibawa oleh sistem
+$satuan_terpilih = strtoupper($s['satuan_barang_beli'] ?? $s['satuan_pr'] ?? '');
 ?>
 
-<!-- Info PR (read-only reference) -->
 <div class="row g-2 mb-4">
     <div class="col-12">
         <div class="alert alert-info py-2 mb-0 small">
             <i class="fas fa-info-circle me-1"></i>
-            <strong>Periksa semua informasi di bawah.</strong> Anda dapat mengedit field yang salah sebelum menyetujui.
-            Jika ditolak, item akan kembali ke antrean petugas pembelian.
+            <strong>Periksa semua informasi di bawah.</strong> Anda dapat mengedit field yang salah (termasuk Qty, Harga, dan Dropdown Satuan) sebelum menyetujui.
         </div>
     </div>
 </div>
 
-<!-- Referensi dari PR -->
 <div class="card border-secondary mb-4">
     <div class="card-header bg-secondary text-white py-1 small fw-bold">
         <i class="fas fa-file-alt me-1"></i>REFERENSI DARI PURCHASE REQUEST
@@ -58,7 +66,8 @@ while ($m = mysqli_fetch_assoc($q_mob)) $mobil_list[] = $m;
             <div class="col-md-2"><span class="text-muted">No. PR</span><br><strong><?= $s['no_request'] ?? '-' ?></strong></div>
             <div class="col-md-3"><span class="text-muted">Pemesan</span><br><strong><?= strtoupper($s['nama_pemesan'] ?? '-') ?></strong></div>
             <div class="col-md-3"><span class="text-muted">Nama Barang (PR)</span><br><strong><?= $s['nama_barang_beli'] ?></strong></div>
-            <div class="col-md-2"><span class="text-muted">Qty PR</span><br><strong><?= (float)($s['qty_pr']??0) ?> <?= $s['satuan_pr'] ?></strong></div>
+            <div class="col-md-1"><span class="text-muted">Qty PR</span><br><strong><?= (float)($s['qty_pr']??0) ?></strong></div>
+            <div class="col-md-1"><span class="text-muted">Satuan PR</span><br><strong><?= strtoupper($s['satuan_pr'] ?? '-') ?></strong></div>
             <div class="col-md-2"><span class="text-muted">Est. Harga</span><br><strong><?= number_format($s['harga_satuan_estimasi']??0) ?></strong></div>
         </div>
         <?php if (!empty($s['ket_pr'])): ?>
@@ -67,7 +76,6 @@ while ($m = mysqli_fetch_assoc($q_mob)) $mobil_list[] = $m;
     </div>
 </div>
 
-<!-- Form Editable -->
 <div class="card border-success">
     <div class="card-header py-1 small fw-bold" style="background:#d1fae5;">
         <i class="fas fa-edit me-1 text-success"></i>DATA YANG DIINPUT PETUGAS — BISA DIEDIT
@@ -117,14 +125,33 @@ while ($m = mysqli_fetch_assoc($q_mob)) $mobil_list[] = $m;
                        value="<?= (float)$s['qty'] ?>" min="0.01" step="0.01">
             </div>
 
-            <div class="col-md-3">
+            <div class="col-md-2">
+                <label class="fw-bold small">SATUAN <span class="text-danger">*</span></label>
+                <select id="modal_satuan" class="form-select form-select-sm fw-bold text-center" readonly style="text-transform:uppercase;">
+                    <?php 
+                    // Jika satuan bawaan PR/Staging ternyata tidak ada di master_satuan, tetep munculkan sebagai opsi teratas
+                    if (!empty($satuan_terpilih) && !in_array($satuan_terpilih, $satuan_list)): 
+                    ?>
+                        <option value="<?= $satuan_terpilih ?>" selected><?= $satuan_terpilih ?></option>
+                    <?php endif; ?>
+
+                    <?php foreach ($satuan_list as $sat_nama): 
+                        $sat_nama_up = strtoupper($sat_nama);
+                        $selected = ($sat_nama_up == $satuan_terpilih) ? 'selected' : '';
+                    ?>
+                        <option value="<?= $sat_nama_up ?>" <?= $selected ?>><?= $sat_nama_up ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="col-md-2">
                 <label class="fw-bold small">HARGA SATUAN <span class="text-danger">*</span></label>
                 <input type="number" id="modal_harga"
                        class="form-control form-control-sm text-end"
                        value="<?= (float)$s['harga'] ?>" min="0" step="1">
             </div>
 
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="fw-bold small">ALOKASI STOK</label>
                 <select id="modal_alokasi" class="form-select form-select-sm">
                     <option value="LANGSUNG PAKAI" <?= $s['alokasi_stok']=='LANGSUNG PAKAI'?'selected':'' ?>>LANGSUNG PAKAI</option>
@@ -155,18 +182,14 @@ while ($m = mysqli_fetch_assoc($q_mob)) $mobil_list[] = $m;
                           placeholder="Contoh: Harga tidak sesuai nota, supplier salah ketik, dll..."></textarea>
             </div>
 
-        </div><!-- /row -->
-    </div><!-- /card-body -->
-</div>
+        </div></div></div>
 
-<!-- Info Petugas -->
 <div class="mt-3 p-2 bg-light rounded small text-muted">
     <i class="fas fa-user me-1"></i>Diinput oleh: <strong><?= $s['driver'] ?></strong>
     &nbsp;|&nbsp;
     <i class="fas fa-clock me-1"></i>Waktu input: <strong><?= date('d/m/Y H:i', strtotime($s['created_at'])) ?></strong>
 </div>
 
-<!-- Tombol Aksi -->
 <div class="d-flex justify-content-end gap-2 mt-4">
     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
         <i class="fas fa-times me-1"></i>TUTUP
