@@ -8,8 +8,6 @@ $h = null;
 
 if (!empty($_GET['id'])) {
     $id_raw = (int)$_GET['id'];
-    // BUG FIX: hapus filter no_request LIKE 'PRB%'
-    // Ganti dengan filter kategori_pr IN ('BESAR','IT') agar PR IT ikut masuk
     $h = mysqli_fetch_assoc(mysqli_query($koneksi,
         "SELECT * FROM tr_request
          WHERE id_request = '$id_raw'
@@ -18,8 +16,6 @@ if (!empty($_GET['id'])) {
 
 } elseif (!empty($_GET['no'])) {
     $no_raw = mysqli_real_escape_string($koneksi, trim($_GET['no']));
-    // BUG FIX: hapus filter LIKE 'PRB%', pakai kategori_pr IN agar PR IT (PRI/...)
-    // bisa diakses juga lewat parameter ?no=
     $h = mysqli_fetch_assoc(mysqli_query($koneksi,
         "SELECT * FROM tr_request
          WHERE no_request = '$no_raw'
@@ -42,14 +38,13 @@ if (empty($h['no_form'])) {
     $bulan  = date('m');
     $tahun  = date('Y');
     $suffix = substr($h['no_request'], -4);
-    // BUG FIX: prefix no_form disesuaikan dengan kategori
     $prefix_form = ($h['kategori_pr'] === 'IT') ? 'PRI-MCP' : 'PRB-MCP';
     $no_form = "$prefix_form-$suffix/$bulan/$tahun";
     mysqli_query($koneksi, "UPDATE tr_request SET no_form = '$no_form' WHERE id_request = '$id'");
     $h['no_form'] = $no_form;
 }
 
-// ── 3. AMBIL DETAIL BARANG (dengan Supplier dari PO) ──────────────────────────
+// ── 3. AMBIL DETAIL BARANG (Disesuaikan dengan struktur tabel pembelian Anda) ──
 $items = [];
 $q = mysqli_query($koneksi,
     "SELECT 
@@ -67,27 +62,25 @@ $q = mysqli_query($koneksi,
             d.kwalifikasi,
             d.tipe_request,
             d.keterangan,
-            d.is_ban,
-            d.status_pasang,
-            d.tgl_pasang,
-            d.pasang_oleh,
-            d.is_dibeli,
-            d.tgl_dibeli,
-            d.dibeli_oleh,
-            ANY_VALUE(m.plat_nomor) as plat_nomor,
-            ANY_VALUE(b.nama_barang) as nama_barang_master,
-            ANY_VALUE(p.tgl_beli_barang) as tgl_beli_barang,
-            GROUP_CONCAT(DISTINCT ms.nama_supplier SEPARATOR ', ') as supplier_names
+            m.plat_nomor,
+            b.nama_barang as nama_barang_master,
+            p.tgl_beli_barang,
+            p.nama_barang_beli as nama_barang_final,      
+            p.qty as qty_final,                            
+            (SELECT GROUP_CONCAT(DISTINCT ms.nama_supplier SEPARATOR ', ') 
+             FROM tr_purchase_order po 
+             JOIN master_supplier ms ON po.id_supplier = ms.id_supplier 
+             WHERE po.id_request = d.id_request) as supplier_names
      FROM tr_request_detail d
      LEFT JOIN master_mobil  m ON d.id_mobil  = m.id_mobil
      LEFT JOIN master_barang b ON d.id_barang = b.id_barang
      LEFT JOIN pembelian     p ON p.id_request_detail = d.id_detail
-     LEFT JOIN tr_purchase_order po ON po.id_request = d.id_request
-     LEFT JOIN master_supplier ms ON po.id_supplier = ms.id_supplier
      WHERE d.id_request = '$id'
-     GROUP BY d.id_detail
      ORDER BY d.id_detail ASC");
-while ($d = mysqli_fetch_assoc($q)) { $items[] = $d; }
+
+while ($d = mysqli_fetch_assoc($q)) { 
+    $items[] = $d; 
+}
 
 // ── 4. AMBIL NAMA LENGKAP APPROVER ───────────────────────────────────────────
 function getApproverData($koneksi, $username) {
@@ -133,7 +126,6 @@ $ttd_url = [
 $fully_approved = ($h['status_approval'] === 'APPROVED');
 $need_m3        = (int)($h['need_approve3'] ?? 0);
 
-// Label judul sesuai kategori
 $is_it         = ($h['kategori_pr'] === 'IT');
 $judul_cetak   = $is_it ? 'PURCHASE REQUEST (PR) IT' : 'PURCHASE REQUEST (PR) BESAR';
 $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
@@ -188,15 +180,15 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
             overflow: hidden;
         }
 
-        .c-no       { width: 20px;  text-align: center; }
-        .c-barang   { width: 95px;  text-align: left; }
-        .c-supplier { width: 70px;  text-align: center; }
-        .c-tgl      { width: 48px;  text-align: center; }
-        .c-unit     { width: 55px;  text-align: center; }
+        .c-no       { width: 22px;  text-align: center; }
+        .c-barang   { width: 150px; text-align: left; }
+        .c-supplier { width: 85px;  text-align: center; }
+        .c-tgl      { width: 55px;  text-align: center; }
+        .c-unit     { width: 65px;  text-align: center; }
         .c-tipe     { width: 50px;  text-align: center; }
-        .c-qty      { width: 38px;  text-align: center; }
-        .c-harga    { width: 65px;  text-align: right; }
-        .c-sub      { width: 75px;  text-align: right; }
+        .c-qty      { width: 65px;  text-align: center; }
+        .c-harga    { width: 70px;  text-align: right; }
+        .c-sub      { width: 80px;  text-align: right; }
         .c-ket      { width: auto;  text-align: left; }
 
         .ttd-section { width: 100%; border-collapse: collapse; margin-top: 10px; }
@@ -231,8 +223,6 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
             pointer-events: none; z-index: 0; letter-spacing: 4px;
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
         }
-        .ttd-note { margin-top: 5px; font-size: 6pt; color: #64748b; border-top: 0.5px dashed #aaa; padding-top: 3px; }
-
         @media print {
             .no-print { display: none !important; }
             body { padding: 0; margin: 0; }
@@ -245,7 +235,6 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
 <div class="wm-pending">BELUM DISETUJUI</div>
 <?php endif; ?>
 
-<!-- ── Tombol Cetak ── -->
 <div class="no-print" style="background:#dbeafe; padding:8px; margin-bottom:10px; border:1px solid #93c5fd; border-radius:4px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
     <button onclick="window.print()" style="padding:7px 18px; background:<?= $warna_badge ?>; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">
         🖨️ CETAK PR <?= $is_it ? 'IT' : 'BESAR' ?>
@@ -259,13 +248,11 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
     </span>
 </div>
 
-<!-- ── Header ── -->
 <div class="header">
     <h2><?= $judul_cetak ?></h2>
     <h4>PT. Mutiaracahaya Plastindo</h4>
 </div>
 
-<!-- ── Info PR ── -->
 <table class="info-pr">
     <tr>
         <td width="40%">
@@ -278,6 +265,12 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
         <td width="30%" style="text-align:center;">ADMIN: <?= strtoupper(htmlspecialchars($h['nama_pemesan'])) ?></td>
         <td width="30%" style="text-align:right;">TGL: <?= date('d/m/Y', strtotime($h['tgl_request'])) ?></td>
     </tr>
+    <!-- TAMBAHAN: Baris untuk Nama Pembeli -->
+    <tr>
+        <td colspan="3" style="text-align:center; font-weight:normal; padding-top:2px; border-top:0.5px dashed #ccc;">
+            <span style="font-weight:bold;">PEMBELI:</span> <?= !empty($h['nama_pembeli']) ? strtoupper(htmlspecialchars($h['nama_pembeli'])) : '<span style="color:#999;">(belum diisi)</span>' ?>
+        </td>
+    </tr>
     <?php if (!empty($h['keterangan'])): ?>
     <tr>
         <td colspan="3" style="font-weight:normal; font-size:7pt; padding-top:2px;">
@@ -287,7 +280,6 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
     <?php endif; ?>
 </table>
 
-<!-- ── Tabel Barang (dengan kolom Supplier) ── -->
 <table class="data">
     <thead>
         <tr>
@@ -307,7 +299,16 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
         <?php
         $grand_total = 0;
         foreach ($items as $i => $d):
-            $nama     = !empty($d['nama_barang_manual']) ? $d['nama_barang_manual'] : $d['nama_barang_master'];
+            // Fallback: Jika data sudah diverifikasi gudang, gunakan nama final & qty final. Satuan tetap ikut tr_request_detail.
+            if (!empty($d['nama_barang_final'])) {
+                $nama = $d['nama_barang_final'];
+                $qty_tampil = (float)$d['qty_final'];
+            } else {
+                $nama = !empty($d['nama_barang_manual']) ? $d['nama_barang_manual'] : $d['nama_barang_master'];
+                $qty_tampil = (float)$d['jumlah'];
+            }
+
+            $satuan_tampil = $d['satuan']; // Karena tabel pembelian tidak punya kolom satuan, ikut satuan asal
             $supplier = !empty($d['supplier_names']) ? $d['supplier_names'] : '-';
             $harga    = (float)($d['harga_satuan_estimasi'] ?? 0);
             $subtotal = (float)($d['subtotal_estimasi']    ?? 0);
@@ -316,9 +317,7 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
         <tr>
             <td style="text-align:center;"><?= $i + 1 ?></td>
             <td style="font-weight:bold;"><?= strtoupper(htmlspecialchars($nama)) ?></td>
-            <td style="font-size:6.5pt; text-align:center;">
-                <?= htmlspecialchars($supplier) ?>
-            </td>
+            <td style="font-size:6.5pt; text-align:center;"><?= htmlspecialchars($supplier) ?></td>
             <td style="text-align:center;">
                 <?php if (!empty($d['tgl_beli_barang']) && $d['tgl_beli_barang'] != '0000-00-00'): ?>
                     <span style="font-weight:bold; color:#166534;"><?= date('d/m/y', strtotime($d['tgl_beli_barang'])) ?></span>
@@ -330,8 +329,8 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
                 <?= ($d['id_mobil'] != 0 && !empty($d['plat_nomor'])) ? htmlspecialchars($d['plat_nomor']) : '-' ?>
             </td>
             <td style="text-align:center; font-size:6.5pt; font-weight:bold;"><?= htmlspecialchars($d['tipe_request']) ?></td>
-            <td style="text-align:center;"><b><?= (float)$d['jumlah'] ?></b> <?= htmlspecialchars($d['satuan']) ?></td>
-            <td style="text-align:right;"><?= number_format($harga,    0, ',', '.') ?></td>
+            <td style="text-align:center;"><b><?= $qty_tampil ?></b> <?= htmlspecialchars($satuan_tampil) ?></td>
+            <td style="text-align:right;"><?= number_format($harga, 0, ',', '.') ?></td>
             <td style="text-align:right; font-weight:bold;"><?= number_format($subtotal, 0, ',', '.') ?></td>
             <td style="font-size:7pt;"><?= htmlspecialchars($d['keterangan'] ?: '-') ?></td>
         </tr>
@@ -347,7 +346,6 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
     </tbody>
 </table>
 
-<!-- ── Blok Tanda Tangan ── -->
 <?php
 $ttd_cols = [
     [

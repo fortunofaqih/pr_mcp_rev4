@@ -1,7 +1,7 @@
 <?php
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 $id = mysqli_real_escape_string($koneksi, $_GET['id']);
 $query_header = mysqli_query($koneksi, "SELECT * FROM tr_request WHERE id_request = '$id'");
@@ -138,6 +138,12 @@ while ($d = mysqli_fetch_assoc($q)) { $items[] = $d; }
         <td width="34%" style="text-align:center;">ADMIN: <?= strtoupper($h['nama_pemesan']) ?></td>
         <td width="33%" style="text-align:right;">TGL: <?= date('d/m/Y', strtotime($h['tgl_request'])) ?></td>
     </tr>
+    <!-- TAMBAHAN: Baris untuk Nama Pembeli -->
+    <tr>
+        <td colspan="3" style="text-align:center; font-weight:normal; padding-top:2px; border-top:0.5px dashed #ccc;">
+            <span style="font-weight:bold;">PEMBELI:</span> <?= !empty($h['nama_pembeli']) ? strtoupper($h['nama_pembeli']) : '<span style="color:#999;">(belum diisi)</span>' ?>
+        </td>
+    </tr>
 </table>
 
 <table class="data">
@@ -162,15 +168,15 @@ while ($d = mysqli_fetch_assoc($q)) { $items[] = $d; }
         <tr>
             <td style="text-align:center;"><?= $i + 1 ?></td>
             <td style="font-weight:bold;"><?= strtoupper($nama) ?></td>
-            	<td style="text-align:center;">
-			<?php if (!empty($d['tgl_beli_barang']) && $d['tgl_beli_barang'] != '0000-00-00'): ?>
-				<span style="font-weight:bold; color:#166534;">
-					<?= date('d/m/y', strtotime($d['tgl_beli_barang'])) ?>
-				</span>
-			<?php else: ?>
-				<span style="color:#cbd5e1;">—</span>
-			<?php endif; ?>
-		</td>
+            <td style="text-align:center;">
+                <?php if (!empty($d['tgl_beli_barang']) && $d['tgl_beli_barang'] != '0000-00-00'): ?>
+                    <span style="font-weight:bold; color:#166534;">
+                        <?= date('d/m/y', strtotime($d['tgl_beli_barang'])) ?>
+                    </span>
+                <?php else: ?>
+                    <span style="color:#cbd5e1;">—</span>
+                <?php endif; ?>
+            </td>
             <td style="text-align:center;"><?= ($d['id_mobil'] != 0 && !empty($d['plat_nomor'])) ? $d['plat_nomor'] : '-' ?></td>
             <td style="text-align:center;font-size:6.5pt;font-weight:bold;"><?= $d['tipe_request'] ?></td>
             <td style="text-align:center;"><b><?= (float)$d['jumlah'] ?></b> <?= $d['satuan'] ?></td>
