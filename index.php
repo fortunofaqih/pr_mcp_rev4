@@ -303,6 +303,12 @@ if ($is_finance) {
                             <i class="fas fa-car me-2"></i> Update Status BAN
                         </a>
                     </li>
+                    <!-- Update kondisi kendaraan -->
+                    <li class="nav-item">
+                        <a href="modul/master/kondisi_kendaraan.php" class="nav-link">
+                            <i class="fas fa-car me-2"></i> Update Kondisi Kendaraan
+                        </a>
+                    </li>
                 <?php endif; ?>
                 <!-- MENU ADMIN GUDANG -->
                 <?php if ($is_gudang_access) : ?>
