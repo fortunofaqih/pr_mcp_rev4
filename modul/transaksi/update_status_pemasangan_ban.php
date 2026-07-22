@@ -201,21 +201,28 @@ if ($id_po_filter) {
     if ($po_detail) {
         $id_request_sel = (int)$po_detail['id_request'];
         // Query dengan join ke stok_ban_luar untuk cek status stok
-$detail_items = mysqli_query($koneksi,
-    "SELECT d.*,
-            b.nama_barang AS nama_master,
-            m.plat_nomor,
-            s.id_stok AS stok_id,
-            s.tgl_transaksi AS tgl_masuk_stok,
-            s.keterangan AS stok_keterangan
-     FROM tr_request_detail d
-     LEFT JOIN master_barang b ON d.id_barang = b.id_barang
-     LEFT JOIN master_mobil  m ON d.id_mobil  = m.id_mobil
-     LEFT JOIN stok_ban_luar s ON s.id_detail = d.id_detail 
-        AND s.tipe_transaksi = 'MASUK'
-     WHERE d.id_request = $id_request_sel
-       AND d.is_ban = 1
-     ORDER BY d.id_detail ASC");
+        // DAN join ke pembelian untuk ambil tgl_beli_barang dan id_user_beli
+        // SERTA join ke users untuk ambil nama_lengkap dari id_user_beli
+        $detail_items = mysqli_query($koneksi,
+            "SELECT d.*,
+                    b.nama_barang AS nama_master,
+                    m.plat_nomor,
+                    s.id_stok AS stok_id,
+                    s.tgl_transaksi AS tgl_masuk_stok,
+                    s.keterangan AS stok_keterangan,
+                    pb.tgl_beli_barang,
+                    pb.id_user_beli,
+                    u.nama_lengkap AS nama_pembeli
+             FROM tr_request_detail d
+             LEFT JOIN master_barang b ON d.id_barang = b.id_barang
+             LEFT JOIN master_mobil  m ON d.id_mobil  = m.id_mobil
+             LEFT JOIN stok_ban_luar s ON s.id_detail = d.id_detail 
+                AND s.tipe_transaksi = 'MASUK'
+             LEFT JOIN pembelian pb ON pb.id_request_detail = d.id_detail
+             LEFT JOIN users u ON u.id_user = pb.id_user_beli
+             WHERE d.id_request = $id_request_sel
+               AND d.is_ban = 1
+             ORDER BY d.id_detail ASC");
     }
 }
 
@@ -855,13 +862,13 @@ body {
                                 <?= (float)($d['jumlah'] ?? 0) + 0 ?>
                                 <span style="font-size:.65rem;color:var(--slate);font-weight:500;"><?= htmlspecialchars($d['satuan'] ?? '') ?></span>
                             </td>
-                            <!-- Status Beli -->
+                            <!-- Status Beli - PERBAIKAN: gunakan tgl_beli_barang dan nama_pembeli -->
                             <td style="text-align:center;">
                                 <?php if ($sudah_beli): ?>
                                     <span class="bdg bdg-done"><i class="fas fa-check me-1"></i>TERBELI</span>
                                     <div style="font-size:.63rem;color:var(--slate);margin-top:3px;">
-                                        <?= !empty($d['tgl_dibeli']) ? date('d/m/Y', strtotime($d['tgl_dibeli'])) : '' ?>
-                                        <?= !empty($d['dibeli_oleh']) ? '<br>' . htmlspecialchars($d['dibeli_oleh']) : '' ?>
+                                        <?= !empty($d['tgl_beli_barang']) ? date('d/m/Y', strtotime($d['tgl_beli_barang'])) : '' ?>
+                                        <?= !empty($d['nama_pembeli']) ? '<br>' . htmlspecialchars($d['nama_pembeli']) : '' ?>
                                     </div>
                                 <?php else: ?>
                                     <span class="bdg bdg-pending"><i class="fas fa-clock me-1"></i><?= htmlspecialchars($status_item ?: 'PENDING') ?></span>
@@ -872,7 +879,10 @@ body {
                                 <?php if ($stok_masuk): ?>
                                     <span class="bdg bdg-stok-yes"><i class="fas fa-check me-1"></i>SUDAH MASUK</span>
                                     <div style="font-size:.63rem;color:var(--slate);margin-top:3px;">
-                                        <?= !empty($d['tgl_masuk_stok']) ? date('d/m/Y', strtotime($d['tgl_masuk_stok'])) : '' ?>
+                                        <!-- Tanggal berada di baris pertama -->
+                                        <div><?= !empty($d['tgl_masuk_stok']) ? date('d/m/Y', strtotime($d['tgl_masuk_stok'])) : '' ?></div>
+                                        <!-- Verifikasi otomatis pindah ke baris bawahnya -->
+                                        <div style="margin-top: 2px; font-weight: bold; color: green;"><?= "verifikasi" ?></div>
                                     </div>
                                 <?php else: ?>
                                     <span class="bdg bdg-stok-no"><i class="fas fa-times me-1"></i>BELUM MASUK</span>
@@ -995,42 +1005,6 @@ function filterItems(val) {
     if (noResult) noResult.style.display = (visible === 0 && rows.length > 0) ? 'block' : 'none';
 }
 
-function konfirmPasang(e, nama, plat, idDetail) {
-    e.preventDefault();
-    var form = e.target;
-    var tglPasang = form.querySelector('input[name="tgl_pasang"]').value;
-    
-    if (!tglPasang) {
-        Swal.fire('Error', 'Tanggal terpasang harus diisi!', 'error');
-        return false;
-    }
-    
-    Swal.fire({
-        title: 'Tandai ban sudah terpasang?',
-        html: '<strong>Pastikan semua kondisi terpenuhi:</strong><br><br>' +
-              '<span style="color:green">✓ Status Beli: TERBELI</span><br>' +
-              '<span style="color:green">✓ Status Stok: SUDAH MASUK</span><br>' +
-              '<span style="color:green">✓ Tanggal terpasang: ' + tglPasang + '</span><br><br>' +
-              'Ban: <strong>' + nama + '</strong><br>Kendaraan: <strong>' + plat + '</strong>',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#d97706',
-        confirmButtonText: '<i class="fas fa-circle me-1"></i> Ya, Sudah Terpasang',
-        cancelButtonText: 'Batal'
-    }).then(function(r) {
-        if (r.isConfirmed) {
-            Swal.fire({
-                title: 'Menyimpan…',
-                allowOutsideClick: false,
-                showConfirmButton: false,
-                didOpen: function() { Swal.showLoading(); }
-            });
-            form.submit();
-        }
-    });
-    return false;
-}
-// Tambahkan fungsi validasi tambahan
 function konfirmPasang(e, nama, plat, idDetail) {
     e.preventDefault();
     var form = e.target;

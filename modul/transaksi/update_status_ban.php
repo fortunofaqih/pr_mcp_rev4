@@ -32,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $aksi         = $_POST['aksi']             ?? '';
     $id_po_redir  = (int)($_POST['id_po']      ?? 0);
     $id_req_redir = (int)($_POST['id_request'] ?? 0);
+    $tgl_pasang   = $_POST['tgl_pasang']       ?? '';
 
     if (!$id_detail || !in_array($aksi, ['beli', 'pasang'])) {
         header('location:update_status_ban.php?pesan=invalid');
@@ -88,10 +89,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
         } elseif ($aksi === 'pasang') {
+            // Validasi tanggal pasang wajib diisi
+            if (empty($tgl_pasang)) {
+                throw new Exception('Tanggal pemasangan harus diisi!');
+            }
+            if (!strtotime($tgl_pasang)) {
+                throw new Exception('Format tanggal tidak valid!');
+            }
+            
             if (!mysqli_query($koneksi,
                 "UPDATE tr_request_detail SET
                     status_pasang = 'TERPASANG',
-                    tgl_pasang    = '$today',
+                    tgl_pasang    = '$tgl_pasang',
                     pasang_oleh   = '$nama_esc'
                  WHERE id_detail = $id_detail AND is_ban = 1 AND is_dibeli = 1 AND status_pasang = 'BELUM_TERPASANG'")) {
                 throw new Exception('Gagal update pasang: ' . mysqli_error($koneksi));
@@ -222,17 +231,22 @@ if ($id_po_filter) {
 
     if ($po_detail) {
         $id_request_sel = (int)$po_detail['id_request'];
+        // PERBAIKAN: Query dengan join ke pembelian dan users untuk ambil tgl_beli_barang & nama_pembeli
         $detail_items = mysqli_query($koneksi,
             "SELECT d.*,
                     b.nama_barang AS nama_master,
                     m.plat_nomor,
                     pb.harga      AS harga_nota,
                     pb.qty        AS qty_nota,
-                    pb.id_pembelian
+                    pb.id_pembelian,
+                    pb.tgl_beli_barang,
+                    pb.id_user_beli,
+                    u.nama_lengkap AS nama_pembeli
              FROM tr_request_detail d
              LEFT JOIN master_barang b  ON d.id_barang = b.id_barang
              LEFT JOIN master_mobil  m  ON d.id_mobil  = m.id_mobil
              LEFT JOIN pembelian     pb ON d.id_detail  = pb.id_request_detail
+             LEFT JOIN users         u  ON u.id_user = pb.id_user_beli
              WHERE d.id_request = $id_request_sel
              ORDER BY d.id_detail ASC");
     }
@@ -909,12 +923,13 @@ body {
                                 <?= (float)($d['jumlah'] ?? 0) + 0 ?>
                                 <span style="font-size:.65rem;color:var(--slate);font-weight:500;"><?= htmlspecialchars($d['satuan'] ?? '') ?></span>
                             </td>
+                            <!-- Status Beli - PERBAIKAN: gunakan tgl_beli_barang dan nama_pembeli -->
                             <td style="text-align:center;">
                                 <?php if ($is_dibeli): ?>
                                     <span class="bdg bdg-done"><i class="fas fa-check me-1"></i>TERBELI</span>
                                     <div style="font-size:.63rem;color:var(--slate);margin-top:3px;">
-                                        <?= !empty($d['tgl_dibeli']) ? date('d/m/Y', strtotime($d['tgl_dibeli'])) : '' ?>
-                                        <?= !empty($d['dibeli_oleh']) ? '<br>' . htmlspecialchars($d['dibeli_oleh']) : '' ?>
+                                        <?= !empty($d['tgl_beli_barang']) ? date('d/m/Y', strtotime($d['tgl_beli_barang'])) : '' ?>
+                                        <?= !empty($d['nama_pembeli']) ? '<br>' . htmlspecialchars($d['nama_pembeli']) : '' ?>
                                     </div>
                                 <?php else: ?>
                                     <span class="bdg bdg-pending"><i class="fas fa-clock me-1"></i>OPEN</span>
@@ -994,6 +1009,7 @@ body {
                                         <input type="hidden" name="id_po"      value="<?= $id_po_filter ?>">
                                         <input type="hidden" name="id_request" value="<?= $id_request_sel ?>">
                                         <input type="hidden" name="aksi"       value="pasang">
+                                        <input type="hidden" name="tgl_pasang" value="<?= date('Y-m-d') ?>">
                                         <div style="display:flex;flex-direction:column;gap:4px;align-items:center; width: 100%;">
                                             <div style="display:flex;gap:5px;align-items:center; flex-wrap: wrap; justify-content: center;">
                                                 <input type="date" 
@@ -1007,7 +1023,7 @@ body {
                                             </div>
                                             <small style="color: #d97706; font-size: 0.6rem;">
                                                 <i class="fas fa-exclamation-circle"></i> 
-                                                Setelah pasang, akan muncul tombol DONE
+                                                Pastikan ban sudah terpasang
                                             </small>
                                         </div>
                                     </form>
