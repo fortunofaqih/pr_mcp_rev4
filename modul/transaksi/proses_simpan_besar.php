@@ -4,6 +4,7 @@
 // Simpan PR Besar (kategori_pr=BESAR) + draft PO
 // Mendukung alur 2-3 approval manager + kolom ban
 // + Upload file penawaran supplier (PDF, opsional, maks 5MB)
+// + Menyimpan tanggal terakhir beli ban
 // ============================================================
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
@@ -54,11 +55,10 @@ if (isset($_FILES['file_penawaran']) && $_FILES['file_penawaran']['error'] === U
     }
 
     // Buat folder jika belum ada
-// Simpan di luar webroot agar tidak bisa diakses langsung via browser
-$folder = 'C:/uploads_pr/penawaran/';
-if (!is_dir($folder)) {
-    mkdir($folder, 0755, true);
-}
+    $folder = 'C:/uploads_pr/penawaran/';
+    if (!is_dir($folder)) {
+        mkdir($folder, 0755, true);
+    }
 
     // Nama file unik: penawaran_PRB-I-25-0001_20250602_143022_ab12cd34.pdf
     $no_safe             = preg_replace('/[^A-Za-z0-9_-]/', '-', $no_request);
@@ -80,8 +80,6 @@ mysqli_begin_transaction($koneksi);
 try {
 
     // INSERT header tr_request
-    // need_approve3 = 0 default, akan diisi Manager ke-1 saat approval
-    // approve3_target = NULL default, akan diisi Manager ke-1
     $sql_header = "INSERT INTO tr_request
         (no_request, tgl_request, nama_pemesan, nama_pembeli,
          status_request, kategori_pr, status_approval,
@@ -111,8 +109,10 @@ try {
     $satuan_arr      = $_POST['satuan']             ?? [];
     $harga_arr       = $_POST['harga']              ?? [];
     $ket_item_arr    = $_POST['keterangan_item']    ?? [];
-    // is_ban_val: hidden field yang selalu ada (0 atau 1), lebih reliable dari checkbox is_ban[]
+    // is_ban_val: hidden field yang selalu ada (0 atau 1)
     $is_ban_arr      = $_POST['is_ban_val']         ?? [];
+    // TAMBAHAN: ambil tanggal terakhir beli ban
+    $tgl_terakhir_beli_arr = $_POST['tgl_terakhir_beli_ban'] ?? [];
 
     $subtotal_total = 0;
     for ($i = 0; $i < count($id_barang_arr); $i++) {
@@ -131,6 +131,17 @@ try {
         $is_ban      = (int)($is_ban_arr[$i] ?? 0) === 1 ? 1 : 0;
         // status_pasang: jika ban → BELUM_TERPASANG, jika bukan → NULL
         $status_pasang_sql = $is_ban ? "'BELUM_TERPASANG'" : "NULL";
+        
+        // TAMBAHAN: Ambil tanggal terakhir beli ban jika item adalah ban
+        $tgl_terakhir_beli = NULL;
+        if ($is_ban && isset($tgl_terakhir_beli_arr[$i]) && !empty($tgl_terakhir_beli_arr[$i])) {
+            $tgl_terakhir_beli = mysqli_real_escape_string($koneksi, $tgl_terakhir_beli_arr[$i]);
+            // Validasi format tanggal
+            if (!strtotime($tgl_terakhir_beli)) {
+                throw new Exception("Format tanggal terakhir beli ban tidak valid untuk baris ke-" . ($i+1));
+            }
+        }
+        $tgl_terakhir_beli_sql = $tgl_terakhir_beli ? "'$tgl_terakhir_beli'" : "NULL";
 
         if ($jumlah <= 0) continue;
 
@@ -142,16 +153,17 @@ try {
             }
         }
 
+        // MODIFIKASI: Tambahkan kolom tgl_terakhir_beli pada INSERT
         $sql_detail = "INSERT INTO tr_request_detail
             (id_request, nama_barang_manual, id_barang, id_mobil,
              jumlah, satuan, harga_satuan_estimasi, subtotal_estimasi,
              kategori_barang, kwalifikasi, tipe_request, keterangan,
-             status_item, is_ban, status_pasang, is_dibeli)
+             status_item, is_ban, status_pasang, is_dibeli, tgl_terakhir_beli)
             VALUES
             ('$id_request','$nama_manual','$id_barang','$id_mobil',
              '$jumlah','$satuan','$harga','$subtotal',
              '$kategori','$kwalifikasi','$tipe','$ket_item',
-             'PENDING', '$is_ban', $status_pasang_sql, 0)";
+             'PENDING', '$is_ban', $status_pasang_sql, 0, $tgl_terakhir_beli_sql)";
 
         if (!mysqli_query($koneksi, $sql_detail)) {
             throw new Exception("Gagal simpan detail: " . mysqli_error($koneksi));

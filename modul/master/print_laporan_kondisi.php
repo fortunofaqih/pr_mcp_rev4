@@ -8,306 +8,167 @@ if ($_SESSION['status'] != "login") {
     exit;
 }
 
-// Ambil parameter filter
-$bulan = isset($_GET['bulan']) ? $_GET['bulan'] : date('m');
-$tahun = isset($_GET['tahun']) ? $_GET['tahun'] : date('Y');
+$bulan = isset($_GET['bulan']) ? (int) $_GET['bulan'] : (int) date('m');
+$tahun = isset($_GET['tahun']) ? (int) $_GET['tahun'] : (int) date('Y');
+if ($bulan < 1 || $bulan > 12) $bulan = (int) date('m');
 
-// Set header untuk Excel
-header("Content-Type: application/vnd.ms-excel");
-header("Content-Disposition: attachment; filename=Laporan_Kondisi_Kendaraan_".$bulan."_".$tahun.".xls");
+$nama_bulan = date('F', mktime(0, 0, 0, $bulan, 1, $tahun));
+
+// ================= PERSIAPAN HEADER DOWLOAD EXCEL =================
+header("Content-type: application/vnd-ms-excel");
+header("Content-Disposition: attachment; filename=Laporan_Kondisi_Kendaraan_MCP_" . $nama_bulan . "_" . $tahun . ".xls");
 header("Pragma: no-cache");
 header("Expires: 0");
 
-// Mulai output
-echo '<html>';
-echo '<head>';
-echo '<meta charset="UTF-8">';
-echo '<style>
-    body { font-family: Arial, sans-serif; }
-    .title { font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 20px; }
-    .subtitle { font-size: 14px; text-align: center; margin-bottom: 20px; }
-    table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-    th { background-color: #4CAF50; color: white; padding: 8px; border: 1px solid #ddd; text-align: left; }
-    td { padding: 8px; border: 1px solid #ddd; }
-    .header { background-color: #4472C4; color: white; font-weight: bold; text-align: center; }
-    .header-orange { background-color: #ED7D31; color: white; font-weight: bold; text-align: center; }
-    .header-green { background-color: #70AD47; color: white; font-weight: bold; text-align: center; }
-    .header-purple { background-color: #7030A0; color: white; font-weight: bold; text-align: center; }
-    .text-center { text-align: center; }
-    .text-right { text-align: right; }
-    .footer { margin-top: 20px; font-size: 12px; text-align: right; }
-    .warning { background-color: #FFC000; }
-    .danger { background-color: #FF0000; color: white; }
-    .success { background-color: #92D050; }
-    .info { background-color: #00B0F0; color: white; }
-</style>';
-echo '</head>';
-echo '<body>';
+// ================= QUERY KPI KINERJA =================
+$total_mobil = mysqli_fetch_assoc(mysqli_query($koneksi, "SELECT COUNT(*) as total FROM master_mobil"))['total'];
 
-// Judul Laporan
-echo '<div class="title">LAPORAN KONDISI KENDARAAN</div>';
-echo '<div class="subtitle">Periode: ' . date('F Y', mktime(0, 0, 0, $bulan, 1, $tahun)) . '</div>';
-echo '<br>';
+$total_aktif = mysqli_fetch_assoc(mysqli_query($koneksi,
+    "SELECT COUNT(DISTINCT id_mobil) as total FROM kondisi_kendaraan WHERE end_date IS NULL"
+))['total'];
 
-// 1. STATISTIK
-echo '<table>';
-echo '<tr><th colspan="4" class="header">STATISTIK KONDISI KENDARAAN</th></tr>';
-echo '<tr style="background-color: #D9E1F2;">';
-echo '<th style="font-weight: bold;">Total Armada</th>';
-echo '<th style="font-weight: bold;">Dalam Service</th>';
-echo '<th style="font-weight: bold;">Service Berjalan</th>';
-echo '<th style="font-weight: bold;">Selesai Service</th>';
-echo '</tr>';
+$stmt = mysqli_prepare($koneksi,
+    "SELECT COUNT(*) as total FROM kondisi_kendaraan
+     WHERE end_date IS NOT NULL AND MONTH(end_date) = ? AND YEAR(end_date) = ?"
+);
+mysqli_stmt_bind_param($stmt, "ii", $bulan, $tahun);
+mysqli_stmt_execute($stmt);
+mysqli_stmt_bind_result($stmt, $total_selesai);
+mysqli_stmt_fetch($stmt);
+mysqli_stmt_close($stmt);
 
-// Hitung statistik
-$query_total = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM master_mobil");
-$total_mobil = mysqli_fetch_assoc($query_total)['total'];
-
-$query_service = mysqli_query($koneksi, "SELECT COUNT(DISTINCT k.id_mobil) as total 
-                                        FROM kondisi_kendaraan k 
-                                        WHERE k.kondisi IN ('DISERVICE', 'RUSAK RINGAN', 'RUSAK BERAT')
-                                        AND k.created_at <= NOW()");
-$total_service = mysqli_fetch_assoc($query_service)['total'];
-
-$query_ongoing = mysqli_query($koneksi, "SELECT COUNT(DISTINCT k.id_mobil) as total 
-                                        FROM kondisi_kendaraan k 
-                                        WHERE k.kondisi IN ('DISERVICE', 'RUSAK RINGAN', 'RUSAK BERAT')
-                                        AND (k.end_date IS NULL OR k.end_date > NOW())");
-$total_ongoing = mysqli_fetch_assoc($query_ongoing)['total'];
-
-$query_selesai = mysqli_query($koneksi, "SELECT COUNT(DISTINCT k.id_mobil) as total 
-                                        FROM kondisi_kendaraan k 
-                                        WHERE k.kondisi = 'BAIK'
-                                        AND MONTH(k.end_date) = '$bulan' 
-                                        AND YEAR(k.end_date) = '$tahun'");
-$total_selesai = mysqli_fetch_assoc($query_selesai)['total'];
-
-echo '<tr>';
-echo '<td class="text-center"><strong>' . $total_mobil . '</strong></td>';
-echo '<td class="text-center"><strong>' . $total_service . '</strong></td>';
-echo '<td class="text-center"><strong>' . $total_ongoing . '</strong></td>';
-echo '<td class="text-center"><strong>' . $total_selesai . '</strong></td>';
-echo '</tr>';
-echo '</table>';
-echo '<br>';
-
-// 2. KENDARAAN DALAM SERVICE
-echo '<table>';
-echo '<tr><th colspan="7" class="header-orange">KENDARAAN DALAM SERVICE</th></tr>';
-echo '<tr style="background-color: #FCE4D6;">';
-echo '<th style="font-weight: bold;">Plat Nomor</th>';
-echo '<th style="font-weight: bold;">Driver</th>';
-echo '<th style="font-weight: bold;">Merk/Tipe</th>';
-echo '<th style="font-weight: bold;">Kondisi</th>';
-echo '<th style="font-weight: bold;">Keterangan</th>';
-echo '<th style="font-weight: bold;">Start Service</th>';
-echo '<th style="font-weight: bold;">Durasi (Hari)</th>';
-echo '</tr>';
-
-$query_service_detail = mysqli_query($koneksi, "
-    SELECT k.*, m.driver_tetap, m.merk_tipe 
-    FROM kondisi_kendaraan k 
-    JOIN master_mobil m ON k.id_mobil = m.id_mobil 
-    WHERE k.kondisi IN ('DISERVICE', 'RUSAK RINGAN', 'RUSAK BERAT')
-    AND (k.end_date IS NULL OR k.end_date > NOW())
-    ORDER BY k.start_date ASC
-");
-
-if (mysqli_num_rows($query_service_detail) > 0) {
-    while($d = mysqli_fetch_array($query_service_detail)):
-        $durasi = 0;
-        if ($d['start_date']) {
-            $start = new DateTime($d['start_date']);
-            $now = new DateTime();
-            $diff = $start->diff($now);
-            $durasi = $diff->days;
-        }
-        
-        $keterangan = $d['keterangan'] ?? '-';
-        $keterangan = str_replace("\n", " ", $keterangan);
-        $keterangan = str_replace("\r", " ", $keterangan);
-    ?>
-    <tr>
-        <td><?= $d['plat_nomor'] ?></td>
-        <td><?= $d['driver_tetap'] ?></td>
-        <td><?= $d['merk_tipe'] ?></td>
-        <td><?= $d['kondisi'] ?></td>
-        <td><?= $keterangan ?></td>
-        <td><?= date('d-M-Y', strtotime($d['start_date'])) ?></td>
-        <td class="text-center"><?= $durasi ?></td>
-    </tr>
-    <?php endwhile;
-} else {
-    echo '<tr><td colspan="7" class="text-center">Tidak ada kendaraan dalam service</td></tr>';
-}
-echo '</table>';
-echo '<br>';
-
-// 3. RIWAYAT SERVICE BULAN INI
-echo '<table>';
-echo '<tr><th colspan="8" class="header-green">RIWAYAT SERVICE ' . strtoupper(date('F Y', mktime(0, 0, 0, $bulan, 1, $tahun))) . '</th></tr>';
-echo '<tr style="background-color: #E2EFDA;">';
-echo '<th style="font-weight: bold;">Plat Nomor</th>';
-echo '<th style="font-weight: bold;">Driver</th>';
-echo '<th style="font-weight: bold;">Merk/Tipe</th>';
-echo '<th style="font-weight: bold;">Kondisi</th>';
-echo '<th style="font-weight: bold;">Keterangan</th>';
-echo '<th style="font-weight: bold;">Start Service</th>';
-echo '<th style="font-weight: bold;">End Service</th>';
-echo '<th style="font-weight: bold;">Durasi</th>';
-echo '</tr>';
-
-$query_riwayat = mysqli_query($koneksi, "
-    SELECT k.*, m.driver_tetap, m.merk_tipe 
-    FROM kondisi_kendaraan k 
-    JOIN master_mobil m ON k.id_mobil = m.id_mobil 
-    WHERE MONTH(k.created_at) = '$bulan' 
-    AND YEAR(k.created_at) = '$tahun'
-    ORDER BY k.created_at DESC
-");
-
-if (mysqli_num_rows($query_riwayat) > 0) {
-    while($d = mysqli_fetch_array($query_riwayat)):
-        $durasi = '-';
-        if ($d['start_date'] && $d['end_date']) {
-            $start = new DateTime($d['start_date']);
-            $end = new DateTime($d['end_date']);
-            $diff = $start->diff($end);
-            $durasi = ($diff->days + 1) . ' hari';
-        } elseif ($d['start_date']) {
-            $durasi = 'Berjalan';
-        }
-        
-        $keterangan = $d['keterangan'] ?? '-';
-        $keterangan = str_replace("\n", " ", $keterangan);
-        $keterangan = str_replace("\r", " ", $keterangan);
-    ?>
-    <tr>
-        <td><?= $d['plat_nomor'] ?></td>
-        <td><?= $d['driver_tetap'] ?></td>
-        <td><?= $d['merk_tipe'] ?></td>
-        <td><?= $d['kondisi'] ?></td>
-        <td><?= $keterangan ?></td>
-        <td><?= $d['start_date'] ? date('d-M-Y', strtotime($d['start_date'])) : '-' ?></td>
-        <td><?= $d['end_date'] ? date('d-M-Y', strtotime($d['end_date'])) : '-' ?></td>
-        <td class="text-center"><?= $durasi ?></td>
-    </tr>
-    <?php endwhile;
-} else {
-    echo '<tr><td colspan="8" class="text-center">Tidak ada data service untuk bulan ini</td></tr>';
-}
-echo '</table>';
-echo '<br>';
-
-// 4. REKAP SERVICE PER PLAT NOMOR (Frekuensi Service)
-echo '<table>';
-echo '<tr><th colspan="6" class="header-purple">REKAP FREKUENSI SERVICE PER KENDARAAN</th></tr>';
-echo '<tr style="background-color: #E4DFEC;">';
-echo '<th style="font-weight: bold;">Plat Nomor</th>';
-echo '<th style="font-weight: bold;">Driver</th>';
-echo '<th style="font-weight: bold;">Total Service</th>';
-echo '<th style="font-weight: bold;">Total Hari Service</th>';
-echo '<th style="font-weight: bold;">Rata-rata Hari Service</th>';
-echo '<th style="font-weight: bold;">Keterangan Terakhir</th>';
-echo '</tr>';
-
-$query_rekap = mysqli_query($koneksi, "
-    SELECT 
-        m.plat_nomor,
-        m.driver_tetap,
-        COUNT(k.id_kondisi) as total_service,
-        SUM(CASE 
-            WHEN k.start_date IS NOT NULL AND k.end_date IS NOT NULL 
-            THEN DATEDIFF(k.end_date, k.start_date) + 1 
-            ELSE 0 
-        END) as total_hari,
-        AVG(CASE 
-            WHEN k.start_date IS NOT NULL AND k.end_date IS NOT NULL 
-            THEN DATEDIFF(k.end_date, k.start_date) + 1 
-            ELSE NULL 
-        END) as rata_hari,
-        (SELECT keterangan FROM kondisi_kendaraan k2 
-         WHERE k2.id_mobil = m.id_mobil 
-         ORDER BY k2.created_at DESC LIMIT 1) as keterangan_terakhir
-    FROM master_mobil m
-    LEFT JOIN kondisi_kendaraan k ON m.id_mobil = k.id_mobil
-    WHERE k.kondisi IN ('DISERVICE', 'RUSAK RINGAN', 'RUSAK BERAT')
-    GROUP BY m.id_mobil
-    HAVING total_service > 0
-    ORDER BY total_service DESC
-");
-
-if (mysqli_num_rows($query_rekap) > 0) {
-    while($d = mysqli_fetch_array($query_rekap)):
-        $keterangan = $d['keterangan_terakhir'] ?? '-';
-        $keterangan = str_replace("\n", " ", $keterangan);
-        $keterangan = str_replace("\r", " ", $keterangan);
-    ?>
-    <tr>
-        <td><?= $d['plat_nomor'] ?></td>
-        <td><?= $d['driver_tetap'] ?></td>
-        <td class="text-center"><?= $d['total_service'] ?>x</td>
-        <td class="text-center"><?= $d['total_hari'] ?> hari</td>
-        <td class="text-center"><?= number_format($d['rata_hari'], 1) ?> hari</td>
-        <td><?= $keterangan ?></td>
-    </tr>
-    <?php endwhile;
-} else {
-    echo '<tr><td colspan="6" class="text-center">Tidak ada data service</td></tr>';
-}
-echo '</table>';
-echo '<br>';
-
-// 5. DETAIL SEMUA DATA KONDISI (Lengkap)
-echo '<table>';
-echo '<tr><th colspan="8" class="header">DETAIL SELURUH DATA KONDISI KENDARAAN</th></tr>';
-echo '<tr style="background-color: #D9E1F2;">';
-echo '<th style="font-weight: bold;">Plat Nomor</th>';
-echo '<th style="font-weight: bold;">Driver</th>';
-echo '<th style="font-weight: bold;">Jenis</th>';
-echo '<th style="font-weight: bold;">Kategori</th>';
-echo '<th style="font-weight: bold;">Merk/Tipe</th>';
-echo '<th style="font-weight: bold;">Kondisi</th>';
-echo '<th style="font-weight: bold;">Keterangan</th>';
-echo '<th style="font-weight: bold;">Tanggal Update</th>';
-echo '</tr>';
-
-$query_detail = mysqli_query($koneksi, "
-    SELECT k.*, m.driver_tetap, m.jenis_kendaraan, m.kategori_kendaraan, m.merk_tipe
-    FROM kondisi_kendaraan k 
-    JOIN master_mobil m ON k.id_mobil = m.id_mobil 
-    ORDER BY k.created_at DESC
-    LIMIT 100
-");
-
-if (mysqli_num_rows($query_detail) > 0) {
-    while($d = mysqli_fetch_array($query_detail)):
-        $keterangan = $d['keterangan'] ?? '-';
-        $keterangan = str_replace("\n", " ", $keterangan);
-        $keterangan = str_replace("\r", " ", $keterangan);
-    ?>
-    <tr>
-        <td><?= $d['plat_nomor'] ?></td>
-        <td><?= $d['driver_tetap'] ?></td>
-        <td><?= $d['jenis_kendaraan'] ?></td>
-        <td><?= $d['kategori_kendaraan'] ?></td>
-        <td><?= $d['merk_tipe'] ?></td>
-        <td><?= $d['kondisi'] ?></td>
-        <td><?= $keterangan ?></td>
-        <td><?= date('d-M-Y H:i', strtotime($d['created_at'])) ?></td>
-    </tr>
-    <?php endwhile;
-} else {
-    echo '<tr><td colspan="8" class="text-center">Tidak ada data kondisi</td></tr>';
-}
-echo '</table>';
-
-// Footer
-echo '<div class="footer">';
-echo 'Dicetak: ' . date('d-m-Y H:i:s') . '<br>';
-echo 'User: ' . ($_SESSION['username'] ?? 'System');
-echo '</div>';
-
-echo '</body>';
-echo '</html>';
+$row_durasi = mysqli_fetch_assoc(mysqli_query($koneksi,
+    "SELECT AVG(DATEDIFF(end_date, start_date) + 1) as rata2
+     FROM kondisi_kendaraan WHERE end_date IS NOT NULL AND start_date IS NOT NULL"
+));
+$rata2_durasi = $row_durasi['rata2'] !== null ? round($row_durasi['rata2'], 1) : 0;
 ?>
+
+<!-- Struktur HTML Table yang akan dibaca otomatis sebagai Excel -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: sans-serif; }
+        .table-data { border-collapse: collapse; width: 100%; }
+        .table-data th { background-color: #f2f2f2; font-weight: bold; border: 1px solid #000000; padding: 6px; }
+        .table-data td { border: 1px solid #000000; padding: 6px; }
+        .text-center { text-align: center; }
+        .text-bold { font-weight: bold; }
+        .kpi-table { border-collapse: collapse; margin-bottom: 20px; }
+        .kpi-table td { border: 1px solid #000000; padding: 5px 10px; }
+    </style>
+</head>
+<body>
+
+    <!-- Judul Laporan -->
+    <table style="border: none; margin-bottom: 10px;">
+        <tr>
+            <td colspan="8" style="font-size: 14px; font-weight: bold;">PT MUTIARA CAHAYA PLASTINDO</td>
+        </tr>
+        <tr>
+            <td colspan="8" style="font-size: 14px; font-weight: bold;">LAPORAN KONDISI KENDARAAN (ARMADA)</td>
+        </tr>
+        <tr>
+            <td colspan="8" style="font-size: 11px; font-style: italic;">Periode: <?= $nama_bulan ?> <?= $tahun ?></td>
+        </tr>
+    </table>
+
+    <br>
+
+    <!-- Ringkasan Statistik -->
+    <table class="kpi-table">
+        <tr>
+            <td colspan="2" class="text-bold" style="background-color: #f2f2f2;">RINGKASAN STATISTIK ARMADA</td>
+        </tr>
+        <tr>
+            <td class="text-bold">Total Armada</td>
+            <td><?= $total_mobil ?> Unit</td>
+        </tr>
+        <tr>
+            <td class="text-bold">Sedang Servis Saat Ini (Aktif)</td>
+            <td><?= $total_aktif ?> Unit</td>
+        </tr>
+        <tr>
+            <td class="text-bold">Selesai Servis Bulan Ini</td>
+            <td><?= $total_selesai ?> Unit</td>
+        </tr>
+        <tr>
+            <td class="text-bold">Rata-rata Durasi Servis</td>
+            <td><?= $rata2_durasi ?> Hari</td>
+        </tr>
+    </table>
+
+    <br>
+
+    <!-- Tabel Utama -->
+    <div style="font-weight: bold; margin-bottom: 5px;">RIWAYAT SERVIS KENDARAAN YANG DIMULAI PERIODE INI</div>
+    <table class="table-data">
+        <thead>
+            <tr>
+                <th>No</th>
+                <th>Plat Nomor</th>
+                <th>Nama Driver</th>
+                <th>Kondisi Saat Input</th>
+                <th>Tanggal Mulai</th>
+                <th>Tanggal Selesai</th>
+                <th>Durasi Berjalan / Total</th>
+                <th>Status Terakhir</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php
+            $stmt_riwayat = mysqli_prepare($koneksi, "
+                SELECT k.kondisi, k.plat_nomor, k.start_date, k.end_date, m.driver_tetap
+                FROM kondisi_kendaraan k
+                JOIN master_mobil m ON k.id_mobil = m.id_mobil
+                WHERE MONTH(k.start_date) = ? AND YEAR(k.start_date) = ?
+                ORDER BY k.start_date DESC
+            ");
+            mysqli_stmt_bind_param($stmt_riwayat, "ii", $bulan, $tahun);
+            mysqli_stmt_execute($stmt_riwayat);
+            mysqli_stmt_bind_result($stmt_riwayat, $r_kondisi, $r_plat, $r_start, $r_end, $r_driver);
+
+            $no = 1;
+            $hasData = false;
+
+            while (mysqli_stmt_fetch($stmt_riwayat)) {
+                $hasData = true;
+                $aktif = is_null($r_end);
+                
+                // Hitung durasi
+                $durasi_str = '-';
+                if ($r_start) {
+                    $start_dt = new DateTime($r_start);
+                    $sampai_dt = $aktif ? new DateTime() : new DateTime($r_end);
+                    $durasi_str = ($start_dt->diff($sampai_dt)->days + 1) . ' Hari';
+                }
+                
+                $status_terakhir = $aktif ? 'AKTIF' : 'SELESAI';
+                $tgl_mulai = $r_start ? date('d-M-Y', strtotime($r_start)) : '-';
+                $tgl_selesai = $r_end ? date('d-M-Y', strtotime($r_end)) : '-';
+            ?>
+                <tr>
+                    <td class="text-center"><?= $no++ ?></td>
+                    <td class="text-center" style="font-weight: bold;"><?= htmlspecialchars($r_plat) ?></td>
+                    <td><?= htmlspecialchars($r_driver) ?></td>
+                    <td class="text-center"><?= htmlspecialchars($r_kondisi) ?></td>
+                    <td class="text-center"><?= $tgl_mulai ?></td>
+                    <td class="text-center"><?= $tgl_selesai ?></td>
+                    <td class="text-center"><?= $durasi_str ?></td>
+                    <td class="text-center"><?= $status_terakhir ?></td>
+                </tr>
+            <?php 
+            }
+            mysqli_stmt_close($stmt_riwayat);
+
+            if (!$hasData) {
+                echo '<tr><td colspan="8" class="text-center" style="font-style: italic; color: #777;">Tidak ada data riwayat servis untuk periode ini.</td></tr>';
+            }
+            ?>
+        </tbody>
+    </table>
+
+</body>
+</html>

@@ -406,6 +406,31 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
     .page-header h5 { font-size: .82rem; }
     .page-header small { display: none; } /* Sembunyikan subtitle di HP kecil */
 }
+/* ═══════════════════════════════════════════
+   TANGGAL TERAKHIR BELI BAN
+═══════════════════════════════════════════ */
+.tgl-ban-wrap {
+    display: none;
+    margin-top: 4px;
+}
+.tgl-ban-wrap.show {
+    display: block;
+}
+.tgl-ban-wrap input[type="date"] {
+    font-size: .7rem;
+    padding: 2px 6px;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    background: #fffbeb;
+    width: 130px;
+}
+.tgl-ban-wrap label {
+    font-size: .62rem;
+    font-weight: 600;
+    color: #7c4a00;
+    display: block;
+    margin-bottom: 2px;
+}
 </style>
 </head>
 <body class="py-3 py-md-4">
@@ -557,14 +582,20 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
     <td><input type="text" class="form-control form-control-sm input-subtotal text-end bg-light fw-bold" value="0" readonly tabindex="-1"></td>
     <td><textarea name="keterangan_item[]" class="form-control form-control-sm input-keterangan" rows="1" placeholder="Spesifikasi mendalam..." required></textarea></td>
     <td>
-        <div class="ban-check-wrap">
-            <div class="text-center">
-                <input type="checkbox" name="is_ban[]" value="1" class="chk-ban" title="Centang jika item ini adalah BAN kendaraan">
-                <div class="ban-badge d-none ban-label">BAN</div>
+    <div class="ban-check-wrap">
+        <div class="text-center">
+            <input type="checkbox" name="is_ban[]" value="1" class="chk-ban" title="Centang jika item ini adalah BAN kendaraan">
+            <div class="ban-badge d-none ban-label">BAN</div>
+            <!-- TAMBAHAN: Input tanggal terakhir beli ban -->
+            <div class="tgl-ban-wrap">
+                <label><i class="fas fa-calendar-alt me-1"></i>Terakhir Beli</label>
+                <input type="date" name="tgl_terakhir_beli_ban[]" class="form-control form-control-sm tgl-terakhir-beli-ban" 
+                       placeholder="dd/mm/yyyy" data-format="dd/mm/yyyy">
             </div>
         </div>
-        <input type="hidden" name="is_ban_val[]" class="input-is-ban-val" value="0">
-    </td>
+    </div>
+    <input type="hidden" name="is_ban_val[]" class="input-is-ban-val" value="0">
+</td>
     <td class="text-center">
         <button type="button" class="btn btn-sm btn-outline-danger remove-row border-0">
             <i class="fas fa-times"></i>
@@ -718,14 +749,20 @@ var OPSI_KATEGORI = <?= json_encode($html_opsi_kategori) ?>;
 $(document).ready(function(){
 
 		function initSelect2(ctx){
-		var $c = ctx ? $(ctx) : $(document);
-		// Pastikan hanya elemen select yang benar-benar butuh pencarian yang ada di sini
-		$c.find('.select-barang,.select-mobil,.select-tipe,.select-pembeli,.select-supplier').each(function(){
-			if(!$(this).hasClass('select2-hidden-accessible')){
-				$(this).select2({ theme:'bootstrap-5', width:'100%' });
-			}
-		});
-	}
+            var $c = ctx ? $(ctx) : $(document);
+            // Pastikan hanya elemen select yang benar-benar butuh pencarian yang ada di sini
+            $c.find('.select-barang,.select-mobil,.select-tipe,.select-pembeli,.select-supplier').each(function(){
+                if(!$(this).hasClass('select2-hidden-accessible')){
+                    $(this).select2({ theme:'bootstrap-5', width:'100%' });
+                }
+            });
+            
+            // Inisialisasi datepicker untuk input tanggal di row baru
+            $c.find('.tgl-terakhir-beli-ban').each(function() {
+                // Jika menggunakan flatpickr atau datepicker bawaan
+                // Kita gunakan input type date saja, cukup set atribut
+            });
+        }
     initSelect2();
 
     function rp(n){ return 'Rp ' + parseFloat(n||0).toLocaleString('id-ID'); }
@@ -759,28 +796,37 @@ $(document).ready(function(){
         });
     }
 
-    // ── Checkbox BAN ────────────────────────────────────────
-    $(document).on('change', '.chk-ban', function(){
-        var row     = $(this).closest('tr');
-        var checked = $(this).is(':checked');
-        row.find('.input-is-ban-val').val(checked ? '1' : '0');
-        row.find('.ban-label').toggleClass('d-none', !checked);
-        if(checked){
-            var mobil = row.find('.select-mobil').val();
-            if(!mobil || mobil == '0'){
-                Swal.fire({
-                    icon: 'info', title: 'Perhatian',
-                    text: 'Item ini ditandai sebagai BAN. Pastikan kolom Unit/Mobil diisi dengan plat nomor kendaraan.',
-                    confirmButtonColor: '#dc3545', timer: 4000
-                });
-                row.find('.select-mobil').next('.select2-container').find('.select2-selection')
-                   .css('border','2px solid #ffc107');
+   // ── Checkbox BAN ────────────────────────────────────────
+        $(document).on('change', '.chk-ban', function(){
+            var row     = $(this).closest('tr');
+            var checked = $(this).is(':checked');
+            row.find('.input-is-ban-val').val(checked ? '1' : '0');
+            row.find('.ban-label').toggleClass('d-none', !checked);
+            
+            // TAMPILKAN/SEMBUNYIKAN INPUT TANGGAL TERAKHIR BELI BAN
+            var tglWrap = row.find('.tgl-ban-wrap');
+            if(checked){
+                tglWrap.addClass('show');
+                // Set default tanggal ke hari ini
+                var today = new Date().toISOString().split('T')[0];
+                row.find('.tgl-terakhir-beli-ban').val(today);
+                
+                var mobil = row.find('.select-mobil').val();
+                if(!mobil || mobil == '0'){
+                    Swal.fire({
+                        icon: 'info', title: 'Perhatian',
+                        text: 'Item ini ditandai sebagai BAN. Pastikan kolom Unit/Mobil diisi dengan plat nomor kendaraan.',
+                        confirmButtonColor: '#dc3545', timer: 4000
+                    });
+                    row.find('.select-mobil').next('.select2-container').find('.select2-selection')
+                    .css('border','2px solid #ffc107');
+                }
+            } else {
+                tglWrap.removeClass('show');
+                row.find('.tgl-terakhir-beli-ban').val('');
+                row.find('.select-mobil').next('.select2-container').find('.select2-selection').css('border','');
             }
-        } else {
-            row.find('.select-mobil').next('.select2-container').find('.select2-selection').css('border','');
-        }
-    });
-
+        });
    // ── Pilih barang → auto-fill ──────────────────────────
 		$(document).on('change', '.select-barang', function(){
 		var row = $(this).closest('tr'), 
@@ -827,35 +873,38 @@ $(document).ready(function(){
     });
 
   // ── Tambah baris ─────────────────────────────────────
-		$('#addRow').on('click', function(){
-		var n = $('#tbodyItem tr.item-row').length + 1;
-		var r = $('<tr class="item-row"></tr>');
-		r.append('<td class="text-center row-number">' + n + '</td>');
-		r.append('<td><select name="id_barang[]" class="form-select form-select-sm select-barang" required>' + OPSI_BARANG + '</select><input type="hidden" name="nama_barang_manual[]" class="input-nama-barang" value=""></td>');
-		
-		// Kategori Readonly
-		r.append('<td><input type="text" name="kategori_request[]" class="form-control form-control-sm input-kategori-readonly bg-light" placeholder="Otomatis..." readonly></td>');
-		
-		// Merk Readonly
-		r.append('<td><input type="text" name="kwalifikasi[]" class="form-control form-control-sm input-kwalifikasi bg-light" placeholder="Otomatis..." readonly></td>');
-		
-		r.append('<td><select name="id_mobil[]" class="form-select form-select-sm select-mobil">' + OPSI_MOBIL + '</select></td>');
-		r.append('<td><select name="tipe_request[]" class="form-select form-select-sm select-tipe"><option value="LANGSUNG" selected>LANGSUNG</option><option value="STOK">STOK</option></select></td>');
-		r.append('<td><input type="number" name="jumlah[]" class="form-control form-control-sm input-qty text-center" step="0.01" min="0.01" value="1" required></td>');
-		
-		// SATUAN SEKARANG JADI INPUT READONLY
-		r.append('<td><input type="text" name="satuan[]" class="form-control form-control-sm input-satuan-readonly bg-light" placeholder="Otomatis..." readonly></td>');
-		
-		r.append('<td><input type="number" name="harga[]" class="form-control form-control-sm input-harga text-end" placeholder="0" min="0" step="1"></td>');
-		r.append('<td><input type="text" class="form-control form-control-sm input-subtotal text-end bg-light fw-bold" value="0" readonly tabindex="-1"></td>');
-		r.append('<td><textarea name="keterangan_item[]" class="form-control form-control-sm input-keterangan" rows="1" placeholder="Spesifikasi mendalam..." required></textarea></td>');
-		r.append('<td><div class="ban-check-wrap"><div class="text-center"><input type="checkbox" name="is_ban[]" value="1" class="chk-ban"><div class="ban-badge d-none ban-label">BAN</div></div></div><input type="hidden" name="is_ban_val[]" class="input-is-ban-val" value="0"></td>');
-		r.append('<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row border-0"><i class="fas fa-times"></i></button></td>');
-		
-		$('#tbodyItem').append(r);
-		initSelect2(r);
-		updateNo();
-	});
+    $('#addRow').on('click', function(){
+        var n = $('#tbodyItem tr.item-row').length + 1;
+        var r = $('<tr class="item-row"></tr>');
+        r.append('<td class="text-center row-number">' + n + '</td>');
+        r.append('<td><select name="id_barang[]" class="form-select form-select-sm select-barang" required>' + OPSI_BARANG + '</select><input type="hidden" name="nama_barang_manual[]" class="input-nama-barang" value=""></td>');
+        
+        // Kategori Readonly
+        r.append('<td><input type="text" name="kategori_request[]" class="form-control form-control-sm input-kategori-readonly bg-light" placeholder="Otomatis..." readonly></td>');
+        
+        // Merk Readonly
+        r.append('<td><input type="text" name="kwalifikasi[]" class="form-control form-control-sm input-kwalifikasi bg-light" placeholder="Otomatis..." readonly></td>');
+        
+        r.append('<td><select name="id_mobil[]" class="form-select form-select-sm select-mobil">' + OPSI_MOBIL + '</select></td>');
+        r.append('<td><select name="tipe_request[]" class="form-select form-select-sm select-tipe"><option value="LANGSUNG" selected>LANGSUNG</option><option value="STOK">STOK</option></select></td>');
+        r.append('<td><input type="number" name="jumlah[]" class="form-control form-control-sm input-qty text-center" step="0.01" min="0.01" value="1" required></td>');
+        
+        // SATUAN SEKARANG JADI INPUT READONLY
+        r.append('<td><input type="text" name="satuan[]" class="form-control form-control-sm input-satuan-readonly bg-light" placeholder="Otomatis..." readonly></td>');
+        
+        r.append('<td><input type="number" name="harga[]" class="form-control form-control-sm input-harga text-end" placeholder="0" min="0" step="1"></td>');
+        r.append('<td><input type="text" class="form-control form-control-sm input-subtotal text-end bg-light fw-bold" value="0" readonly tabindex="-1"></td>');
+        r.append('<td><textarea name="keterangan_item[]" class="form-control form-control-sm input-keterangan" rows="1" placeholder="Spesifikasi mendalam..." required></textarea></td>');
+        
+        // MODIFIKASI: Tambahkan input tanggal di kolom BAN
+        r.append('<td><div class="ban-check-wrap"><div class="text-center"><input type="checkbox" name="is_ban[]" value="1" class="chk-ban"><div class="ban-badge d-none ban-label">BAN</div><div class="tgl-ban-wrap"><label><i class="fas fa-calendar-alt me-1"></i>Terakhir Beli</label><input type="date" name="tgl_terakhir_beli_ban[]" class="form-control form-control-sm tgl-terakhir-beli-ban" placeholder="dd/mm/yyyy" data-format="dd/mm/yyyy"></div></div></div><input type="hidden" name="is_ban_val[]" class="input-is-ban-val" value="0"></td>');
+        
+        r.append('<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row border-0"><i class="fas fa-times"></i></button></td>');
+        
+        $('#tbodyItem').append(r);
+        initSelect2(r);
+        updateNo();
+    });
 
     // ── Hapus baris ──────────────────────────────────────
     $(document).on('click', '.remove-row', function(){
@@ -867,56 +916,66 @@ $(document).ready(function(){
         }
     });
 
-    // ── Submit ───────────────────────────────────────────
-    $('#formPRBesar').on('submit', function(e){
-        e.preventDefault();
-        var form = this, valid = true, hasBan = false;
+   // ── Submit ───────────────────────────────────────────
+$('#formPRBesar').on('submit', function(e){
+    e.preventDefault();
+    var form = this, valid = true, hasBan = false;
 
-        $('.select-barang').each(function(){
-            if(!$(this).val()){ valid = false; return false; }
-        });
-        if(!valid){
-            Swal.fire('Perhatian', 'Pastikan semua baris sudah memilih nama barang.', 'warning');
-            return;
-        }
-
-        var banError = false;
-        $('.chk-ban:checked').each(function(){
-            hasBan = true;
-            var row   = $(this).closest('tr');
-            var mobil = row.find('.select-mobil').val();
-            if(!mobil || mobil == '0'){ banError = true; return false; }
-        });
-        if(banError){
-            Swal.fire('Perhatian', 'Item yang ditandai BAN harus memiliki plat nomor kendaraan.', 'warning');
-            return;
-        }
-
-        var totalPO  = $('#displayGrandTotalPO').text();
-        var banInfo  = hasBan ? '<br><small class="text-warning"><i class="fas fa-circle me-1"></i>Terdapat item BAN.</small>' : '';
-        var poInfo   = $('#selectSupplier').val() ? '<br><small class="text-muted">Grand Total PO: <strong class="text-danger">' + totalPO + '</strong></small>' : '<br><small class="text-info"><i class="fas fa-info-circle me-1"></i>Data PO belum diisi (opsional).</small>';
-        Swal.fire({
-            title: 'Kirim PR untuk Approval?',
-            html:  'PR akan dikirim ke minimal <strong>2 Manager</strong>.'
-                 + poInfo
-                 + banInfo,
-            icon: 'question', showCancelButton: true,
-            confirmButtonColor: '#dc3545',
-            confirmButtonText: '<i class="fas fa-paper-plane me-1"></i> Ya, Kirim!',
-            cancelButtonText: 'Batal'
-        }).then(function(r){
-            if(r.isConfirmed){
-                Swal.fire({
-                    title: 'Memproses...',
-                    allowOutsideClick: false,
-                    showConfirmButton: false,
-                    didOpen: function(){ Swal.showLoading(); }
-                });
-                form.submit();
-            }
-        });
+    $('.select-barang').each(function(){
+        if(!$(this).val()){ valid = false; return false; }
     });
+    if(!valid){
+        Swal.fire('Perhatian', 'Pastikan semua baris sudah memilih nama barang.', 'warning');
+        return;
+    }
 
+    var banError = false;
+    $('.chk-ban:checked').each(function(){
+        hasBan = true;
+        var row   = $(this).closest('tr');
+        var mobil = row.find('.select-mobil').val();
+        if(!mobil || mobil == '0'){ banError = true; return false; }
+        
+        // VALIDASI: Cek apakah tanggal terakhir beli ban diisi
+        var tglBeli = row.find('.tgl-terakhir-beli-ban').val();
+        if(!tglBeli){
+            Swal.fire({
+                icon: 'warning',
+                title: 'Tanggal Terakhir Beli Ban Wajib Diisi!',
+                text: 'Silakan isi tanggal terakhir kali ban tersebut dibeli.',
+                confirmButtonColor: '#dc3545'
+            });
+            row.find('.tgl-terakhir-beli-ban').focus();
+            banError = true;
+            return false;
+        }
+    });
+    if(banError){ return; }
+
+    var totalPO  = $('#displayGrandTotalPO').text();
+    var banInfo  = hasBan ? '<br><small class="text-warning"><i class="fas fa-circle me-1"></i>Terdapat item BAN dengan tanggal terakhir beli.</small>' : '';
+    var poInfo   = $('#selectSupplier').val() ? '<br><small class="text-muted">Grand Total PO: <strong class="text-danger">' + totalPO + '</strong></small>' : '<br><small class="text-info"><i class="fas fa-info-circle me-1"></i>Data PO belum diisi (opsional).</small>';
+    Swal.fire({
+        title: 'Kirim PR untuk Approval?',
+        html:  'PR akan dikirim ke minimal <strong>2 Manager</strong>.'
+             + poInfo
+             + banInfo,
+        icon: 'question', showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: '<i class="fas fa-paper-plane me-1"></i> Ya, Kirim!',
+        cancelButtonText: 'Batal'
+    }).then(function(r){
+        if(r.isConfirmed){
+            Swal.fire({
+                title: 'Memproses...',
+                allowOutsideClick: false,
+                showConfirmButton: false,
+                didOpen: function(){ Swal.showLoading(); }
+            });
+            form.submit();
+        }
+    });
+});
     // ── Notif setelah redirect ────────────────────────────
     var pesan = new URLSearchParams(window.location.search).get('pesan');
     if(pesan === 'berhasil_kirim'){

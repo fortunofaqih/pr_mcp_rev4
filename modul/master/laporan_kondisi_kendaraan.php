@@ -8,9 +8,11 @@ if ($_SESSION['status'] != "login") {
     exit;
 }
 
-// Filter bulan dan tahun
-$bulan = isset($_GET['bulan']) ? $_GET['bulan'] : date('m');
-$tahun = isset($_GET['tahun']) ? $_GET['tahun'] : date('Y');
+// Filter bulan dan tahun (di-cast ke integer, lebih aman dari SQL injection)
+$bulan = isset($_GET['bulan']) ? (int) $_GET['bulan'] : (int) date('m');
+$tahun = isset($_GET['tahun']) ? (int) $_GET['tahun'] : (int) date('Y');
+if ($bulan < 1 || $bulan > 12) $bulan = (int) date('m');
+$bulan_str = sprintf('%02d', $bulan);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -27,29 +29,53 @@ $tahun = isset($_GET['tahun']) ? $_GET['tahun'] : date('Y');
         body { background-color: #f8f9fa; }
         .navbar-mcp { background: var(--mcp-blue); color: white; }
         .card { border-radius: 12px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .table thead th { background-color: #f1f4f9; vertical-align: middle; }
+
         .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 20px;
+            color: #fff;
+            background: #495057;
         }
-        .stat-card.blue { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
-        .stat-card.green { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
-        .stat-card.orange { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
-        .stat-card.red { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
-        .stat-number { font-size: 2rem; font-weight: bold; }
-        .stat-label { font-size: 0.9rem; opacity: 0.9; }
-        
+        .stat-card.total   { background: var(--mcp-blue); }
+        .stat-card.aktif   { background: #fd7e14; }
+        .stat-card.selesai { background: #28a745; }
+        .stat-card.durasi  { background: #6c757d; }
+        .stat-card i.stat-icon { font-size: 1.5rem; opacity: 0.85; }
+        .stat-number { font-size: 2rem; font-weight: bold; line-height: 1.1; }
+        .stat-label { font-size: 0.85rem; opacity: 0.95; }
+
+        .badge-baik { background-color: #28a745; color: white; }
+        .badge-diservice { background-color: #ffc107; color: black; }
+        .badge-rusak-ringan { background-color: #fd7e14; color: white; }
+        .badge-rusak-berat { background-color: #dc3545; color: white; }
+
+        .chart-box { position: relative; height: 280px; }
+
         @media (max-width: 768px) {
+            .navbar-brand { font-size: 0.9rem; }
+            .btn-sm { font-size: 0.7rem; padding: 0.25rem 0.5rem; }
+            .table-responsive { font-size: 0.8rem; }
+            .card-body { padding: 0.75rem; }
+            .container-fluid { padding-left: 0.5rem; padding-right: 0.5rem; }
             .stat-number { font-size: 1.5rem; }
-            .stat-label { font-size: 0.8rem; }
+            .stat-label { font-size: 0.75rem; }
+            .chart-box { height: 220px; }
         }
-        
+        @media (max-width: 576px) {
+            .navbar-brand { font-size: 0.75rem; }
+            .btn { font-size: 0.7rem; padding: 0.2rem 0.4rem; }
+            .table td, .table th { padding: 0.3rem 0.2rem; }
+            .badge { font-size: 0.65rem; }
+            .stat-card { padding: 14px; }
+        }
+
         @media print {
             .no-print { display: none !important; }
             .card { box-shadow: none !important; border: 1px solid #ddd !important; }
-            .stat-card { background: #f8f9fa !important; color: #333 !important; border: 1px solid #ddd !important; }
+            .stat-card { color: #000 !important; border: 1px solid #ddd !important; }
+            .stat-card.total, .stat-card.aktif, .stat-card.selesai, .stat-card.durasi { background: #f8f9fa !important; }
         }
     </style>
 </head>
@@ -74,7 +100,7 @@ $tahun = isset($_GET['tahun']) ? $_GET['tahun'] : date('Y');
                     <label class="form-label fw-bold">Bulan</label>
                     <select name="bulan" class="form-select">
                         <?php for ($i = 1; $i <= 12; $i++): ?>
-                            <option value="<?= sprintf('%02d', $i) ?>" <?= $bulan == sprintf('%02d', $i) ? 'selected' : '' ?>>
+                            <option value="<?= sprintf('%02d', $i) ?>" <?= $bulan == $i ? 'selected' : '' ?>>
                                 <?= date('F', mktime(0, 0, 0, $i, 1)) ?>
                             </option>
                         <?php endfor; ?>
@@ -83,7 +109,7 @@ $tahun = isset($_GET['tahun']) ? $_GET['tahun'] : date('Y');
                 <div class="col-6 col-md-3">
                     <label class="form-label fw-bold">Tahun</label>
                     <select name="tahun" class="form-select">
-                        <?php for ($i = date('Y'); $i >= date('Y') - 5; $i--): ?>
+                        <?php for ($i = (int)date('Y'); $i >= (int)date('Y') - 5; $i--): ?>
                             <option value="<?= $i ?>" <?= $tahun == $i ? 'selected' : '' ?>><?= $i ?></option>
                         <?php endfor; ?>
                     </select>
@@ -92,7 +118,7 @@ $tahun = isset($_GET['tahun']) ? $_GET['tahun'] : date('Y');
                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter"></i> Filter</button>
                 </div>
                 <div class="col-6 col-md-2">
-                    <a href="print_laporan_kondisi.php?bulan=<?= $bulan ?>&tahun=<?= $tahun ?>" class="btn btn-success w-100" target="_blank">
+                    <a href="print_laporan_kondisi.php?bulan=<?= $bulan_str ?>&tahun=<?= $tahun ?>" class="btn btn-success w-100" target="_blank">
                         <i class="fas fa-file-excel"></i> Excel
                     </a>
                 </div>
@@ -100,220 +126,199 @@ $tahun = isset($_GET['tahun']) ? $_GET['tahun'] : date('Y');
         </div>
     </div>
 
-    <!-- Statistik -->
+    <!-- ================= STATISTIK ================= -->
     <?php
-    // Total kendaraan
-    $query_total = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM master_mobil");
-    $total_mobil = mysqli_fetch_assoc($query_total)['total'];
+    $total_mobil = mysqli_fetch_assoc(mysqli_query($koneksi, "SELECT COUNT(*) as total FROM master_mobil"))['total'];
 
-    // Total dalam service
-    $query_service = mysqli_query($koneksi, "SELECT COUNT(DISTINCT k.id_mobil) as total 
-                                            FROM kondisi_kendaraan k 
-                                            WHERE k.kondisi IN ('DISERVICE', 'RUSAK RINGAN', 'RUSAK BERAT')
-                                            AND k.created_at <= NOW()");
-    $total_service = mysqli_fetch_assoc($query_service)['total'];
+    $total_aktif = mysqli_fetch_assoc(mysqli_query($koneksi,
+        "SELECT COUNT(DISTINCT id_mobil) as total FROM kondisi_kendaraan WHERE end_date IS NULL"
+    ))['total'];
 
-    // Sedang service (belum selesai)
-    $query_ongoing = mysqli_query($koneksi, "SELECT COUNT(DISTINCT k.id_mobil) as total 
-                                            FROM kondisi_kendaraan k 
-                                            WHERE k.kondisi IN ('DISERVICE', 'RUSAK RINGAN', 'RUSAK BERAT')
-                                            AND (k.end_date IS NULL OR k.end_date > NOW())");
-    $total_ongoing = mysqli_fetch_assoc($query_ongoing)['total'];
+    $stmt = mysqli_prepare($koneksi,
+        "SELECT COUNT(*) as total FROM kondisi_kendaraan
+         WHERE end_date IS NOT NULL AND MONTH(end_date) = ? AND YEAR(end_date) = ?"
+    );
+    mysqli_stmt_bind_param($stmt, "ii", $bulan, $tahun);
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_bind_result($stmt, $total_selesai);
+    mysqli_stmt_fetch($stmt);
+    mysqli_stmt_close($stmt);
 
-    // Selesai service bulan ini
-    $query_selesai = mysqli_query($koneksi, "SELECT COUNT(DISTINCT k.id_mobil) as total 
-                                            FROM kondisi_kendaraan k 
-                                            WHERE k.kondisi = 'BAIK'
-                                            AND MONTH(k.end_date) = '$bulan' 
-                                            AND YEAR(k.end_date) = '$tahun'");
-    $total_selesai = mysqli_fetch_assoc($query_selesai)['total'];
+    $row_durasi = mysqli_fetch_assoc(mysqli_query($koneksi,
+        "SELECT AVG(DATEDIFF(end_date, start_date) + 1) as rata2
+         FROM kondisi_kendaraan WHERE end_date IS NOT NULL AND start_date IS NOT NULL"
+    ));
+    $rata2_durasi = $row_durasi['rata2'] !== null ? round($row_durasi['rata2'], 1) : 0;
     ?>
 
-    <div class="row mb-4">
+    <div class="row mb-2">
         <div class="col-6 col-md-3">
-            <div class="stat-card">
+            <div class="stat-card total">
+                <i class="fas fa-truck stat-icon"></i>
                 <div class="stat-number"><?= $total_mobil ?></div>
                 <div class="stat-label">Total Armada</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="stat-card blue">
-                <div class="stat-number"><?= $total_service ?></div>
-                <div class="stat-label">Dalam Service</div>
+            <div class="stat-card aktif">
+                <i class="fas fa-wrench stat-icon"></i>
+                <div class="stat-number"><?= $total_aktif ?></div>
+                <div class="stat-label">Sedang Diservis (Aktif Saat Ini)</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="stat-card orange">
-                <div class="stat-number"><?= $total_ongoing ?></div>
-                <div class="stat-label">Service Berjalan</div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="stat-card green">
+            <div class="stat-card selesai">
+                <i class="fas fa-check-circle stat-icon"></i>
                 <div class="stat-number"><?= $total_selesai ?></div>
-                <div class="stat-label">Selesai Service</div>
+                <div class="stat-label">Selesai Servis Bulan Ini</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-card durasi">
+                <i class="fas fa-clock stat-icon"></i>
+                <div class="stat-number"><?= $rata2_durasi ?> <small style="font-size:1rem;">hari</small></div>
+                <div class="stat-label">Rata-rata Durasi Servis</div>
             </div>
         </div>
     </div>
 
-    <!-- Grafik -->
+    <!-- ================= GRAFIK ================= -->
     <div class="row mb-4">
         <div class="col-12 col-md-6">
             <div class="card">
                 <div class="card-header bg-light">
-                    <h6 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Status Kondisi Kendaraan</h6>
+                    <h6 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Distribusi Kondisi Armada Saat Ini</h6>
                 </div>
                 <div class="card-body">
-                    <canvas id="chartStatus" height="250"></canvas>
+                    <div class="chart-box"><canvas id="chartStatus"></canvas></div>
                 </div>
             </div>
         </div>
         <div class="col-12 col-md-6">
             <div class="card">
                 <div class="card-header bg-light">
-                    <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Durasi Service Terlama</h6>
+                    <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Durasi Servis Terlama (Top 10)</h6>
                 </div>
                 <div class="card-body">
-                    <canvas id="chartDurasi" height="250"></canvas>
+                    <div class="chart-box"><canvas id="chartDurasi"></canvas></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Tabel Kendaraan Dalam Service -->
-    <div class="card">
-        <div class="card-header bg-light">
-            <h6 class="mb-0"><i class="fas fa-tools me-2"></i>Kendaraan Dalam Service</h6>
-        </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover table-striped align-middle">
-                    <thead>
-                        <tr>
-                            <th>Plat Nomor</th>
-                            <th>Driver</th>
-                            <th>Kondisi</th>
-                            <th>Start Service</th>
-                            <th>Durasi (Hari)</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php
-                        $query_service_detail = mysqli_query($koneksi, "
-                            SELECT k.*, m.driver_tetap, m.merk_tipe 
-                            FROM kondisi_kendaraan k 
-                            JOIN master_mobil m ON k.id_mobil = m.id_mobil 
-                            WHERE k.kondisi IN ('DISERVICE', 'RUSAK RINGAN', 'RUSAK BERAT')
-                            AND (k.end_date IS NULL OR k.end_date > NOW())
-                            ORDER BY k.start_date ASC
-                        ");
-                        while($d = mysqli_fetch_array($query_service_detail)):
-                            $durasi = 0;
-                            if ($d['start_date']) {
-                                $start = new DateTime($d['start_date']);
-                                $now = new DateTime();
-                                $diff = $start->diff($now);
-                                $durasi = $diff->days;
-                            }
-                            
-                            $badge = '';
-                            if ($d['kondisi'] == 'DISERVICE') {
-                                $badge = 'badge-diservice';
-                            } else if ($d['kondisi'] == 'RUSAK RINGAN') {
-                                $badge = 'badge-rusak-ringan';
-                            } else if ($d['kondisi'] == 'RUSAK BERAT') {
-                                $badge = 'badge-rusak-berat';
-                            }
-                        ?>
-                        <tr>
-                            <td class="fw-bold text-primary"><?= $d['plat_nomor'] ?></td>
-                            <td><?= $d['driver_tetap'] ?></td>
-                            <td><span class="badge <?= $badge ?>"><?= $d['kondisi'] ?></span></td>
-                            <td><?= date('d-M-Y', strtotime($d['start_date'])) ?></td>
-                            <td><strong><?= $durasi ?></strong> hari</td>
-                            <td>
-                                <?php if ($d['end_date'] && strtotime($d['end_date']) < time()): ?>
-                                    <span class="badge bg-success">Selesai</span>
-                                <?php else: ?>
-                                    <span class="badge bg-warning text-dark">Proses</span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                        <?php endwhile; ?>
-                        <?php if (mysqli_num_rows($query_service_detail) == 0): ?>
-                        <tr>
-                            <td colspan="6" class="text-center text-muted">Tidak ada kendaraan dalam service</td>
-                        </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Tabel Riwayat Service Bulanan -->
+    <!-- ================= TABEL: RIWAYAT BULANAN ================= -->
     <div class="card mt-4">
         <div class="card-header bg-light">
-            <h6 class="mb-0"><i class="fas fa-history me-2"></i>Riwayat Service Bulan <?= date('F Y', mktime(0, 0, 0, $bulan, 1, $tahun)) ?></h6>
+            <h6 class="mb-0"><i class="fas fa-history me-2"></i>Riwayat Servis Dimulai Bulan <?= date('F Y', mktime(0, 0, 0, $bulan, 1, $tahun)) ?></h6>
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-hover table-striped align-middle">
-                    <thead>
+                <table class="table table-hover align-middle">
+                    <thead class="small text-uppercase">
                         <tr>
+                            <th style="width:36px;"></th>
                             <th>Plat Nomor</th>
                             <th>Driver</th>
-                            <th>Kondisi</th>
-                            <th>Start Service</th>
-                            <th>End Service</th>
-                            <th>Durasi</th>
+                            <th class="text-center">Jumlah Servis</th>
+                            <th>Status Terakhir</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php
-                        $query_riwayat = mysqli_query($koneksi, "
-                            SELECT k.*, m.driver_tetap, m.merk_tipe 
-                            FROM kondisi_kendaraan k 
-                            JOIN master_mobil m ON k.id_mobil = m.id_mobil 
-                            WHERE MONTH(k.created_at) = '$bulan' 
-                            AND YEAR(k.created_at) = '$tahun'
-                            ORDER BY k.created_at DESC
+                        $stmt_riwayat = mysqli_prepare($koneksi, "
+                            SELECT k.kondisi, k.plat_nomor, k.start_date, k.end_date, m.driver_tetap
+                            FROM kondisi_kendaraan k
+                            JOIN master_mobil m ON k.id_mobil = m.id_mobil
+                            WHERE MONTH(k.start_date) = ? AND YEAR(k.start_date) = ?
+                            ORDER BY k.start_date DESC
                         ");
-                        while($d = mysqli_fetch_array($query_riwayat)):
-                            $durasi = '-';
-                            if ($d['start_date'] && $d['end_date']) {
-                                $start = new DateTime($d['start_date']);
-                                $end = new DateTime($d['end_date']);
-                                $diff = $start->diff($end);
-                                $durasi = $diff->days + 1 . ' hari';
-                            }
-                            
-                            $badge = '';
-                            if ($d['kondisi'] == 'BAIK') {
-                                $badge = 'bg-success';
-                            } else if ($d['kondisi'] == 'DISERVICE') {
-                                $badge = 'bg-warning text-dark';
-                            } else if ($d['kondisi'] == 'RUSAK RINGAN') {
-                                $badge = 'bg-warning';
-                            } else if ($d['kondisi'] == 'RUSAK BERAT') {
-                                $badge = 'bg-danger';
-                            }
+                        mysqli_stmt_bind_param($stmt_riwayat, "ii", $bulan, $tahun);
+                        mysqli_stmt_execute($stmt_riwayat);
+                        mysqli_stmt_bind_result($stmt_riwayat, $r_kondisi, $r_plat, $r_start, $r_end, $r_driver);
+
+                        $riwayat_grouped = [];
+                        while (mysqli_stmt_fetch($stmt_riwayat)) {
+                            $riwayat_grouped[$r_plat]['driver'] = $r_driver;
+                            $riwayat_grouped[$r_plat]['episodes'][] = [
+                                'kondisi' => $r_kondisi,
+                                'start'   => $r_start,
+                                'end'     => $r_end,
+                            ];
+                        }
+                        mysqli_stmt_close($stmt_riwayat);
+
+                        $badge_map = [
+                            'DISERVICE'    => 'bg-warning text-dark',
+                            'RUSAK RINGAN' => 'bg-warning',
+                            'RUSAK BERAT'  => 'bg-danger',
+                        ];
                         ?>
+
+                        <?php if (empty($riwayat_grouped)): ?>
                         <tr>
-                            <td class="fw-bold text-primary"><?= $d['plat_nomor'] ?></td>
-                            <td><?= $d['driver_tetap'] ?></td>
-                            <td><span class="badge <?= $badge ?>"><?= $d['kondisi'] ?></span></td>
-                            <td><?= $d['start_date'] ? date('d-M-Y', strtotime($d['start_date'])) : '-' ?></td>
-                            <td><?= $d['end_date'] ? date('d-M-Y', strtotime($d['end_date'])) : '-' ?></td>
-                            <td><?= $durasi ?></td>
+                            <td colspan="5" class="text-center text-muted py-3">Tidak ada servis yang dimulai pada bulan ini.</td>
                         </tr>
-                        <?php endwhile; ?>
-                        <?php if (mysqli_num_rows($query_riwayat) == 0): ?>
+                        <?php else: foreach ($riwayat_grouped as $plat => $data):
+                            $episodes = $data['episodes'];
+                            $terakhir = $episodes[0];
+                            $aktif_terakhir = is_null($terakhir['end']);
+                            $collapse_id = 'riwayat_' . preg_replace('/[^A-Za-z0-9]/', '', $plat);
+                        ?>
+                        <tr class="riwayat-toggle" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#<?= $collapse_id ?>">
+                            <td class="text-center text-muted"><i class="fas fa-chevron-right toggle-icon"></i></td>
+                            <td class="fw-bold text-primary"><?= htmlspecialchars($plat) ?></td>
+                            <td><?= htmlspecialchars($data['driver']) ?></td>
+                            <td class="text-center"><span class="badge bg-secondary"><?= count($episodes) ?>x</span></td>
+                            <td>
+                                <?= $aktif_terakhir
+                                    ? '<span class="badge bg-warning text-dark">AKTIF</span>'
+                                    : '<span class="badge bg-success">SELESAI</span>' ?>
+                            </td>
+                        </tr>
                         <tr>
-                            <td colspan="6" class="text-center text-muted">Tidak ada data service untuk bulan ini</td>
+                            <td colspan="5" class="p-0 border-0">
+                                <div class="collapse" id="<?= $collapse_id ?>">
+                                    <div class="p-2 ps-4 bg-light">
+                                        <table class="table table-sm mb-0 bg-white">
+                                            <thead class="small text-uppercase">
+                                                <tr>
+                                                    <th>Kondisi</th>
+                                                    <th>Mulai</th>
+                                                    <th>Selesai</th>
+                                                    <th>Durasi</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($episodes as $ep):
+                                                    $aktif = is_null($ep['end']);
+                                                    $durasi = '-';
+                                                    if ($ep['start']) {
+                                                        $start = new DateTime($ep['start']);
+                                                        $sampai = $aktif ? new DateTime() : new DateTime($ep['end']);
+                                                        $durasi = ($start->diff($sampai)->days + 1) . ' hari';
+                                                    }
+                                                    $badge = $badge_map[$ep['kondisi']] ?? 'bg-secondary';
+                                                ?>
+                                                <tr>
+                                                    <td><span class="badge <?= $badge ?>"><?= htmlspecialchars($ep['kondisi']) ?></span></td>
+                                                    <td><?= $ep['start'] ? date('d-M-Y', strtotime($ep['start'])) : '-' ?></td>
+                                                    <td><?= $ep['end'] ? date('d-M-Y', strtotime($ep['end'])) : '-' ?></td>
+                                                    <td><?= $durasi ?></td>
+                                                    <td>
+                                                        <?= $aktif
+                                                            ? '<span class="badge bg-warning text-dark">AKTIF</span>'
+                                                            : '<span class="badge bg-success">SELESAI</span>' ?>
+                                                    </td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </td>
                         </tr>
-                        <?php endif; ?>
+                        <?php endforeach; endif; ?>
                     </tbody>
                 </table>
             </div>
@@ -324,34 +329,30 @@ $tahun = isset($_GET['tahun']) ? $_GET['tahun'] : date('Y');
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// Data untuk grafik status
 <?php
-// Ambil data kondisi
-$query_status = mysqli_query($koneksi, "
-    SELECT k.kondisi, COUNT(DISTINCT k.id_mobil) as total 
-    FROM kondisi_kendaraan k 
-    WHERE k.created_at <= NOW()
-    GROUP BY k.kondisi
-");
-$status_data = [];
-while ($row = mysqli_fetch_assoc($query_status)) {
-    $status_data[$row['kondisi']] = (int)$row['total'];
-}
-// Jika tidak ada data, set default
-if (empty($status_data)) {
-    $status_data['BAIK'] = 0;
-    $status_data['DISERVICE'] = 0;
-    $status_data['RUSAK RINGAN'] = 0;
-    $status_data['RUSAK BERAT'] = 0;
-}
+$status_data = ['BAIK' => 0, 'DISERVICE' => 0, 'RUSAK RINGAN' => 0, 'RUSAK BERAT' => 0];
 
-// Data durasi service terlama
+$q_mobil = mysqli_query($koneksi, "SELECT id_mobil FROM master_mobil");
+$stmt_cek = mysqli_prepare($koneksi,
+    "SELECT kondisi FROM kondisi_kendaraan WHERE id_mobil = ? AND end_date IS NULL ORDER BY start_date DESC LIMIT 1"
+);
+mysqli_stmt_bind_param($stmt_cek, "i", $id_mobil_loop);
+mysqli_stmt_bind_result($stmt_cek, $kondisi_loop);
+
+while ($m = mysqli_fetch_assoc($q_mobil)) {
+    $id_mobil_loop = $m['id_mobil'];
+    mysqli_stmt_execute($stmt_cek);
+    $k = mysqli_stmt_fetch($stmt_cek) ? $kondisi_loop : 'BAIK';
+    if (!isset($status_data[$k])) $k = 'BAIK';
+    $status_data[$k]++;
+}
+mysqli_stmt_close($stmt_cek);
+
 $query_durasi = mysqli_query($koneksi, "
     SELECT k.plat_nomor, k.start_date, k.end_date,
            DATEDIFF(COALESCE(k.end_date, NOW()), k.start_date) as durasi
     FROM kondisi_kendaraan k
     WHERE k.start_date IS NOT NULL
-    AND k.kondisi IN ('DISERVICE', 'RUSAK RINGAN', 'RUSAK BERAT')
     ORDER BY durasi DESC
     LIMIT 10
 ");
@@ -359,22 +360,20 @@ $durasi_labels = [];
 $durasi_values = [];
 while ($row = mysqli_fetch_assoc($query_durasi)) {
     $durasi_labels[] = $row['plat_nomor'];
-    $durasi_values[] = (int)$row['durasi'];
+    $durasi_values[] = (int) $row['durasi'];
 }
 ?>
 
-// Chart Status
-const ctxStatus = document.getElementById('chartStatus').getContext('2d');
-new Chart(ctxStatus, {
+new Chart(document.getElementById('chartStatus').getContext('2d'), {
     type: 'doughnut',
     data: {
         labels: ['BAIK', 'DISERVICE', 'RUSAK RINGAN', 'RUSAK BERAT'],
         datasets: [{
             data: [
-                <?= $status_data['BAIK'] ?? 0 ?>,
-                <?= $status_data['DISERVICE'] ?? 0 ?>,
-                <?= $status_data['RUSAK RINGAN'] ?? 0 ?>,
-                <?= $status_data['RUSAK BERAT'] ?? 0 ?>
+                <?= $status_data['BAIK'] ?>,
+                <?= $status_data['DISERVICE'] ?>,
+                <?= $status_data['RUSAK RINGAN'] ?>,
+                <?= $status_data['RUSAK BERAT'] ?>
             ],
             backgroundColor: ['#28a745', '#ffc107', '#fd7e14', '#dc3545'],
             borderWidth: 2
@@ -382,75 +381,41 @@ new Chart(ctxStatus, {
     },
     options: {
         responsive: true,
-        plugins: {
-            legend: {
-                position: 'bottom'
-            }
-        }
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } }
     }
 });
 
-// Chart Durasi
-const ctxDurasi = document.getElementById('chartDurasi').getContext('2d');
-new Chart(ctxDurasi, {
+new Chart(document.getElementById('chartDurasi').getContext('2d'), {
     type: 'bar',
     data: {
         labels: <?= json_encode($durasi_labels) ?>,
         datasets: [{
-            label: 'Durasi Service (Hari)',
+            label: 'Durasi Servis (Hari)',
             data: <?= json_encode($durasi_values) ?>,
-            backgroundColor: [
-                'rgba(54, 162, 235, 0.7)',
-                'rgba(255, 206, 86, 0.7)',
-                'rgba(255, 99, 132, 0.7)',
-                'rgba(75, 192, 192, 0.7)',
-                'rgba(153, 102, 255, 0.7)'
-            ],
-            borderColor: [
-                'rgba(54, 162, 235, 1)',
-                'rgba(255, 206, 86, 1)',
-                'rgba(255, 99, 132, 1)',
-                'rgba(75, 192, 192, 1)',
-                'rgba(153, 102, 255, 1)'
-            ],
+            backgroundColor: 'rgba(0, 0, 255, 0.6)',
+            borderColor: 'rgba(0, 0, 255, 1)',
             borderWidth: 1
         }]
     },
     options: {
         responsive: true,
-        plugins: {
-            legend: {
-                display: false
-            }
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                title: {
-                    display: true,
-                    text: 'Hari'
-                }
-            }
-        }
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, title: { display: true, text: 'Hari' } } }
     }
 });
 
-// Idle Timer
 let idleTime = 0;
 const maxIdleMinutes = 15;
-
-function resetTimer() {
-    idleTime = 0;
-}
-
+function resetTimer() { idleTime = 0; }
 window.onload = resetTimer;
 document.onmousemove = resetTimer;
 document.onkeypress = resetTimer;
 document.onmousedown = resetTimer;
 document.onclick = resetTimer;
 document.onscroll = resetTimer;
-
-setInterval(function() {
+setInterval(function () {
     idleTime++;
     if (idleTime >= maxIdleMinutes) {
         window.location.href = "http://192.168.31.200/pr_mcp/auth/logout.php?pesan=timeout";

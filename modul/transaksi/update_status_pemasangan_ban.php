@@ -203,26 +203,27 @@ if ($id_po_filter) {
         // Query dengan join ke stok_ban_luar untuk cek status stok
         // DAN join ke pembelian untuk ambil tgl_beli_barang dan id_user_beli
         // SERTA join ke users untuk ambil nama_lengkap dari id_user_beli
-        $detail_items = mysqli_query($koneksi,
-            "SELECT d.*,
-                    b.nama_barang AS nama_master,
-                    m.plat_nomor,
-                    s.id_stok AS stok_id,
-                    s.tgl_transaksi AS tgl_masuk_stok,
-                    s.keterangan AS stok_keterangan,
-                    pb.tgl_beli_barang,
-                    pb.id_user_beli,
-                    u.nama_lengkap AS nama_pembeli
-             FROM tr_request_detail d
-             LEFT JOIN master_barang b ON d.id_barang = b.id_barang
-             LEFT JOIN master_mobil  m ON d.id_mobil  = m.id_mobil
-             LEFT JOIN stok_ban_luar s ON s.id_detail = d.id_detail 
-                AND s.tipe_transaksi = 'MASUK'
-             LEFT JOIN pembelian pb ON pb.id_request_detail = d.id_detail
-             LEFT JOIN users u ON u.id_user = pb.id_user_beli
-             WHERE d.id_request = $id_request_sel
-               AND d.is_ban = 1
-             ORDER BY d.id_detail ASC");
+       $detail_items = mysqli_query($koneksi,
+        "SELECT d.*,
+                b.nama_barang AS nama_master,
+                m.plat_nomor,
+                s.id_stok AS stok_id,
+                s.tgl_transaksi AS tgl_masuk_stok,
+                s.keterangan AS stok_keterangan,
+                pb.tgl_beli_barang,
+                pb.id_user_beli,
+                u.nama_lengkap AS nama_pembeli,
+                d.tgl_terakhir_beli
+        FROM tr_request_detail d
+        LEFT JOIN master_barang b ON d.id_barang = b.id_barang
+        LEFT JOIN master_mobil  m ON d.id_mobil  = m.id_mobil
+        LEFT JOIN stok_ban_luar s ON s.id_detail = d.id_detail 
+            AND s.tipe_transaksi = 'MASUK'
+        LEFT JOIN pembelian pb ON pb.id_request_detail = d.id_detail
+        LEFT JOIN users u ON u.id_user = pb.id_user_beli
+        WHERE d.id_request = $id_request_sel
+        AND d.is_ban = 1
+        ORDER BY d.id_detail ASC");
     }
 }
 
@@ -798,6 +799,7 @@ body {
                             <th>Nama Ban</th>
                             <th width="90">Unit / Plat</th>
                             <th width="75">Qty</th>
+                            <th width="130">Tgl Terakhir Beli</th>  <!-- KOLOM BARU -->
                             <th width="140">Status Beli</th>
                             <th width="160">Status Stok</th>
                             <th width="160">Status Pasang</th>
@@ -807,9 +809,9 @@ body {
                         </tr>
                     </thead>
                     <tbody id="itemTableBody">
-                    <?php if (empty($rows_item)): ?>
+                   <?php if (empty($rows_item)): ?>
                         <tr>
-                            <td colspan="<?= $is_close_view ? 7 : 8 ?>" style="text-align:center;padding:30px;color:var(--slate);">
+                            <td colspan="<?= $is_close_view ? 8 : 9 ?>" style="text-align:center;padding:30px;color:var(--slate);">
                                 <i class="fas fa-minus" style="opacity:.3;"></i> Tidak ada item ban pada PO ini.
                             </td>
                         </tr>
@@ -858,11 +860,22 @@ body {
                                 <span style="color:var(--slate);">—</span>
                                 <?php endif; ?>
                             </td>
-                            <td style="text-align:center;font-weight:800;font-size:.8rem;">
+                          <td style="text-align:center;font-weight:800;font-size:.8rem;">
                                 <?= (float)($d['jumlah'] ?? 0) + 0 ?>
                                 <span style="font-size:.65rem;color:var(--slate);font-weight:500;"><?= htmlspecialchars($d['satuan'] ?? '') ?></span>
                             </td>
-                            <!-- Status Beli - PERBAIKAN: gunakan tgl_beli_barang dan nama_pembeli -->
+                            <!-- Tgl Terakhir Beli - KOLOM BARU -->
+                            <td style="text-align:center;">
+                                <?php if (!empty($d['tgl_terakhir_beli'])): ?>
+                                    <span style="background: #e0e7ff; padding: 2px 8px; border-radius: 4px; font-size: .7rem; font-weight: 600; color: #1e3a8a;">
+                                        <i class="fas fa-calendar-alt me-1"></i>
+                                        <?= date('d/m/Y', strtotime($d['tgl_terakhir_beli'])) ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span style="color:var(--slate);font-size:.65rem;">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <!-- Status Beli -->
                             <td style="text-align:center;">
                                 <?php if ($sudah_beli): ?>
                                     <span class="bdg bdg-done"><i class="fas fa-check me-1"></i>TERBELI</span>

@@ -71,10 +71,16 @@ $where_tgl  = "WHERE tgl_transaksi BETWEEN '$filter_dari' AND '$filter_sampai'";
 $where_tipe = $filter_tipe ? " AND tipe_transaksi = '$filter_tipe'" : '';
 
 // ═══════════════════════════════════════════════════════════════
-// QUERY LAPORAN LOG
+// QUERY LAPORAN LOG - PERBAIKAN COLLATION
 // ═══════════════════════════════════════════════════════════════
 $sql_log = "
-    SELECT s.*, m.plat_nomor AS plat_mobil, m.driver_tetap, m.jenis_kendaraan, m.merk_tipe
+    SELECT s.*, m.plat_nomor AS plat_mobil, m.driver_tetap, m.jenis_kendaraan, m.merk_tipe,
+           (SELECT tgl_terakhir_beli 
+            FROM tr_request_detail 
+            WHERE nama_barang_manual COLLATE utf8mb4_general_ci = s.nama_barang 
+              AND tgl_terakhir_beli IS NOT NULL 
+            ORDER BY tgl_terakhir_beli DESC 
+            LIMIT 1) AS tgl_terakhir_beli
     FROM stok_ban_luar s
     LEFT JOIN master_mobil m ON s.id_mobil = m.id_mobil
     $where_tgl $where_tipe
@@ -103,7 +109,7 @@ $total_keluar = $row_stat['total_keluar'] ?? 0;
 $stok_akhir   = $total_masuk - $total_keluar;
 
 // ═══════════════════════════════════════════════════════════════
-// REKAP STOK PER NAMA BARANG (untuk dropdown keluar stok)
+// REKAP STOK PER NAMA BARANG - PERBAIKAN COLLATION
 // ═══════════════════════════════════════════════════════════════
 $sql_per_nama = "
     SELECT
@@ -111,8 +117,14 @@ $sql_per_nama = "
         COALESCE(SUM(CASE WHEN tipe_transaksi='MASUK'  THEN qty ELSE 0 END), 0) AS s_masuk,
         COALESCE(SUM(CASE WHEN tipe_transaksi='KELUAR' THEN qty ELSE 0 END), 0) AS s_keluar,
         COALESCE(SUM(CASE WHEN tipe_transaksi='MASUK'  THEN qty ELSE 0 END), 0) -
-        COALESCE(SUM(CASE WHEN tipe_transaksi='KELUAR' THEN qty ELSE 0 END), 0) AS s_akhir
-    FROM stok_ban_luar
+        COALESCE(SUM(CASE WHEN tipe_transaksi='KELUAR' THEN qty ELSE 0 END), 0) AS s_akhir,
+        (SELECT tgl_terakhir_beli 
+         FROM tr_request_detail 
+         WHERE nama_barang_manual COLLATE utf8mb4_general_ci = s.nama_barang 
+           AND tgl_terakhir_beli IS NOT NULL 
+         ORDER BY tgl_terakhir_beli DESC 
+         LIMIT 1) AS tgl_terakhir_beli
+    FROM stok_ban_luar s
     GROUP BY nama_barang
     ORDER BY nama_barang ASC
 ";
@@ -122,6 +134,29 @@ while ($r = mysqli_fetch_assoc($res_per_nama)) {
     $list_per_nama[] = $r;
 }
 mysqli_free_result($res_per_nama);
+
+// Hitung selisih hari untuk highlight
+function getTglClass($tgl) {
+    if (empty($tgl)) return 'tgl-badge';
+    $diff_days = (strtotime(date('Y-m-d')) - strtotime($tgl)) / (60 * 60 * 24);
+    if ($diff_days > 180) {
+        return 'tgl-badge danger';
+    } elseif ($diff_days > 90) {
+        return 'tgl-badge warning';
+    }
+    return 'tgl-badge';
+}
+
+function getTglLabel($tgl) {
+    if (empty($tgl)) return '';
+    $diff_days = (strtotime(date('Y-m-d')) - strtotime($tgl)) / (60 * 60 * 24);
+    if ($diff_days > 180) {
+        return '<span class="badge bg-danger ms-1" style="font-size:0.55rem;">LAMA</span>';
+    } elseif ($diff_days > 90) {
+        return '<span class="badge bg-warning text-dark ms-1" style="font-size:0.55rem;">>3BLN</span>';
+    }
+    return '';
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -173,6 +208,29 @@ mysqli_free_result($res_per_nama);
         .stok-ok      { color: #198754; font-weight: 700; }
         .stok-tipis   { color: #856404; font-weight: 700; }
         .stok-kosong  { color: #dc3545; font-weight: 700; }
+
+        /* Style untuk tanggal terakhir beli */
+        .tgl-badge {
+            background: #e0e7ff;
+            padding: 2px 10px;
+            border-radius: 15px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #1e3a8a;
+            white-space: nowrap;
+            display: inline-block;
+        }
+        .tgl-badge i {
+            margin-right: 4px;
+        }
+        .tgl-badge.warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .tgl-badge.danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
 
         /* Modal */
         .modal-header-keluar { background: linear-gradient(135deg,#dc3545,#8b0000); color:#fff; border-radius:12px 12px 0 0; }
@@ -274,7 +332,7 @@ mysqli_free_result($res_per_nama);
     <div class="row g-3 mb-4">
 
         <!-- ═══ REKAP STOK PER NAMA BARANG ═══ -->
-        <div class="col-md-5">
+        <div class="col-md-6">
             <div class="rekap-card card h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -294,19 +352,22 @@ mysqli_free_result($res_per_nama);
                                     <th class="text-center">Masuk</th>
                                     <th class="text-center">Keluar</th>
                                     <th class="text-center">Stok</th>
+                                    <th class="text-center">Tgl Terakhir Beli</th>
                                 </tr>
                             </thead>
                             <tbody class="small">
                             <?php if (empty($list_per_nama)): ?>
-                                <tr><td colspan="4" class="text-center text-muted py-4">
+                                <tr><td colspan="5" class="text-center text-muted py-4">
                                     <i class="fas fa-inbox fa-2x mb-2 d-block"></i>Belum ada data stok ban.
                                 </td></tr>
                             <?php else: ?>
-                                <?php foreach ($list_per_nama as $n): ?>
-                                <?php
+                                <?php foreach ($list_per_nama as $n): 
                                     $cls_stok = 'stok-ok';
                                     if ($n['s_akhir'] <= 0)    $cls_stok = 'stok-kosong';
                                     elseif ($n['s_akhir'] <= 3) $cls_stok = 'stok-tipis';
+                                    
+                                    $tgl_class = getTglClass($n['tgl_terakhir_beli'] ?? null);
+                                    $tgl_label = getTglLabel($n['tgl_terakhir_beli'] ?? null);
                                 ?>
                                 <tr>
                                     <td class="fw-bold text-uppercase" style="font-size:0.75rem;">
@@ -326,6 +387,17 @@ mysqli_free_result($res_per_nama);
                                             <span class="d-block badge bg-warning text-dark" style="font-size:0.6rem;">TIPIS</span>
                                         <?php endif; ?>
                                     </td>
+                                    <td class="text-center">
+                                        <?php if (!empty($n['tgl_terakhir_beli'])): ?>
+                                            <span class="<?= $tgl_class ?>">
+                                                <i class="fas fa-calendar-alt me-1"></i>
+                                                <?= date('d/m/Y', strtotime($n['tgl_terakhir_beli'])) ?>
+                                                <?= $tgl_label ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span style="color:var(--slate);font-size:0.7rem;">—</span>
+                                        <?php endif; ?>
+                                    </td>
                                 </tr>
                                 <?php endforeach; ?>
                             <?php endif; ?>
@@ -337,7 +409,7 @@ mysqli_free_result($res_per_nama);
         </div>
 
         <!-- ═══ FILTER LOG ═══ -->
-        <div class="col-md-7 d-flex flex-column">
+        <div class="col-md-6 d-flex flex-column">
             <div class="filter-bar mb-0 flex-shrink-0">
                 <form method="GET" action="laporan_stok_ban_luar.php" class="row g-2 align-items-end">
                     <div class="col-md-4">
@@ -420,6 +492,7 @@ mysqli_free_result($res_per_nama);
                             <th class="text-center">Tipe</th>
                             <th>No. PR</th>
                             <th>Nama Ban</th>
+                            <th class="text-center">Tgl Terakhir Beli</th>
                             <th class="text-center">Qty</th>
                             <th>Plat / Kendaraan</th>
                             <th>Driver</th>
@@ -436,7 +509,7 @@ mysqli_free_result($res_per_nama);
                             <td></td>
                             <td></td>
                             <td></td>
-                            <td class="text-center text-muted py-5" colspan="1">
+                            <td class="text-center text-muted py-5" colspan="2">
                                 <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
                                 Tidak ada data transaksi pada periode yang dipilih.
                             </td>
@@ -451,6 +524,8 @@ mysqli_free_result($res_per_nama);
                             $tr_cls = ($l['tipe_transaksi'] === 'MASUK') ? 'tr-masuk' : 'tr-keluar';
                             $plat_tampil = $l['plat_nomor'] ?: $l['plat_mobil'] ?: '';
                             $driver_tampil = $l['driver'] ?: $l['driver_tetap'] ?: '-';
+                            $tgl_class = getTglClass($l['tgl_terakhir_beli'] ?? null);
+                            $tgl_label = getTglLabel($l['tgl_terakhir_beli'] ?? null);
                         ?>
                         <tr class="<?= $tr_cls ?>">
                             <td class="text-center text-muted"><?= $no++ ?></td>
@@ -468,6 +543,17 @@ mysqli_free_result($res_per_nama);
                                     : '<span class="text-muted">-</span>' ?>
                             </td>
                             <td class="fw-bold text-uppercase"><?= htmlspecialchars($l['nama_barang']) ?></td>
+                            <td class="text-center">
+                                <?php if (!empty($l['tgl_terakhir_beli'])): ?>
+                                    <span class="<?= $tgl_class ?>">
+                                        <i class="fas fa-calendar-alt me-1"></i>
+                                        <?= date('d/m/Y', strtotime($l['tgl_terakhir_beli'])) ?>
+                                        <?= $tgl_label ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span style="color:var(--slate);font-size:0.7rem;">—</span>
+                                <?php endif; ?>
+                            </td>
                             <td class="text-center fw-bold <?= $l['tipe_transaksi'] === 'MASUK' ? 'text-success' : 'text-danger' ?>">
                                 <?= ($l['tipe_transaksi'] === 'KELUAR' ? '-' : '+') ?>
                                 <?= rtrim(rtrim(number_format($l['qty'], 4, ',', '.'), '0'), ',') ?> pcs
@@ -602,7 +688,7 @@ $(document).ready(function () {
         pageLength : 25,
         language   : { url: '//cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json' },
         order      : [[1, 'desc']],
-        columnDefs : [{ orderable: false, targets: [0, 2, 8] }]
+        columnDefs : [{ orderable: false, targets: [0, 2, 8, 9, 10] }]
     });
 
     // ── Info stok saat pilih nama ban ────────────────────────
