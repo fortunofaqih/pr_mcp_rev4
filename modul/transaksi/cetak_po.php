@@ -122,13 +122,32 @@ while($row = mysqli_fetch_assoc($raw_details)) {
     }
 }
 
+// ── DETEKSI MATA UANG USD BERDASARKAN KETERANGAN DETAIL BARANG ──────────────
+$is_usd = false;
+foreach ($grouped_details as $item) {
+    if (!empty($item['keterangan']) && stripos($item['keterangan'], 'USD') !== false) {
+        $is_usd = true;
+        break;
+    }
+}
+$currency_symbol = $is_usd ? 'USD ' : 'Rp ';
+
 $tgl_po_fmt = (!empty($po['tgl_po']) && $po['tgl_po'] != '-') ? tgl_indo($po['tgl_po']) : '-';
 
+// ── PENYESUAIAN KALKULASI PPN & NOMINAL JIKA USD ─────────────────────────────
 $grand_total = (float)($po['grand_total'] ?? 0);
-$diskon       = (float)($po['diskon'] ?? 0);
-$dpp_setelah_diskon = $grand_total / 1.11;
-$ppn_tampil         = $grand_total - $dpp_setelah_diskon;
-$subtotal_tampil    = $dpp_setelah_diskon + $diskon;
+$diskon      = (float)($po['diskon'] ?? 0);
+
+if ($is_usd) {
+    // Jika USD, PPN 0% / Dihilangkan
+    $ppn_tampil      = 0;
+    $subtotal_tampil = $grand_total + $diskon;
+} else {
+    // Jika Rupiah, tetap gunakan pembagi PPN 11%
+    $dpp_setelah_diskon = $grand_total / 1.11;
+    $ppn_tampil          = $grand_total - $dpp_setelah_diskon;
+    $subtotal_tampil    = $dpp_setelah_diskon + $diskon;
+}
 
 ?>
 <!DOCTYPE html>
@@ -156,7 +175,6 @@ $subtotal_tampil    = $dpp_setelah_diskon + $diskon;
         .kop-header {
             text-align: center;
             margin-bottom: 10px;
-            /* Border dihapus karena sudah ada di gambar PNG */
         }
 
         .img-kop {
@@ -250,12 +268,11 @@ $subtotal_tampil    = $dpp_setelah_diskon + $diskon;
                     <td class="text-center"><?= $no++ ?></td>
                     <td>
                         <strong><?= strtoupper($nama) ?></strong>
-                        
                     </td>
                     <td class="text-center"><?= $qty ?></td>
                     <td class="text-center"><?= $d['satuan'] ?? '-' ?></td>
-                    <td class="text-end"><?= number_format($harga_item, 0, ',', '.') ?></td>
-                    <td class="text-end"><?= number_format($sub_item, 0, ',', '.') ?></td>
+                    <td class="text-end"><?= $is_usd ? number_format($harga_item, 2, '.', ',') : number_format($harga_item, 0, ',', '.') ?></td>
+                    <td class="text-end"><?= $is_usd ? number_format($sub_item, 2, '.', ',') : number_format($sub_item, 0, ',', '.') ?></td>
                 </tr>
                 <?php endforeach; else: ?>
                     <tr><td colspan="6" class="text-center">Tidak ada detail barang</td></tr>
@@ -269,19 +286,29 @@ $subtotal_tampil    = $dpp_setelah_diskon + $diskon;
                         </div>
                     </td>
                     <td class="text-end fw-bold">DPP</td>
-                    <td class="text-end"><?= number_format($subtotal_tampil, 0, ',', '.') ?></td>
+                    <td class="text-end"><?= $is_usd ? number_format($subtotal_tampil, 2, '.', ',') : number_format($subtotal_tampil, 0, ',', '.') ?></td>
                 </tr>
                 <tr>
                     <td class="text-end fw-bold">Discount</td>
-                    <td class="text-end"><?= $diskon > 0 ? '- '.number_format($diskon, 0, ',', '.') : '0' ?></td>
+                    <td class="text-end">
+                        <?php 
+                        if ($diskon > 0) {
+                            echo '- ' . ($is_usd ? number_format($diskon, 2, '.', ',') : number_format($diskon, 0, ',', '.'));
+                        } else {
+                            echo '0';
+                        }
+                        ?>
+                    </td>
                 </tr>
                 <tr>
-                    <td class="text-end fw-bold">PPN 11%</td>
-                    <td class="text-end"><?= number_format($ppn_tampil, 0, ',', '.') ?></td>
+                    <td class="text-end fw-bold">PPN <?= $is_usd ? '0%' : '11%' ?></td>
+                    <td class="text-end"><?= $is_usd ? '0.00' : number_format($ppn_tampil, 0, ',', '.') ?></td>
                 </tr>
                 <tr style="background: #eee;">
                     <td class="text-end fw-bold" style="font-size: 12px;">GRAND TOTAL</td>
-                    <td class="text-end fw-bold" style="font-size: 12px;">Rp <?= number_format($grand_total, 0, ',', '.') ?></td>
+                    <td class="text-end fw-bold" style="font-size: 12px;">
+                        <?= $currency_symbol ?><?= $is_usd ? number_format($grand_total, 2, '.', ',') : number_format($grand_total, 0, ',', '.') ?>
+                    </td>
                 </tr>
             </tbody>
         </table>
@@ -289,7 +316,6 @@ $subtotal_tampil    = $dpp_setelah_diskon + $diskon;
         <table class="ttd-table">
             <tr>
                 <td>
-                    
                     <small>PEMBELI</small>
                     <div class="ttd-space"></div>
                     <div class="ttd-name">PT. Mutiaracahaya Plastindo</div>

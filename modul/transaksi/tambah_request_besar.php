@@ -476,6 +476,7 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
         <span class="alur-arrow">→</span><span class="badge bg-primary">PO OPEN</span>
     </div>
     <div class="mt-1 text-muted" style="font-size:.72rem;">* Manager ke-3 opsional, ditentukan Manager ke-1</div>
+	<div class="mt-1 text-muted" style="font-size:.72rem;">* Jika dalam bentuk mata uang USD maka di "Catatan Detail" ditulis "USD"</div>
 </div>
 
 <!-- ══ HEADER FORM ════════════════════════════════════ -->

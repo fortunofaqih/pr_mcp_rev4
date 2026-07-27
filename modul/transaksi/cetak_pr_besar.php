@@ -33,6 +33,8 @@ if (!$h) {
 
 $id = (int)$h['id_request'];
 
+
+
 // ── 2. GENERATE no_form jika belum ada ───────────────────────────────────────
 if (empty($h['no_form'])) {
     $bulan  = date('m');
@@ -81,6 +83,16 @@ $q = mysqli_query($koneksi,
 while ($d = mysqli_fetch_assoc($q)) { 
     $items[] = $d; 
 }
+
+// ── Taruh Logika Deteksi Mata Uang di Sini (Tepat setelah loop while selesai) ──
+$is_usd = false;
+foreach ($items as $item) {
+    if (!empty($item['keterangan']) && stripos($item['keterangan'], 'USD') !== false) {
+        $is_usd = true;
+        break; 
+    }
+}
+$currency_symbol = $is_usd ? 'USD ' : 'Rp ';
 
 // ── 4. AMBIL NAMA LENGKAP APPROVER ───────────────────────────────────────────
 function getApproverData($koneksi, $username) {
@@ -265,7 +277,6 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
         <td width="30%" style="text-align:center;">ADMIN: <?= strtoupper(htmlspecialchars($h['nama_pemesan'])) ?></td>
         <td width="30%" style="text-align:right;">TGL: <?= date('d/m/Y', strtotime($h['tgl_request'])) ?></td>
     </tr>
-    <!-- TAMBAHAN: Baris untuk Nama Pembeli -->
     <tr>
         <td colspan="3" style="text-align:center; font-weight:normal; padding-top:2px; border-top:0.5px dashed #ccc;">
             <span style="font-weight:bold;">PEMBELI:</span> <?= !empty($h['nama_pembeli']) ? strtoupper(htmlspecialchars($h['nama_pembeli'])) : '<span style="color:#999;">(belum diisi)</span>' ?>
@@ -299,7 +310,6 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
         <?php
         $grand_total = 0;
         foreach ($items as $i => $d):
-            // Fallback: Jika data sudah diverifikasi gudang, gunakan nama final & qty final. Satuan tetap ikut tr_request_detail.
             if (!empty($d['nama_barang_final'])) {
                 $nama = $d['nama_barang_final'];
                 $qty_tampil = (float)$d['qty_final'];
@@ -308,11 +318,15 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
                 $qty_tampil = (float)$d['jumlah'];
             }
 
-            $satuan_tampil = $d['satuan']; // Karena tabel pembelian tidak punya kolom satuan, ikut satuan asal
+            $satuan_tampil = $d['satuan'];
             $supplier = !empty($d['supplier_names']) ? $d['supplier_names'] : '-';
             $harga    = (float)($d['harga_satuan_estimasi'] ?? 0);
             $subtotal = (float)($d['subtotal_estimasi']    ?? 0);
             $grand_total += $subtotal;
+            
+            // Format angka tabel: Jika USD pakai format US (, dan .), jika IDR pakai format ID (. dan ,)
+            $formatted_harga = $is_usd ? number_format($harga, 2, '.', ',') : number_format($harga, 0, ',', '.');
+            $formatted_subtotal = $is_usd ? number_format($subtotal, 2, '.', ',') : number_format($subtotal, 0, ',', '.');
         ?>
         <tr>
             <td style="text-align:center;"><?= $i + 1 ?></td>
@@ -330,16 +344,16 @@ $warna_badge   = $is_it ? '#1e40af' : '#1e3a8a';
             </td>
             <td style="text-align:center; font-size:6.5pt; font-weight:bold;"><?= htmlspecialchars($d['tipe_request']) ?></td>
             <td style="text-align:center;"><b><?= $qty_tampil ?></b> <?= htmlspecialchars($satuan_tampil) ?></td>
-            <td style="text-align:right;"><?= number_format($harga, 0, ',', '.') ?></td>
-            <td style="text-align:right; font-weight:bold;"><?= number_format($subtotal, 0, ',', '.') ?></td>
+            <td style="text-align:right;"><?= $formatted_harga ?></td>
+            <td style="text-align:right; font-weight:bold;"><?= $formatted_subtotal ?></td>
             <td style="font-size:7pt;"><?= htmlspecialchars($d['keterangan'] ?: '-') ?></td>
         </tr>
         <?php endforeach; ?>
 
-        <tr>
+      <tr>
             <td colspan="8" style="text-align:right; font-weight:bold; background:#f8fafc;">GRAND TOTAL ESTIMASI :</td>
             <td style="text-align:right; font-weight:bold; background:#f8fafc; color:<?= $warna_badge ?>;">
-                Rp <?= number_format($grand_total, 0, ',', '.') ?>
+                <?= $currency_symbol ?><?= $is_usd ? number_format($grand_total, 2, '.', ',') : number_format($grand_total, 0, ',', '.') ?>
             </td>
             <td style="background:#f8fafc;"></td>
         </tr>
