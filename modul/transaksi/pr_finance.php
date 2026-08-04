@@ -46,6 +46,22 @@ if ($_SESSION['status'] != "login") {
             border-color: #0000FF;
             box-shadow: 0 0 0 2px rgba(0,0,255,0.15);
         }
+        
+        /* Tombol Edit khusus untuk Finance */
+        .btn-edit-finance {
+            background: #ffc107;
+            color: #000;
+            transition: all 0.2s;
+            font-weight: 700;
+        }
+        .btn-edit-finance:hover {
+            background: #e0a800;
+            color: #000;
+            transform: scale(1.05);
+        }
+        .btn-edit-finance i {
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body class="pb-5">
@@ -286,6 +302,19 @@ if ($_SESSION['status'] != "login") {
                                     <i class="fas fa-eye"></i>
                                 </button>
                         
+                                <!-- ========================================================= -->
+                                <!-- EDIT - KHUSUS PR BESAR (TANPA BATASAN STATUS)             -->
+                                <!-- TAMPIL UNTUK SEMUA PR BESAR, TERMASUK YANG SUDAH APPROVE -->
+                                <!-- ========================================================= -->
+                                <!-- EDIT - KHUSUS PR BESAR (FINANCE) -->
+                                <?php if ($row['kategori_pr'] == 'BESAR'): ?>
+                                    <a href="edit_request_besar_finance.php?id=<?= $row['id_request'] ?>" 
+                                    class="btn btn-sm btn-warning" 
+                                    title="Edit PR Besar (Finance - Hanya Catatan PO)">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </a>
+                                <?php endif; ?>
+
                                 <!-- Cetak PO — barang besar yang sudah melewati tahap approval -->
                                 <?php if ($row['kategori_pr'] == 'BESAR' && !in_array($row['status_approval'], ['MENUNGGU APPROVAL', 'APPROVED 1', 'APPROVED 2', 'DITOLAK', ''])): ?>
                                     <a href="cetak_po.php?id_request=<?= $row['id_request'] ?>"
@@ -304,28 +333,32 @@ if ($_SESSION['status'] != "login") {
                                 <?php endif; ?>
                         
                                 <!-- Cetak PR (semua PR) -->
-                                <!--<a href="cetak_pr.php?id=<?= $row['id_request'] ?>"
+                                <?php
+                                // 1. Logika penentuan file cetak
+                                $is_pr_besar = (
+                                    $row['kategori_pr'] === 'BESAR' || 
+                                    strpos($row['no_request'] ?? '', 'PRB') === 0 || 
+                                    strpos($row['no_request'] ?? '', 'PRI') === 0
+                                );
+                                $file_cetak = $is_pr_besar ? 'cetak_pr_besar.php' : 'cetak_pr.php';
+
+                                // 2. Logika styling & label (BESAR atau IT)
+                                $is_besar_or_it = in_array($row['kategori_pr'] ?? '', ['BESAR', 'IT'], true);
+
+                                $btn_class   = $is_besar_or_it ? 'btn-danger' : 'btn-info text-white';
+                                $btn_title   = $is_besar_or_it ? 'Cetak PR Besar (QR)' : 'Cetak PR Kecil';
+                                $show_qr     = $is_besar_or_it;
+                                ?>
+
+                                <a href="<?= htmlspecialchars($file_cetak) ?>?id=<?= urlencode($row['id_request'] ?? '') ?>"
                                 target="_blank"
-                                class="btn btn-sm btn-info text-white"
-                                title="Cetak PR">
+                                class="btn btn-sm <?= $btn_class ?>"
+                                title="<?= htmlspecialchars($btn_title) ?>">
                                     <i class="fas fa-print"></i>
-                                </a>-->
-								 <?php
-								$file_cetak = ($row['kategori_pr'] === 'BESAR' || strpos($row['no_request'], 'PRB') === 0)
-											  ? 'cetak_pr_besar.php'
-											  : 'cetak_pr.php';
-								?>
-								<a href="<?= $file_cetak ?>?id=<?= $row['id_request'] ?>"
-								   target="_blank"
-								   class="btn btn-sm <?= $row['kategori_pr'] === 'BESAR' ? 'btn-danger' : 'btn-info text-white' ?>"
-								   title="Cetak PR <?= $row['kategori_pr'] === 'BESAR' ? 'Besar (QR)' : 'Kecil' ?>">
-									<i class="fas fa-print"></i>
-									<?php if ($row['kategori_pr'] === 'BESAR'): ?>
-										<i class="fas fa-qrcode ms-1" style="font-size:.6rem;opacity:.8;"></i>
-									<?php endif; ?>
-								</a>
-                        
-                          
+                                    <?php if ($show_qr): ?>
+                                        <i class="fas fa-qrcode ms-1" style="font-size:.6rem;opacity:.8;"></i>
+                                    <?php endif; ?>
+                                </a>
                         
                             </div>
                         </td>
@@ -402,29 +435,49 @@ $(document).ready(function () {
         destroy     : true,
         pageLength  : 10,
         order       : [[0, 'asc']],
-        language    : { url: '//cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json' },
+        // ============================================================
+        // FIX CORS ERROR: Gunakan opsi language bawaan tanpa external file
+        // ============================================================
+        language    : {
+            "emptyTable": "Tidak ada data yang tersedia",
+            "info": "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
+            "infoEmpty": "Menampilkan 0 sampai 0 dari 0 data",
+            "infoFiltered": "(disaring dari _MAX_ total data)",
+            "lengthMenu": "Tampilkan _MENU_ data",
+            "loadingRecords": "Memuat...",
+            "processing": "Memproses...",
+            "search": "Cari:",
+            "zeroRecords": "Tidak ditemukan data yang cocok",
+            "paginate": {
+                "first": "Pertama",
+                "last": "Terakhir",
+                "next": "Selanjutnya",
+                "previous": "Sebelumnya"
+            },
+            "aria": {
+                "sortAscending": ": aktifkan untuk mengurutkan kolom ascending",
+                "sortDescending": ": aktifkan untuk mengurutkan kolom descending"
+            }
+        },
         columnDefs  : [
             { orderable: false, targets: [4, 5, 6] }
         ]
     });
 
     // ── 2. Filter Dropdown Status ────────────────────────────────
-    // Pakai custom search function berdasarkan data-status di <tr>.
-    // Ini lebih andal karena tidak terpengaruh oleh teks badge lain
-    // (nama pembeli, "BELUM DISET", dll) yang ada dalam <td> yang sama.
     $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
         const pilihan = $('#filterStatus').val();
-        if (!pilihan) return true; // Kosong = tampilkan semua
+        if (!pilihan) return true;
         const statusRow = $(table.row(dataIndex).node()).data('status') || '';
         return statusRow === pilihan;
     });
 
     $('#filterStatus').on('click', function (e) {
-        e.stopPropagation(); // Cegah klik dropdown memicu sort kolom
+        e.stopPropagation();
     });
 
     $('#filterStatus').on('change', function () {
-        table.draw(); // Cukup redraw, custom search di atas yang menyaring
+        table.draw();
     });
 
     // ── 3. Event Delegation untuk tombol detail ──────────────────
@@ -463,8 +516,7 @@ $(document).ready(function () {
         Swal.fire({ icon: 'error', title: 'GAGAL!', text: 'Terjadi kesalahan sistem saat menyimpan data.', confirmButtonColor: '#d33' });
     } else if (pesan === 'update_sukses') {
         Swal.fire({ icon: 'success', title: 'BERHASIL!', text: 'Data request berhasil diperbarui.', confirmButtonColor: '#0000FF' });
-    
-     } else if (pesan === 'revisi_berhasil') {
+    } else if (pesan === 'revisi_berhasil') {
         Swal.fire({
             icon: 'success',
             title: 'Revisi Berhasil!',
@@ -498,16 +550,13 @@ $(document).ready(function () {
 </script>
 <script>
     let idleTime = 0;
-    const maxIdleMinutes = 15; // Samakan dengan server
+    const maxIdleMinutes = 15;
     let lastServerUpdate = Date.now();
     let sessionValid = true;
 
-    // Fungsi reset timer saat ada gerakan
     function resetTimer() {
         idleTime = 0;
         let now = Date.now();
-
-        // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
         if (now - lastServerUpdate > 300000) {
             fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
                 .then(response => response.json())
@@ -524,14 +573,11 @@ $(document).ready(function () {
         }
     }
 
-    // Fungsi paksa logout
     function forceLogout() {
         alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
-        // Redirect ke logout.php agar session server juga dihancurkan
         window.location.href = "http://192.168.31.200/pr_mcp/auth/logout.php?pesan=timeout";
     }
 
-    // Pantau aktivitas user
     window.onload = resetTimer;
     document.onmousemove = resetTimer;
     document.onkeypress = resetTimer;
@@ -539,10 +585,8 @@ $(document).ready(function () {
     document.onclick = resetTimer;
     document.onscroll = resetTimer;
 
-    // Cek status idle setiap 1 menit
     setInterval(function() {
         idleTime++;
-        // Cek session ke server juga
         fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
             .then(response => response.json())
             .then(data => {
@@ -551,9 +595,7 @@ $(document).ready(function () {
                     forceLogout();
                 }
             })
-            .catch(err => {
-                // Jika error koneksi, biarkan user tetap di halaman
-            });
+            .catch(err => {});
         if (idleTime >= maxIdleMinutes && sessionValid) {
             forceLogout();
         }
