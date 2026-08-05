@@ -155,7 +155,6 @@ body { background: var(--bg); font-size: .85rem; -webkit-text-size-adjust: 100%;
     -webkit-overflow-scrolling: touch;
     border-radius: 8px;
     border: 1px solid #dee2e6;
-    /* Hint scroll di mobile */
     background:
         linear-gradient(to right,  white 30%, rgba(255,255,255,0)),
         linear-gradient(to left,   white 30%, rgba(255,255,255,0)) 100% 0,
@@ -166,7 +165,6 @@ body { background: var(--bg); font-size: .85rem; -webkit-text-size-adjust: 100%;
     background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
     background-attachment: local, local, scroll, scroll;
 }
-/* Badge scroll hint — tampil hanya di layar kecil */
 .scroll-hint {
     display: none;
     font-size: .7rem;
@@ -179,7 +177,7 @@ body { background: var(--bg); font-size: .85rem; -webkit-text-size-adjust: 100%;
 }
 
 .table-input {
-    min-width: 1600px;
+    min-width: 1730px;
     table-layout: fixed;
     margin-bottom: 0;
 }
@@ -198,6 +196,7 @@ body { background: var(--bg); font-size: .85rem; -webkit-text-size-adjust: 100%;
 .col-sat  { width: 95px; }
 .col-hrg  { width: 125px; }
 .col-tot  { width: 125px; }
+.col-ppn  { width: 130px; }
 .col-ket  { width: 220px; }
 .col-ban  { width: 60px; }
 .col-aks  { width: 44px; }
@@ -315,98 +314,6 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
 }
 
 /* ═══════════════════════════════════════════
-   RESPONSIVE — TABLET (≤768px)
-═══════════════════════════════════════════ */
-@media (max-width: 767.98px) {
-
-    .po-section { 
-        padding: 15px; 
-        margin-top: 15px;
-    }
-    
-    /* Berikan jarak antar kolom input di PO Section agar tidak menumpuk */
-    .po-section .row > div {
-        margin-bottom: 10px;
-    }
-
-    body { font-size: .82rem; }
-
-    /* Padding lebih rapat di mobile */
-    .card-body { padding: 14px !important; }
-    .po-section { padding: 14px; }
-    .card-footer { padding: 12px 14px; }
-
-    /* Header lebih kompak */
-    .page-header { padding: 12px 14px; border-radius: 10px 10px 0 0; }
-    .page-header h5 { font-size: .88rem; }
-    .page-header .btn { font-size: .75rem; padding: 4px 10px; }
-
-    /* Alur badge bisa wrap lebih bebas */
-    .alur-badge-wrap { gap: 4px; font-size: .7rem; }
-
-    /* Input lebih besar agar mudah disentuh */
-    .form-control, .form-select, .form-control-sm, .form-select-sm {
-        min-height: 38px !important;
-        font-size: .82rem !important;
-    }
-
-    /* Grand total full width di mobile */
-   .total-box {
-    background: white;
-    border-radius: 10px;
-    border: 1px solid #dee2e6;
-    padding: 14px 16px;
-    margin-bottom: 1.5rem; /* Tambahkan jarak bawah agar tidak menutupi elemen lain */
-}
-    .total-box .grand-value { font-size: 1.15rem; }
-    .grand-po-box {
-    background: var(--blue);
-    color: white;
-    border-radius: 10px;
-    padding: 14px 18px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-height: 80px;
-    margin-bottom: 1rem; /* Jarak aman untuk layar mobile */
-}
-
-    /* Footer tombol stack */
-    .card-footer {
-        flex-direction: column;
-        gap: 10px;
-        align-items: stretch !important;
-    }
-    .card-footer .text-muted { font-size: .7rem; text-align: center; }
-    .card-footer .btn {
-        width: 100%;
-        justify-content: center;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }
-    .card-footer > div:last-child {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        width: 100%;
-    }
-
-    /* PO section grand total full width */
-    .grand-po-box { margin-top: 8px; }
-}
-
-/* ═══════════════════════════════════════════
-   RESPONSIVE — MOBILE KECIL (≤480px)
-═══════════════════════════════════════════ */
-@media (max-width: 479.98px) {
-    .container-fluid { padding-left: 10px !important; padding-right: 10px !important; }
-    body { padding-top: 10px !important; padding-bottom: 10px !important; }
-    .info-alert { font-size: .72rem; padding: 8px 10px; }
-    .page-header h5 { font-size: .82rem; }
-    .page-header small { display: none; } /* Sembunyikan subtitle di HP kecil */
-}
-/* ═══════════════════════════════════════════
    TANGGAL TERAKHIR BELI BAN
 ═══════════════════════════════════════════ */
 .tgl-ban-wrap {
@@ -431,6 +338,91 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
     display: block;
     margin-bottom: 2px;
 }
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE — TABLET (≤768px)
+═══════════════════════════════════════════ */
+@media (max-width: 767.98px) {
+
+    .po-section { 
+        padding: 15px; 
+        margin-top: 15px;
+    }
+    
+    .po-section .row > div {
+        margin-bottom: 10px;
+    }
+
+    body { font-size: .82rem; }
+
+    .card-body { padding: 14px !important; }
+    .po-section { padding: 14px; }
+    .card-footer { padding: 12px 14px; }
+
+    .page-header { padding: 12px 14px; border-radius: 10px 10px 0 0; }
+    .page-header h5 { font-size: .88rem; }
+    .page-header .btn { font-size: .75rem; padding: 4px 10px; }
+
+    .alur-badge-wrap { gap: 4px; font-size: .7rem; }
+
+    .form-control, .form-select, .form-control-sm, .form-select-sm {
+        min-height: 38px !important;
+        font-size: .82rem !important;
+    }
+
+    .total-box {
+        background: white;
+        border-radius: 10px;
+        border: 1px solid #dee2e6;
+        padding: 14px 16px;
+        margin-bottom: 1.5rem;
+    }
+    .total-box .grand-value { font-size: 1.15rem; }
+    .grand-po-box {
+        background: var(--blue);
+        color: white;
+        border-radius: 10px;
+        padding: 14px 18px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: 80px;
+        margin-bottom: 1rem;
+    }
+
+    .card-footer {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch !important;
+    }
+    .card-footer .text-muted { font-size: .7rem; text-align: center; }
+    .card-footer .btn {
+        width: 100%;
+        justify-content: center;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .card-footer > div:last-child {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .grand-po-box { margin-top: 8px; }
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE — MOBILE KECIL (≤480px)
+═══════════════════════════════════════════ */
+@media (max-width: 479.98px) {
+    .container-fluid { padding-left: 10px !important; padding-right: 10px !important; }
+    body { padding-top: 10px !important; padding-bottom: 10px !important; }
+    .info-alert { font-size: .72rem; padding: 8px 10px; }
+    .page-header h5 { font-size: .82rem; }
+    .page-header small { display: none; }
+}
 </style>
 </head>
 <body class="py-3 py-md-4">
@@ -445,19 +437,15 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
             <h5><i class="fas fa-boxes-stacked me-2"></i>PURCHASE REQUEST — BARANG BESAR / INVESTASI</h5>
             <small class="opacity-75">Pengajuan ini memerlukan persetujuan minimal 2 Manager sebelum PO diterbitkan</small>
         </div>
-            <!-- TAMBAHKAN INI -->
-             <div class="flex-shrink-0 fw-bold gap-1 fw-bold">
-                <a href="../../ganti_password.php" class="btn btn-warning btn-sm ">
-                    <i class="fas fa-key me-1"></i> GANTI PASSWORD
-                </a>
-                <a href="pr.php" class="btn btn-sm btn-danger ">
-                     <i class="fas fa-rotate-left me-1"></i><span class="d-none d-sm-inline">KEMBALI</span>
-                </a>
-             </div>
-            
-            
+        <div class="flex-shrink-0 fw-bold gap-1 fw-bold">
+            <a href="../../ganti_password.php" class="btn btn-warning btn-sm ">
+                <i class="fas fa-key me-1"></i> GANTI PASSWORD
+            </a>
+            <a href="pr.php" class="btn btn-sm btn-danger ">
+                <i class="fas fa-rotate-left me-1"></i><span class="d-none d-sm-inline">KEMBALI</span>
+            </a>
+        </div>
     </div>
-    
 </div>
 
 <div class="card-body p-3 p-md-4">
@@ -476,7 +464,7 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
         <span class="alur-arrow">→</span><span class="badge bg-primary">PO OPEN</span>
     </div>
     <div class="mt-1 text-muted" style="font-size:.72rem;">* Manager ke-3 opsional, ditentukan Manager ke-1</div>
-	<div class="mt-1 text-muted" style="font-size:.72rem;">* Jika dalam bentuk mata uang USD maka di "Catatan Detail" ditulis "USD"</div>
+    <div class="mt-1 text-muted" style="font-size:.72rem;">* Jika dalam bentuk mata uang USD maka di "Catatan Detail" ditulis "USD"</div>
 </div>
 
 <!-- ══ HEADER FORM ════════════════════════════════════ -->
@@ -549,6 +537,7 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
         <th class="col-sat">Satuan</th>
         <th class="col-hrg">Harga Est. (Rp)</th>
         <th class="col-tot">Total (Rp)</th>
+        <th class="col-ppn">Status PPN</th> <!-- HELPER UNTUK CATATAN -->
         <th class="col-ket">Catatan Detail</th>
         <th class="col-ban" title="Centang jika item adalah BAN kendaraan">
             <i class="fas fa-circle text-warning me-1" style="font-size:.55rem;"></i>BAN?
@@ -575,28 +564,35 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
         </select>
     </td>
     <td><input type="number" name="jumlah[]" class="form-control form-control-sm input-qty text-center" step="0.01" min="0.01" value="1" required></td>
-    <td><input type="text" name="satuan[]" 
-           class="form-control form-control-sm input-satuan-readonly bg-light" 
-           placeholder="Otomatis..." readonly>
-	</td>
+    <td><input type="text" name="satuan[]" class="form-control form-control-sm input-satuan-readonly bg-light" placeholder="Otomatis..." readonly></td>
     <td><input type="number" name="harga[]" class="form-control form-control-sm input-harga text-end" placeholder="0" min="0" step="1"></td>
     <td><input type="text" class="form-control form-control-sm input-subtotal text-end bg-light fw-bold" value="0" readonly tabindex="-1"></td>
+    
+    <!-- KOLOM STATUS PPN (HELPER UNTUK CATATAN) -->
+    <td>
+        <select name="ppn_status_item[]" class="form-select form-select-sm select-ppn-item" required>
+            <option value="">-- Pilih --</option>
+            <option value="Include PPN">Include PPN</option>
+            <option value="Exclude PPN">Exclude PPN</option>
+            s
+        </select>
+        <small class="text-muted" style="font-size:.6rem;">Akan masuk ke catatan</small>
+    </td>
+    
     <td><textarea name="keterangan_item[]" class="form-control form-control-sm input-keterangan" rows="1" placeholder="Spesifikasi mendalam..." required></textarea></td>
     <td>
-    <div class="ban-check-wrap">
-        <div class="text-center">
-            <input type="checkbox" name="is_ban[]" value="1" class="chk-ban" title="Centang jika item ini adalah BAN kendaraan">
-            <div class="ban-badge d-none ban-label">BAN</div>
-            <!-- TAMBAHAN: Input tanggal terakhir beli ban -->
-            <div class="tgl-ban-wrap">
-                <label><i class="fas fa-calendar-alt me-1"></i>Terakhir Beli</label>
-                <input type="date" name="tgl_terakhir_beli_ban[]" class="form-control form-control-sm tgl-terakhir-beli-ban" 
-                       placeholder="dd/mm/yyyy" data-format="dd/mm/yyyy">
+        <div class="ban-check-wrap">
+            <div class="text-center">
+                <input type="checkbox" name="is_ban[]" value="1" class="chk-ban" title="Centang jika item ini adalah BAN kendaraan">
+                <div class="ban-badge d-none ban-label">BAN</div>
+                <div class="tgl-ban-wrap">
+                    <label><i class="fas fa-calendar-alt me-1"></i>Terakhir Beli</label>
+                    <input type="date" name="tgl_terakhir_beli_ban[]" class="form-control form-control-sm tgl-terakhir-beli-ban" placeholder="dd/mm/yyyy" data-format="dd/mm/yyyy">
+                </div>
             </div>
         </div>
-    </div>
-    <input type="hidden" name="is_ban_val[]" class="input-is-ban-val" value="0">
-</td>
+        <input type="hidden" name="is_ban_val[]" class="input-is-ban-val" value="0">
+    </td>
     <td class="text-center">
         <button type="button" class="btn btn-sm btn-outline-danger remove-row border-0">
             <i class="fas fa-times"></i>
@@ -646,11 +642,6 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
                     </option>
                 <?php endforeach; ?>
             </select>
-            <!--<small>
-                <a href="master_supplier.php" target="_blank" class="text-decoration-none text-muted">
-                    <i class="fas fa-plus-circle me-1"></i>Tambah supplier baru
-                </a>
-            </small>-->
         </div>
         <div class="col-6 col-md-3">
             <div class="section-label">Tanggal PO <span class="text-danger">*</span></div>
@@ -666,7 +657,7 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
         </div>
     </div>
 
-    <div class="row g-3  mb-3">
+    <div class="row g-3 mb-3">
         <div class="col-6 col-md-3">
             <div class="section-label">Diskon (Rp)</div>
             <input type="number" name="diskon" id="inputDiskon" class="form-control form-control-sm" value="0" min="0">
@@ -697,22 +688,22 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
             echo "3. Nomor invoice dicantumkan di referensi faktur pajak\n";
             echo "4. Lain-lain : -"; 
         ?></textarea>
-                  <div class="mt-3">
-                <div class="section-label">
-                    Lampiran Penawaran Supplier 
-                    <span class="text-muted fw-normal">(Opsional — PDF, maks. 5MB)</span>
-                </div>
-                <input type="file" 
-                    name="file_penawaran" 
-                    id="filePenawaran"
-                    class="form-control form-control-sm" 
-                    accept=".pdf"
-                    style="text-transform:none;">
-                <small class="text-muted">
-                     <i class="fas fa-file-pdf text-danger me-1"></i>
-                    Format: PDF saja. Contoh: scan penawaran harga, quotation, dll.
-                </small>
+        <div class="mt-3">
+            <div class="section-label">
+                Lampiran Penawaran Supplier 
+                <span class="text-muted fw-normal">(Opsional — PDF, maks. 5MB)</span>
             </div>
+            <input type="file" 
+                name="file_penawaran" 
+                id="filePenawaran"
+                class="form-control form-control-sm" 
+                accept=".pdf"
+                style="text-transform:none;">
+            <small class="text-muted">
+                <i class="fas fa-file-pdf text-danger me-1"></i>
+                Format: PDF saja. Contoh: scan penawaran harga, quotation, dll.
+            </small>
+        </div>
     </div>
 </div>
 </div>
@@ -749,21 +740,18 @@ var OPSI_KATEGORI = <?= json_encode($html_opsi_kategori) ?>;
 <script>
 $(document).ready(function(){
 
-		function initSelect2(ctx){
-            var $c = ctx ? $(ctx) : $(document);
-            // Pastikan hanya elemen select yang benar-benar butuh pencarian yang ada di sini
-            $c.find('.select-barang,.select-mobil,.select-tipe,.select-pembeli,.select-supplier').each(function(){
-                if(!$(this).hasClass('select2-hidden-accessible')){
-                    $(this).select2({ theme:'bootstrap-5', width:'100%' });
-                }
-            });
-            
-            // Inisialisasi datepicker untuk input tanggal di row baru
-            $c.find('.tgl-terakhir-beli-ban').each(function() {
-                // Jika menggunakan flatpickr atau datepicker bawaan
-                // Kita gunakan input type date saja, cukup set atribut
-            });
-        }
+    function initSelect2(ctx){
+        var $c = ctx ? $(ctx) : $(document);
+        $c.find('.select-barang,.select-mobil,.select-tipe,.select-pembeli,.select-supplier,.select-ppn-item').each(function(){
+            if(!$(this).hasClass('select2-hidden-accessible')){
+                $(this).select2({ theme:'bootstrap-5', width:'100%' });
+            }
+        });
+        
+        $c.find('.tgl-terakhir-beli-ban').each(function() {
+            // Input type date sudah cukup
+        });
+    }
     initSelect2();
 
     function rp(n){ return 'Rp ' + parseFloat(n||0).toLocaleString('id-ID'); }
@@ -797,68 +785,99 @@ $(document).ready(function(){
         });
     }
 
-   // ── Checkbox BAN ────────────────────────────────────────
-        $(document).on('change', '.chk-ban', function(){
-            var row     = $(this).closest('tr');
-            var checked = $(this).is(':checked');
-            row.find('.input-is-ban-val').val(checked ? '1' : '0');
-            row.find('.ban-label').toggleClass('d-none', !checked);
+    // ── Checkbox BAN ────────────────────────────────────────
+    $(document).on('change', '.chk-ban', function(){
+        var row     = $(this).closest('tr');
+        var checked = $(this).is(':checked');
+        row.find('.input-is-ban-val').val(checked ? '1' : '0');
+        row.find('.ban-label').toggleClass('d-none', !checked);
+        
+        var tglWrap = row.find('.tgl-ban-wrap');
+        if(checked){
+            tglWrap.addClass('show');
+            var today = new Date().toISOString().split('T')[0];
+            row.find('.tgl-terakhir-beli-ban').val(today);
             
-            // TAMPILKAN/SEMBUNYIKAN INPUT TANGGAL TERAKHIR BELI BAN
-            var tglWrap = row.find('.tgl-ban-wrap');
-            if(checked){
-                tglWrap.addClass('show');
-                // Set default tanggal ke hari ini
-                var today = new Date().toISOString().split('T')[0];
-                row.find('.tgl-terakhir-beli-ban').val(today);
-                
-                var mobil = row.find('.select-mobil').val();
-                if(!mobil || mobil == '0'){
-                    Swal.fire({
-                        icon: 'info', title: 'Perhatian',
-                        text: 'Item ini ditandai sebagai BAN. Pastikan kolom Unit/Mobil diisi dengan plat nomor kendaraan.',
-                        confirmButtonColor: '#dc3545', timer: 4000
-                    });
-                    row.find('.select-mobil').next('.select2-container').find('.select2-selection')
-                    .css('border','2px solid #ffc107');
-                }
-            } else {
-                tglWrap.removeClass('show');
-                row.find('.tgl-terakhir-beli-ban').val('');
-                row.find('.select-mobil').next('.select2-container').find('.select2-selection').css('border','');
+            var mobil = row.find('.select-mobil').val();
+            if(!mobil || mobil == '0'){
+                Swal.fire({
+                    icon: 'info', title: 'Perhatian',
+                    text: 'Item ini ditandai sebagai BAN. Pastikan kolom Unit/Mobil diisi dengan plat nomor kendaraan.',
+                    confirmButtonColor: '#dc3545', timer: 4000
+                });
+                row.find('.select-mobil').next('.select2-container').find('.select2-selection')
+                .css('border','2px solid #ffc107');
             }
-        });
-   // ── Pilih barang → auto-fill ──────────────────────────
-		$(document).on('change', '.select-barang', function(){
-		var row = $(this).closest('tr'), 
-			sel = $(this).find(':selected');
-		
-		// Ambil data dari atribut data- master_barang
-		var nama     = sel.data('nama') || '';
-		var merk     = sel.data('merk') || '';
-		var kategori = sel.data('kategori') || '';
-		var satuan   = sel.data('satuan') || '';
-		var harga    = sel.data('harga') || 0;
+        } else {
+            tglWrap.removeClass('show');
+            row.find('.tgl-terakhir-beli-ban').val('');
+            row.find('.select-mobil').next('.select2-container').find('.select2-selection').css('border','');
+        }
+    });
 
-		// Masukkan ke input masing-masing
-		row.find('.input-nama-barang').val(nama);
-		row.find('.input-kategori-readonly').val(kategori);
-		row.find('.input-kwalifikasi').val(merk);
-		row.find('.input-satuan-readonly').val(satuan); // Isi Satuan Otomatis
-		row.find('.input-harga').val(harga);
+    // ── Pilih barang → auto-fill ──────────────────────────
+    $(document).on('change', '.select-barang', function(){
+        var row = $(this).closest('tr'), 
+            sel = $(this).find(':selected');
+        
+        var nama     = sel.data('nama') || '';
+        var merk     = sel.data('merk') || '';
+        var kategori = sel.data('kategori') || '';
+        var satuan   = sel.data('satuan') || '';
+        var harga    = sel.data('harga') || 0;
 
-		hitungSubtotal(row);
-	});
+        row.find('.input-nama-barang').val(nama);
+        row.find('.input-kategori-readonly').val(kategori);
+        row.find('.input-kwalifikasi').val(merk);
+        row.find('.input-satuan-readonly').val(satuan);
+        row.find('.input-harga').val(harga);
 
-	// Event input untuk Qty dan Harga
-	$(document).on('input', '.input-qty,.input-harga', function(){
-		hitungSubtotal($(this).closest('tr'));
-	});
+        hitungSubtotal(row);
+    });
 
-	// Update Total saat Diskon atau PPN berubah
-	$('#inputDiskon,#selectPPN').on('input change', function(){ 
-		hitungTotal(); 
-	});
+    // ── Event PPN Status per item (HELPER UNTUK CATATAN) ──
+    $(document).on('change', '.select-ppn-item', function(){
+        var row = $(this).closest('tr');
+        var selectedValue = $(this).val();
+        var keteranganTextarea = row.find('.input-keterangan');
+        
+        if (selectedValue) {
+            var currentText = keteranganTextarea.val();
+            // Bersihkan status PPN yang lama
+            currentText = currentText.replace(/^(Include PPN|Exclude PPN)\s*\n?/, '');
+            // Tambahkan status PPN baru di awal
+            if (currentText.trim()) {
+                keteranganTextarea.val(selectedValue + '\n' + currentText.trim());
+            } else {
+                keteranganTextarea.val(selectedValue);
+            }
+        }
+    });
+
+    // ── Saat textarea Catatan Detail menerima fokus ────────
+    $(document).on('focus', '.input-keterangan', function() {
+        var row = $(this).closest('tr');
+        var ppnStatus = row.find('.select-ppn-item').val();
+        
+        if (ppnStatus && !$(this).val().includes('Include PPN') && !$(this).val().includes('Exclude PPN')) {
+            var currentText = $(this).val();
+            if (currentText.trim()) {
+                $(this).val(ppnStatus + '\n' + currentText.trim());
+            } else {
+                $(this).val(ppnStatus);
+            }
+        }
+    });
+
+    // Event input untuk Qty dan Harga
+    $(document).on('input', '.input-qty,.input-harga', function(){
+        hitungSubtotal($(this).closest('tr'));
+    });
+
+    // Update Total saat Diskon atau PPN berubah
+    $('#inputDiskon,#selectPPN').on('input change', function(){ 
+        hitungTotal(); 
+    });
 
     // ── Info Supplier ─────────────────────────────────────
     $('#selectSupplier').on('change', function(){
@@ -873,31 +892,27 @@ $(document).ready(function(){
         }
     });
 
-  // ── Tambah baris ─────────────────────────────────────
+    // ── Tambah baris ─────────────────────────────────────
     $('#addRow').on('click', function(){
         var n = $('#tbodyItem tr.item-row').length + 1;
         var r = $('<tr class="item-row"></tr>');
         r.append('<td class="text-center row-number">' + n + '</td>');
         r.append('<td><select name="id_barang[]" class="form-select form-select-sm select-barang" required>' + OPSI_BARANG + '</select><input type="hidden" name="nama_barang_manual[]" class="input-nama-barang" value=""></td>');
-        
-        // Kategori Readonly
         r.append('<td><input type="text" name="kategori_request[]" class="form-control form-control-sm input-kategori-readonly bg-light" placeholder="Otomatis..." readonly></td>');
-        
-        // Merk Readonly
         r.append('<td><input type="text" name="kwalifikasi[]" class="form-control form-control-sm input-kwalifikasi bg-light" placeholder="Otomatis..." readonly></td>');
-        
         r.append('<td><select name="id_mobil[]" class="form-select form-select-sm select-mobil">' + OPSI_MOBIL + '</select></td>');
         r.append('<td><select name="tipe_request[]" class="form-select form-select-sm select-tipe"><option value="LANGSUNG" selected>LANGSUNG</option><option value="STOK">STOK</option></select></td>');
         r.append('<td><input type="number" name="jumlah[]" class="form-control form-control-sm input-qty text-center" step="0.01" min="0.01" value="1" required></td>');
-        
-        // SATUAN SEKARANG JADI INPUT READONLY
         r.append('<td><input type="text" name="satuan[]" class="form-control form-control-sm input-satuan-readonly bg-light" placeholder="Otomatis..." readonly></td>');
-        
         r.append('<td><input type="number" name="harga[]" class="form-control form-control-sm input-harga text-end" placeholder="0" min="0" step="1"></td>');
         r.append('<td><input type="text" class="form-control form-control-sm input-subtotal text-end bg-light fw-bold" value="0" readonly tabindex="-1"></td>');
+        
+        // KOLOM STATUS PPN (HELPER UNTUK CATATAN)
+        r.append('<td><select name="ppn_status_item[]" class="form-select form-select-sm select-ppn-item" required><option value="">-- Pilih --</option><option value="Include PPN">Include PPN</option><option value="Exclude PPN">Exclude PPN</option></select><small class="text-muted" style="font-size:.6rem;">Akan masuk ke catatan</small></td>');
+        
         r.append('<td><textarea name="keterangan_item[]" class="form-control form-control-sm input-keterangan" rows="1" placeholder="Spesifikasi mendalam..." required></textarea></td>');
         
-        // MODIFIKASI: Tambahkan input tanggal di kolom BAN
+        // KOLOM BAN
         r.append('<td><div class="ban-check-wrap"><div class="text-center"><input type="checkbox" name="is_ban[]" value="1" class="chk-ban"><div class="ban-badge d-none ban-label">BAN</div><div class="tgl-ban-wrap"><label><i class="fas fa-calendar-alt me-1"></i>Terakhir Beli</label><input type="date" name="tgl_terakhir_beli_ban[]" class="form-control form-control-sm tgl-terakhir-beli-ban" placeholder="dd/mm/yyyy" data-format="dd/mm/yyyy"></div></div></div><input type="hidden" name="is_ban_val[]" class="input-is-ban-val" value="0"></td>');
         
         r.append('<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row border-0"><i class="fas fa-times"></i></button></td>');
@@ -905,6 +920,12 @@ $(document).ready(function(){
         $('#tbodyItem').append(r);
         initSelect2(r);
         updateNo();
+        
+        // Copy PPN status dari baris pertama jika ada
+        var firstRowPPN = $('.item-row:first .select-ppn-item').val();
+        if (firstRowPPN) {
+            r.find('.select-ppn-item').val(firstRowPPN).trigger('change');
+        }
     });
 
     // ── Hapus baris ──────────────────────────────────────
@@ -917,66 +938,89 @@ $(document).ready(function(){
         }
     });
 
-   // ── Submit ───────────────────────────────────────────
-$('#formPRBesar').on('submit', function(e){
-    e.preventDefault();
-    var form = this, valid = true, hasBan = false;
+    // ── Submit ───────────────────────────────────────────
+    $('#formPRBesar').on('submit', function(e){
+        e.preventDefault();
+        var form = this, valid = true, hasBan = false;
 
-    $('.select-barang').each(function(){
-        if(!$(this).val()){ valid = false; return false; }
-    });
-    if(!valid){
-        Swal.fire('Perhatian', 'Pastikan semua baris sudah memilih nama barang.', 'warning');
-        return;
-    }
-
-    var banError = false;
-    $('.chk-ban:checked').each(function(){
-        hasBan = true;
-        var row   = $(this).closest('tr');
-        var mobil = row.find('.select-mobil').val();
-        if(!mobil || mobil == '0'){ banError = true; return false; }
+        // CEK APAKAH SEMUA STATUS PPN (HELPER) SUDAH DIPILIH
+        var ppnIncomplete = false;
+        $('.select-ppn-item').each(function() {
+            if (!$(this).val()) {
+                ppnIncomplete = true;
+                $(this).css('border', '2px solid red');
+                return false;
+            } else {
+                $(this).css('border', '');
+            }
+        });
         
-        // VALIDASI: Cek apakah tanggal terakhir beli ban diisi
-        var tglBeli = row.find('.tgl-terakhir-beli-ban').val();
-        if(!tglBeli){
+        if (ppnIncomplete) {
             Swal.fire({
                 icon: 'warning',
-                title: 'Tanggal Terakhir Beli Ban Wajib Diisi!',
-                text: 'Silakan isi tanggal terakhir kali ban tersebut dibeli.',
+                title: 'Status PPN Wajib Diisi!',
+                text: 'Silakan pilih status PPN (Include PPN atau Exclude PPN) untuk setiap item.',
                 confirmButtonColor: '#dc3545'
             });
-            row.find('.tgl-terakhir-beli-ban').focus();
-            banError = true;
-            return false;
+            return;
         }
-    });
-    if(banError){ return; }
 
-    var totalPO  = $('#displayGrandTotalPO').text();
-    var banInfo  = hasBan ? '<br><small class="text-warning"><i class="fas fa-circle me-1"></i>Terdapat item BAN dengan tanggal terakhir beli.</small>' : '';
-    var poInfo   = $('#selectSupplier').val() ? '<br><small class="text-muted">Grand Total PO: <strong class="text-danger">' + totalPO + '</strong></small>' : '<br><small class="text-info"><i class="fas fa-info-circle me-1"></i>Data PO belum diisi (opsional).</small>';
-    Swal.fire({
-        title: 'Kirim PR untuk Approval?',
-        html:  'PR akan dikirim ke minimal <strong>2 Manager</strong>.'
-             + poInfo
-             + banInfo,
-        icon: 'question', showCancelButton: true,
-        confirmButtonColor: '#dc3545',
-        confirmButtonText: '<i class="fas fa-paper-plane me-1"></i> Ya, Kirim!',
-        cancelButtonText: 'Batal'
-    }).then(function(r){
-        if(r.isConfirmed){
-            Swal.fire({
-                title: 'Memproses...',
-                allowOutsideClick: false,
-                showConfirmButton: false,
-                didOpen: function(){ Swal.showLoading(); }
-            });
-            form.submit();
+        $('.select-barang').each(function(){
+            if(!$(this).val()){ valid = false; return false; }
+        });
+        if(!valid){
+            Swal.fire('Perhatian', 'Pastikan semua baris sudah memilih nama barang.', 'warning');
+            return;
         }
+
+        var banError = false;
+        $('.chk-ban:checked').each(function(){
+            hasBan = true;
+            var row   = $(this).closest('tr');
+            var mobil = row.find('.select-mobil').val();
+            if(!mobil || mobil == '0'){ banError = true; return false; }
+            
+            var tglBeli = row.find('.tgl-terakhir-beli-ban').val();
+            if(!tglBeli){
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Tanggal Terakhir Beli Ban Wajib Diisi!',
+                    text: 'Silakan isi tanggal terakhir kali ban tersebut dibeli.',
+                    confirmButtonColor: '#dc3545'
+                });
+                row.find('.tgl-terakhir-beli-ban').focus();
+                banError = true;
+                return false;
+            }
+        });
+        if(banError){ return; }
+
+        var totalPO  = $('#displayGrandTotalPO').text();
+        var banInfo  = hasBan ? '<br><small class="text-warning"><i class="fas fa-circle me-1"></i>Terdapat item BAN dengan tanggal terakhir beli.</small>' : '';
+        var poInfo   = $('#selectSupplier').val() ? '<br><small class="text-muted">Grand Total PO: <strong class="text-danger">' + totalPO + '</strong></small>' : '<br><small class="text-info"><i class="fas fa-info-circle me-1"></i>Data PO belum diisi (opsional).</small>';
+        
+        Swal.fire({
+            title: 'Kirim PR untuk Approval?',
+            html:  'PR akan dikirim ke minimal <strong>2 Manager</strong>.'
+                 + poInfo
+                 + banInfo,
+            icon: 'question', showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            confirmButtonText: '<i class="fas fa-paper-plane me-1"></i> Ya, Kirim!',
+            cancelButtonText: 'Batal'
+        }).then(function(r){
+            if(r.isConfirmed){
+                Swal.fire({
+                    title: 'Memproses...',
+                    allowOutsideClick: false,
+                    showConfirmButton: false,
+                    didOpen: function(){ Swal.showLoading(); }
+                });
+                form.submit();
+            }
+        });
     });
-});
+
     // ── Notif setelah redirect ────────────────────────────
     var pesan = new URLSearchParams(window.location.search).get('pesan');
     if(pesan === 'berhasil_kirim'){
@@ -989,16 +1033,14 @@ $('#formPRBesar').on('submit', function(e){
 </script>
 <script>
     let idleTime = 0;
-    const maxIdleMinutes = 15; // Samakan dengan server
+    const maxIdleMinutes = 15;
     let lastServerUpdate = Date.now();
     let sessionValid = true;
 
-    // Fungsi reset timer saat ada gerakan
     function resetTimer() {
         idleTime = 0;
         let now = Date.now();
 
-        // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
         if (now - lastServerUpdate > 300000) {
             fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
                 .then(response => response.json())
@@ -1015,14 +1057,11 @@ $('#formPRBesar').on('submit', function(e){
         }
     }
 
-    // Fungsi paksa logout
     function forceLogout() {
         alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
-        // Redirect ke logout.php agar session server juga dihancurkan
         window.location.href = "http://192.168.31.200/pr_mcp/auth/logout.php?pesan=timeout";
     }
 
-    // Pantau aktivitas user
     window.onload = resetTimer;
     document.onmousemove = resetTimer;
     document.onkeypress = resetTimer;
@@ -1030,10 +1069,8 @@ $('#formPRBesar').on('submit', function(e){
     document.onclick = resetTimer;
     document.onscroll = resetTimer;
 
-    // Cek status idle setiap 1 menit
     setInterval(function() {
         idleTime++;
-        // Cek session ke server juga
         fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
             .then(response => response.json())
             .then(data => {
@@ -1042,17 +1079,15 @@ $('#formPRBesar').on('submit', function(e){
                     forceLogout();
                 }
             })
-            .catch(err => {
-                // Jika error koneksi, biarkan user tetap di halaman
-            });
+            .catch(err => {});
         if (idleTime >= maxIdleMinutes && sessionValid) {
             forceLogout();
         }
     }, 60000);
-	// Pastikan data yang 'disabled' tetap terkirim ke PHP
-	$('#formPRBesar').on('submit', function() {
-		$('.select-kategori').prop('disabled', false);
-	});
+    
+    $('#formPRBesar').on('submit', function() {
+        $('.select-kategori').prop('disabled', false);
+    });
 </script>
 </body>
 </html>
