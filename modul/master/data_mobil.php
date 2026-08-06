@@ -43,6 +43,29 @@ if ($_SESSION['status'] != "login") {
         .badge-diservice { background-color: #ffc107; color: black; }
         .badge-rusak-ringan { background-color: #fd7e14; color: white; }
         .badge-rusak-berat { background-color: #dc3545; color: white; }
+        
+        .btn-group-vertical-custom {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .btn-group-vertical-custom .btn {
+            border-radius: 4px !important;
+            padding: 4px 8px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+        }
+        
+        @media (min-width: 769px) {
+            .btn-group-vertical-custom {
+                flex-direction: row;
+                gap: 5px;
+            }
+            .btn-group-vertical-custom .btn {
+                padding: 0.25rem 0.5rem;
+                font-size: 0.75rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -110,18 +133,36 @@ if ($_SESSION['status'] != "login") {
                             <td class="text-center"><?= htmlspecialchars($d['tahun_kendaraan']) ?></td>
                             <td class="text-center"><span class="badge <?= $badge_class ?>"><?= $kondisi ?></span></td>
                             <td class="text-center">
-                                <div class="btn-group">
+                                <div class="btn-group-vertical-custom">
                                     <a href="edit_mobil.php?id=<?= $d['id_mobil'] ?>" class="btn btn-sm btn-outline-primary" title="Edit">
-                                        <i class="fas fa-edit"></i>
+                                        <i class="fas fa-edit"></i> Edit
                                     </a>
                                     <button class="btn btn-sm btn-outline-info" onclick="lihatKondisi(<?= $d['id_mobil'] ?>)" title="Lihat Riwayat Servis">
-                                        <i class="fas fa-clipboard-list"></i>
+                                        <i class="fas fa-clipboard-list"></i> Riwayat
                                     </button>
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-sm btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Laporan">
+                                            <i class="fas fa-file-alt"></i> Cetak
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li>
+                                                <a class="dropdown-item" href="laporan_kondisi_mobil_print.php?id_mobil=<?= $d['id_mobil'] ?>&format=pdf" target="_blank">
+                                                    <i class="fas fa-file-pdf text-danger"></i> PDF
+                                                </a>
+                                            </li>
+                                            <!--<li>
+                                                <a class="dropdown-item" href="#" onclick="cetakLaporan(<?= $d['id_mobil'] ?>, 'excel')">
+                                                    <i class="fas fa-file-excel text-success"></i> Excel
+                                                </a>
+                                            </li>-->
+                                        </ul>
+                                    </div>
                                     <a href="proses_status_mobil.php?id=<?= $d['id_mobil'] ?>&status=<?= $d['status_aktif'] ?>"
                                        class="btn btn-sm <?= ($d['status_aktif'] == 'AKTIF') ? 'btn-outline-danger' : 'btn-outline-success' ?>"
                                        onclick="return confirm('Ubah status kendaraan ini?')" title="Ubah Status Aktif">
-                                        <i class="fas fa-power-off"></i>
+                                        <i class="fas fa-power-off"></i> Status
                                     </a>
+                                    
                                 </div>
                             </td>
                         </tr>
@@ -135,7 +176,7 @@ if ($_SESSION['status'] != "login") {
 
 <!-- Modal Riwayat Servis -->
 <div class="modal fade" id="modalRiwayat" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="fas fa-history me-2"></i> Riwayat Servis Kendaraan</h5>
@@ -178,6 +219,26 @@ function lihatKondisi(id_mobil) {
             $('#riwayatBody').html('<p class="text-center text-danger">Error memuat data!</p>');
         }
     });
+}
+
+function cetakLaporan(id_mobil, format) {
+    // Tampilkan loading
+    Swal.fire({
+        title: 'Memproses...',
+        text: 'Sedang membuat laporan ' + format.toUpperCase(),
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    // Redirect ke file laporan
+    window.location.href = 'laporan_kondisi_mobil.php?id_mobil=' + id_mobil + '&format=' + format;
+    
+    // Tutup loading setelah redirect
+    setTimeout(() => {
+        Swal.close();
+    }, 2000);
 }
 
 // Idle Timer
