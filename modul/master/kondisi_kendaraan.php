@@ -277,8 +277,9 @@ $(document).ready(function () {
         responsive: true
     });
 
+   // Di bagian datepicker initialization
     $('.datepicker').datepicker({
-        format: 'dd-M-yyyy',
+        format: 'dd-mm-yyyy',  // Ubah dari 'dd-M-yyyy' menjadi 'dd-mm-yyyy'
         autoclose: true,
         todayHighlight: true,
         language: 'id',
@@ -358,13 +359,38 @@ $('#formMulai').on('submit', function (e) {
     }, 'json').fail(function () { alert('Gagal menghubungi server.'); });
 });
 
+// Update fungsi bukaModalSelesai
 function bukaModalSelesai(id_kondisi, plat, kondisi, start_date) {
     $('#id_kondisi_selesai').val(id_kondisi);
     $('#selesai_plat').text(plat);
     $('#selesai_kondisi').text(kondisi);
-    $('#selesai_mulai').text(start_date ? new Date(start_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-');
-    $('#end_date_selesai').datepicker('update', new Date());
+    
+    // Format tanggal untuk ditampilkan
+    if (start_date) {
+        var dateObj = new Date(start_date);
+        var day = ('0' + dateObj.getDate()).slice(-2);
+        var month = getMonthName(dateObj.getMonth());
+        var year = dateObj.getFullYear();
+        $('#selesai_mulai').text(day + '-' + month + '-' + year);
+    } else {
+        $('#selesai_mulai').text('-');
+    }
+    
+    // Set default tanggal selesai ke hari ini
+    var today = new Date();
+    var day = ('0' + today.getDate()).slice(-2);
+    var month = getMonthName(today.getMonth());
+    var year = today.getFullYear();
+    var todayStr = day + '-' + month + '-' + year;
+    
+    $('#end_date_selesai').datepicker('update', todayStr);
     $('#modalSelesai').modal('show');
+}
+
+// Helper function untuk mendapatkan nama bulan (3 huruf)
+function getMonthName(monthIndex) {
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+    return months[monthIndex];
 }
 
 $('#formSelesai').on('submit', function (e) {

@@ -1,4 +1,5 @@
 <?php
+// approval pimpinan detail
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
 require_once __DIR__ . '/../../auth/check_session.php';
@@ -16,7 +17,8 @@ if (!$id) { header("location:approval_pimpinan.php"); exit; }
 
 // BUG FIX: Hapus filter kategori_pr agar PR IT dan BESAR sama-sama bisa dibuka
 $pr = mysqli_fetch_assoc(mysqli_query($koneksi,
-    "SELECT * FROM tr_request WHERE id_request='$id'"));
+    "SELECT * FROM tr_request WHERE id_request='$id' 
+     AND status_request != 'BATAL'"));
 if (!$pr) { header("location:approval_pimpinan.php?pesan=tidak_ditemukan"); exit; }
 
 // Pastikan hanya kategori yang valid yang bisa diakses dari sini
