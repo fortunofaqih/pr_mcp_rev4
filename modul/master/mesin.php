@@ -82,15 +82,19 @@ if ($_SESSION['status'] != "login") {
         <span class="navbar-brand fw-bold text-white"><i class="fas fa-industry me-2"></i> MANAJEMEN MESIN</span>
         <div class="d-flex flex-wrap gap-1">
             <a href="../../index.php" class="btn btn-sm btn-danger"><i class="fas fa-rotate-left"></i> HOME</a>
-            <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalTambahMesin" onclick="resetFormTambah()">
+            <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#modalTambahMesin" onclick="resetFormTambah()">
                 <i class="fas fa-plus-circle"></i> TAMBAH MESIN
             </button>
             <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalImportCSV">
                 <i class="fas fa-file-import"></i> IMPORT CSV
             </button>
+			<a href="export_master_mesin.php" class="btn btn-sm btn-success">
+				<i class="fas fa-file-excel"></i> EXPORT EXCEL
+			</a>
             <a href="template_export.php?action=template" class="btn btn-sm btn-secondary import-template-btn">
                 <i class="fas fa-download"></i> TEMPLATE
             </a>
+
         </div>
     </div>
 </nav>
@@ -113,7 +117,7 @@ if ($_SESSION['status'] != "login") {
                             <th>Nama Mesin</th>
                             <th>Spesifikasi</th>
                             <th>Kapasitas</th>
-                            <th>Supplier</th>
+                            <th>Unit</th>
                             <th>Status</th>
                             <th class="text-center">Aksi</th>
                         </tr>
@@ -188,8 +192,8 @@ if ($_SESSION['status'] != "login") {
                             <input type="text" class="form-control" id="capacity" name="capacity" placeholder="Contoh: 1000 kg/jam">
                         </div>
                         <div class="col-12 col-md-6 mb-3">
-                            <label class="form-label fw-bold">Supplier</label>
-                            <input type="text" class="form-control" id="supplier" name="supplier" placeholder="Nama supplier">
+                            <label class="form-label fw-bold">Unit</label>
+                            <input type="text" class="form-control" id="supplier" name="supplier" placeholder="Nama Unit">
                         </div>
                     </div>
                     <div class="mb-3">
