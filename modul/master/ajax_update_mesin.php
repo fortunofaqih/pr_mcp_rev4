@@ -24,11 +24,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
     
-    // Sanitasi input dengan pengecekan
+    // Sanitasi input
     $id_mesin = isset($_POST['id_mesin']) ? mysqli_real_escape_string($koneksi, trim($_POST['id_mesin'])) : '';
     $name = isset($_POST['name']) ? mysqli_real_escape_string($koneksi, trim($_POST['name'])) : '';
     
-    // Validasi field wajib
     if (empty($id_mesin) || empty($name)) {
         echo json_encode(['status' => 'error', 'message' => 'ID Mesin dan Nama Mesin wajib diisi!']);
         exit;
@@ -37,12 +36,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $spec = isset($_POST['spec']) ? mysqli_real_escape_string($koneksi, $_POST['spec']) : '';
     $manufactured_by = isset($_POST['manufactured_by']) ? mysqli_real_escape_string($koneksi, $_POST['manufactured_by']) : '';
     $supplier = isset($_POST['supplier']) ? mysqli_real_escape_string($koneksi, $_POST['supplier']) : '';
+    $unit = isset($_POST['unit']) ? mysqli_real_escape_string($koneksi, $_POST['unit']) : '';
     $acc_reff = isset($_POST['acc_reff']) ? mysqli_real_escape_string($koneksi, $_POST['acc_reff']) : '';
     $remarks = isset($_POST['remarks']) ? mysqli_real_escape_string($koneksi, $_POST['remarks']) : '';
     $capacity = isset($_POST['capacity']) ? mysqli_real_escape_string($koneksi, $_POST['capacity']) : '';
     $active = isset($_POST['active']) ? (int)$_POST['active'] : 1;
     
-    // Handle tanggal dengan benar
+    // Handle tanggal
     $manufactured_date = (!empty($_POST['manufactured_date'])) 
         ? "'" . mysqli_real_escape_string($koneksi, $_POST['manufactured_date']) . "'" 
         : "NULL";
@@ -51,7 +51,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ? "'" . mysqli_real_escape_string($koneksi, $_POST['purchase_date']) . "'" 
         : "NULL";
     
-    // Handle harga
     $purchase_price = (isset($_POST['purchase_price']) && $_POST['purchase_price'] !== '') 
         ? (float)$_POST['purchase_price'] 
         : 0;
@@ -63,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // Query update dengan penanganan yang lebih baik
+    // Query update
     $query = "UPDATE master_mesin SET
         id_mesin = '$id_mesin',
         name = '$name',
@@ -71,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         manufactured_date = $manufactured_date,
         manufactured_by = '$manufactured_by',
         supplier = '$supplier',
+        unit = '$unit',
         purchase_price = $purchase_price,
         purchase_date = $purchase_date,
         acc_reff = '$acc_reff',
@@ -78,9 +78,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         active = $active,
         capacity = '$capacity'
     WHERE id = $id";
-
-    // Debug: log query jika diperlukan
-    // error_log("Update Query: " . $query);
     
     if (mysqli_query($koneksi, $query)) {
         echo json_encode(['status' => 'success', 'message' => 'Data mesin berhasil diupdate!']);

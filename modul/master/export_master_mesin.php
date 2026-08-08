@@ -26,10 +26,10 @@ $query = mysqli_query($koneksi, "
 
 // Fungsi format tanggal Indonesia
 function formatDateIndo($date) {
-    if (empty($date) || $date == '0000-00-00') return '-';
+    if (empty($date) || $date == '0000-00-00' || $date == 'NULL') return '-';
     $bulan = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
     $timestamp = strtotime($date);
-    if ($timestamp === false) return '-';
+    if ($timestamp === false || $timestamp < 0) return '-';
     return date('d', $timestamp) . '-' . $bulan[date('n', $timestamp) - 1] . '-' . date('Y', $timestamp);
 }
 
@@ -68,17 +68,19 @@ echo '</div>';
 echo '<table>';
 echo '<thead>';
 echo '<tr>';
-echo '<th style="width:10%;">ID Mesin</th>';
-echo '<th style="width:15%;">Nama Mesin</th>';
-echo '<th style="width:20%;">Spesifikasi</th>';
-echo '<th style="width:10%;">Kapasitas</th>';
-echo '<th style="width:10%;">Unit</th>';
-echo '<th style="width:12%;">Manufactured By</th>';
-echo '<th style="width:10%;">Tgl Manufactur</th>';
-echo '<th style="width:12%;">Harga Beli</th>';
-echo '<th style="width:10%;">Tgl Beli</th>';
-echo '<th style="width:10%;">Acc Reff</th>';
-echo '<th style="width:8%;">Status</th>';
+echo '<th style="width:8%;">ID Mesin</th>';
+echo '<th style="width:12%;">Nama Mesin</th>';
+echo '<th style="width:15%;">Spesifikasi</th>';
+echo '<th style="width:8%;">Kapasitas</th>';
+echo '<th style="width:8%;">Unit</th>';
+echo '<th style="width:10%;">Supplier</th>';
+echo '<th style="width:10%;">Manufactured By</th>';
+echo '<th style="width:8%;">Tgl Manufactur</th>';
+echo '<th style="width:10%;">Harga Beli</th>';
+echo '<th style="width:8%;">Tgl Beli</th>';
+echo '<th style="width:8%;">Acc Reff</th>';
+echo '<th style="width:10%;">Keterangan</th>';
+echo '<th style="width:7%;">Status</th>';
 echo '</tr>';
 echo '</thead>';
 echo '<tbody>';
@@ -91,22 +93,24 @@ if (mysqli_num_rows($query) > 0) {
         $status_class = $active ? 'status-aktif' : 'status-nonaktif';
         
         echo '<tr class="' . $row_class . '">';
-        echo '<td style="text-align:center;">' . htmlspecialchars($d['id_mesin']) . '</td>';
-        echo '<td>' . htmlspecialchars($d['name']) . '</td>';
+        echo '<td style="text-align:center;">' . htmlspecialchars($d['id_mesin'] ?? '-') . '</td>';
+        echo '<td>' . htmlspecialchars($d['name'] ?? '-') . '</td>';
         echo '<td>' . htmlspecialchars($d['spec'] ?? '-') . '</td>';
-        echo '<td>' . htmlspecialchars($d['capacity'] ?? '-') . '</td>';
+        echo '<td style="text-align:center;">' . htmlspecialchars($d['capacity'] ?? '-') . '</td>';
+        echo '<td style="text-align:center;">' . htmlspecialchars($d['unit'] ?? '-') . '</td>';
         echo '<td>' . htmlspecialchars($d['supplier'] ?? '-') . '</td>';
         echo '<td>' . htmlspecialchars($d['manufactured_by'] ?? '-') . '</td>';
-        echo '<td style="text-align:center;">' . formatDateIndo($d['manufactured_date']) . '</td>';
-        echo '<td style="text-align:right;">' . formatRupiah($d['purchase_price']) . '</td>';
-        echo '<td style="text-align:center;">' . formatDateIndo($d['purchase_date']) . '</td>';
-        echo '<td>' . htmlspecialchars($d['acc_reff'] ?? '-') . '</td>';
-        echo '<td style="text-align:center;" class="' . $status_class . '">' . $status_text . '</td>';
+        echo '<td style="text-align:center;">' . formatDateIndo($d['manufactured_date'] ?? '') . '</td>';
+        echo '<td style="text-align:right;">' . formatRupiah($d['purchase_price'] ?? 0) . '</td>';
+        echo '<td style="text-align:center;">' . formatDateIndo($d['purchase_date'] ?? '') . '</td>';
+        echo '<td style="text-align:center;">' . htmlspecialchars($d['acc_reff'] ?? '-') . '</td>';
+        echo '<td>' . htmlspecialchars($d['remarks'] ?? '-') . '</td>';
+        echo '<td style="text-align:center;font-weight:bold;" class="' . $status_class . '">' . $status_text . '</td>';
         echo '</tr>';
     }
 } else {
     echo '<tr>';
-    echo '<td colspan="11" style="text-align:center;">Tidak ada data mesin</td>';
+    echo '<td colspan="13" style="text-align:center;padding:20px;">Tidak ada data mesin</td>';
     echo '</tr>';
 }
 
@@ -116,6 +120,7 @@ echo '</table>';
 // Footer
 echo '<div class="footer">';
 echo 'Total Data: ' . mysqli_num_rows($query) . ' mesin';
+echo ' | Dicetak oleh: ' . ($_SESSION['username'] ?? 'System');
 echo '</div>';
 
 echo '</body>';

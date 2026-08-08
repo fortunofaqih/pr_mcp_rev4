@@ -11,6 +11,13 @@ if ($_SESSION['status'] != "login") {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id'])) {
     $id = (int)$_POST['id'];
     
+    // Cek apakah data ada
+    $cek = mysqli_query($koneksi, "SELECT id FROM master_mesin WHERE id = $id");
+    if (mysqli_num_rows($cek) == 0) {
+        echo json_encode(['status' => 'error', 'message' => 'Data tidak ditemukan!']);
+        exit;
+    }
+    
     $query = "DELETE FROM master_mesin WHERE id = $id";
     
     if (mysqli_query($koneksi, $query)) {
