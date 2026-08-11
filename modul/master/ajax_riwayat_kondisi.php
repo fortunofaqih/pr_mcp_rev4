@@ -18,10 +18,11 @@ if (!isset($_POST['id_mobil']) || empty($_POST['id_mobil'])) {
 
 $id = (int) $_POST['id_mobil'];
 
+// Perbaikan ORDER BY: urutkan dari yang paling awal (start_date ASC)
 $query = "SELECT id_kondisi, kondisi, keterangan, start_date, end_date, created_at
           FROM kondisi_kendaraan
           WHERE id_mobil = $id
-          ORDER BY (end_date IS NULL) DESC, start_date DESC";
+          ORDER BY start_date ASC, created_at ASC";
 $result = mysqli_query($koneksi, $query);
 
 if (!$result) {
@@ -70,3 +71,4 @@ if (mysqli_num_rows($result) > 0) {
 } else {
     echo '<p class="text-center text-muted">Belum ada riwayat servis untuk kendaraan ini. Status: <span class="badge bg-success">BAIK</span></p>';
 }
+?>

@@ -26,10 +26,11 @@ if (!$mobil) {
     die('Data mobil tidak ditemukan');
 }
 
+// PERBAIKAN: Urutkan dari yang paling awal (start_date ASC)
 $query_riwayat = "SELECT id_kondisi, kondisi, keterangan, start_date, end_date, created_at
                   FROM kondisi_kendaraan
                   WHERE id_mobil = $id_mobil
-                  ORDER BY (end_date IS NULL) DESC, start_date DESC";
+                  ORDER BY start_date ASC, created_at ASC";
 $result_riwayat = mysqli_query($koneksi, $query_riwayat);
 
 $riwayat = [];
