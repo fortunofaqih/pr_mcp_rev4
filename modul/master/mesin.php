@@ -7,6 +7,22 @@ if ($_SESSION['status'] != "login") {
     header("location:../../login.php?pesan=belum_login");
     exit;
 }
+
+// Ambil data kondisi terakhir untuk setiap mesin
+$query_kondisi_terakhir = "
+    SELECT km.id_mesin, km.kondisi_mesin, km.start_date, km.end_date
+    FROM kondisi_mesin km
+    INNER JOIN (
+        SELECT id_mesin, MAX(start_date) as max_start_date
+        FROM kondisi_mesin
+        GROUP BY id_mesin
+    ) latest ON km.id_mesin = latest.id_mesin AND km.start_date = latest.max_start_date
+";
+$result_kondisi = mysqli_query($koneksi, $query_kondisi_terakhir);
+$kondisi_terakhir = [];
+while ($row = mysqli_fetch_assoc($result_kondisi)) {
+    $kondisi_terakhir[$row['id_mesin']] = $row;
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -32,6 +48,39 @@ if ($_SESSION['status'] != "login") {
         }
         .badge-active { background-color: #28a745; color: white; }
         .badge-inactive { background-color: #dc3545; color: white; }
+        .badge-baik { background-color: #28a745; color: white; }
+        .badge-diservice { background-color: #ffc107; color: #000; }
+        .btn-kondisi {
+            background: #ffc107;
+            color: #000;
+            border: 1px solid #ffc107;
+        }
+        .btn-kondisi:hover {
+            background: #e0a800;
+            color: #000;
+            border-color: #e0a800;
+        }
+        .dropdown-menu-aksi {
+            min-width: 120px;
+            padding: 0.25rem 0;
+        }
+        .dropdown-menu-aksi .dropdown-item {
+            padding: 0.25rem 1rem;
+            font-size: 0.8rem;
+        }
+        .dropdown-menu-aksi .dropdown-item i {
+            width: 18px;
+        }
+        .btn-laporan {
+            background: #17a2b8;
+            color: white;
+            border: 1px solid #17a2b8;
+        }
+        .btn-laporan:hover {
+            background: #138496;
+            color: white;
+            border-color: #138496;
+        }
     </style>
 </head>
 <body>
@@ -44,6 +93,8 @@ if ($_SESSION['status'] != "login") {
             <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#modalTambahMesin" onclick="resetFormTambah()">
                 <i class="fas fa-plus-circle"></i> TAMBAH MESIN
             </button>
+            <!-- Tombol IMPORT CSV, EXPORT EXCEL, TEMPLATE dinonaktifkan dengan comment -->
+            <!--
             <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalImportCSV">
                 <i class="fas fa-file-import"></i> IMPORT CSV
             </button>
@@ -53,6 +104,14 @@ if ($_SESSION['status'] != "login") {
             <a href="template_export.php?action=template" class="btn btn-sm btn-secondary">
                 <i class="fas fa-download"></i> TEMPLATE
             </a>
+            -->
+            <!-- Tombol KONDISI MESIN -->
+            <button class="btn btn-sm btn-kondisi" onclick="window.location.href='kondisi_mesin.php'">
+                <i class="fas fa-heartbeat"></i> KONDISI MESIN
+            </button>
+            <button class="btn btn-sm btn-laporan" onclick="window.location.href='laporan_kondisi_mesin.php'">
+                <i class="fas fa-file-alt"></i> LAPORAN
+            </button>
         </div>
     </div>
 </nav>
@@ -63,6 +122,8 @@ if ($_SESSION['status'] != "login") {
         Kelola data mesin yang digunakan di perusahaan. 
         <span class="badge badge-active">AKTIF</span> = mesin masih digunakan,
         <span class="badge badge-inactive">NONAKTIF</span> = mesin sudah tidak digunakan.
+        <span class="badge badge-baik">BAIK</span> = kondisi mesin baik,
+        <span class="badge badge-diservice">DISERVICE</span> = mesin sedang dalam perbaikan.
     </div>
 
     <div class="card">
@@ -77,6 +138,7 @@ if ($_SESSION['status'] != "login") {
                             <th>Kapasitas</th>
                             <th>Unit</th>
                             <th>Status</th>
+                            <th>Kondisi</th>
                             <th class="text-center">Aksi</th>
                         </tr>
                     </thead>
@@ -88,6 +150,21 @@ if ($_SESSION['status'] != "login") {
                         ");
                         while ($d = mysqli_fetch_array($query)) {
                             $active = (int)$d['active'] === 1;
+                            $id_mesin = (int)$d['id'];
+                            
+                            // Cek kondisi terakhir dari array yang sudah di-query
+                            $kondisi = 'BAIK';
+                            $start_date = '-';
+                            $end_date = '-';
+                            if (isset($kondisi_terakhir[$id_mesin])) {
+                                $kondisi = $kondisi_terakhir[$id_mesin]['kondisi_mesin'];
+                                $start_date = $kondisi_terakhir[$id_mesin]['start_date'];
+                                $end_date = $kondisi_terakhir[$id_mesin]['end_date'] ?? '-';
+                            }
+                            
+                            $badge_kondisi = $kondisi == 'BAIK' 
+                                ? '<span class="badge badge-baik"><i class="fas fa-check-circle me-1"></i>BAIK</span>'
+                                : '<span class="badge badge-diservice"><i class="fas fa-tools me-1"></i>DISERVICE</span>';
                         ?>
                         <tr>
                             <td class="fw-bold text-primary"><?= htmlspecialchars($d['id_mesin']) ?></td>
@@ -100,8 +177,9 @@ if ($_SESSION['status'] != "login") {
                                     ? '<span class="badge badge-active"><i class="fas fa-check-circle me-1"></i>AKTIF</span>'
                                     : '<span class="badge badge-inactive"><i class="fas fa-times-circle me-1"></i>NONAKTIF</span>' ?>
                             </td>
+                            <td><?= $badge_kondisi ?></td>
                             <td class="text-center">
-                                <div class="btn-group">
+                                <div class="btn-group" role="group">
                                     <button class="btn btn-sm btn-outline-primary"
                                             onclick="editMesin(<?= (int)$d['id'] ?>)"
                                             title="Edit Mesin">
@@ -112,6 +190,12 @@ if ($_SESSION['status'] != "login") {
                                             title="Hapus Mesin">
                                         <i class="fas fa-trash"></i>
                                     </button>
+                                    <a href="riwayat_kondisi_mesin.php?id_mesin=<?= (int)$d['id'] ?>" 
+                                    target="_blank" 
+                                    class="btn btn-sm btn-outline-success"
+                                    title="Riwayat Kondisi Mesin">
+                                        <i class="fas fa-history"></i>
+                                    </a>
                                 </div>
                             </td>
                         </tr>
@@ -214,7 +298,7 @@ if ($_SESSION['status'] != "login") {
     </div>
 </div>
 
-<!-- Modal: Import CSV -->
+<!-- Modal: Import CSV (tetap ada tapi dinonaktifkan) -->
 <div class="modal fade" id="modalImportCSV" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -258,7 +342,7 @@ $(document).ready(function () {
     $('#tabelMesin').DataTable({
         pageLength: 10,
         language: { url: "//cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json" },
-        columnDefs: [{ orderable: false, targets: 6 }],
+        columnDefs: [{ orderable: false, targets: 7 }],
         responsive: true
     });
 });
@@ -376,6 +460,8 @@ function hapusMesin(id, name) {
 
 $('#formImport').on('submit', function (e) {
     e.preventDefault();
+    alert('Fungsi import CSV dinonaktifkan sementara.');
+    /*
     const formData = new FormData(this);
     
     $.ajax({
@@ -396,6 +482,7 @@ $('#formImport').on('submit', function (e) {
             alert('Gagal mengimport data!');
         }
     });
+    */
 });
 </script>
 </body>

@@ -21,6 +21,9 @@ $pr = mysqli_fetch_assoc(mysqli_query($koneksi,
      AND status_request != 'BATAL'"));
 if (!$pr) { header("location:approval_pimpinan.php?pesan=tidak_ditemukan"); exit; }
 
+// Cek apakah keterangan mengandung USD
+$use_usd = stripos($pr['keterangan'], 'USD') !== false;
+
 // Pastikan hanya kategori yang valid yang bisa diakses dari sini
 if (!in_array($pr['kategori_pr'], ['BESAR', 'IT'])) {
     header("location:approval_pimpinan.php?pesan=tidak_ditemukan");
@@ -160,6 +163,17 @@ $bg_kategori    = $pr['kategori_pr'] === 'IT' ? '#dbeafe'  : '#fee2e2';
     }
     .banner-penawaran .btn-buka-pdf:hover { background: #15803d; color: white; transform: translateY(-1px); }
 
+    /* Tambahan style untuk USD */
+    .currency-symbol {
+        font-weight: 700;
+    }
+    .currency-usd {
+        color: #0ea5e9;
+    }
+    .currency-rp {
+        color: #ef4444;
+    }
+
     @media (max-width: 768px) {
         .info-header { padding: 15px; }
         .table-detail thead { display: none; }
@@ -196,6 +210,11 @@ $bg_kategori    = $pr['kategori_pr'] === 'IT' ? '#dbeafe'  : '#fee2e2';
               style="background:<?= $bg_kategori ?>; color:<?= $color_kategori ?>; font-size:.75rem; border:1px solid <?= $color_kategori ?>30;">
             <i class="fas <?= $icon_kategori ?> me-1"></i> <?= $label_kategori ?>
         </span>
+        <?php if ($use_usd): ?>
+        <span class="badge rounded-pill px-3 py-2 fw-bold ms-2" style="background:#e0f2fe; color:#0369a1; border:1px solid #38bdf8;">
+            <i class="fas fa-dollar-sign me-1"></i> USD
+        </span>
+        <?php endif; ?>
     </div>
 
     <?php if ($giliran_m1): ?>
@@ -319,8 +338,18 @@ $bg_kategori    = $pr['kategori_pr'] === 'IT' ? '#dbeafe'  : '#fee2e2';
                         <td data-label="Unit" class="text-center"><?= $d['plat_nomor'] ?: '-' ?></td>
                         <td data-label="Tipe" class="text-center small"><?= $d['tipe_request'] ?></td>
                         <td data-label="Qty" class="text-center fw-bold"><?= (float)$d['jumlah']+0 ?> <?= $d['satuan'] ?></td>
-                        <td data-label="Harga" class="text-end">Rp <?= number_format($d['harga_satuan_estimasi'],0,',','.') ?></td>
-                        <td data-label="Subtotal" class="text-end fw-bold text-primary">Rp <?= number_format($d['subtotal_estimasi'],0,',','.') ?></td>
+                        <td data-label="Harga" class="text-end">
+                            <span class="currency-symbol <?= $use_usd ? 'currency-usd' : 'currency-rp' ?>">
+                                <?= $use_usd ? 'USD' : 'Rp' ?>
+                            </span>
+                            <?= number_format($d['harga_satuan_estimasi'],0,',','.') ?>
+                        </td>
+                        <td data-label="Subtotal" class="text-end fw-bold <?= $use_usd ? 'text-primary' : 'text-primary' ?>">
+                            <span class="currency-symbol <?= $use_usd ? 'currency-usd' : 'currency-rp' ?>">
+                                <?= $use_usd ? 'USD' : 'Rp' ?>
+                            </span>
+                            <?= number_format($d['subtotal_estimasi'],0,',','.') ?>
+                        </td>
                         <td data-label="Ket" class="small"><?= htmlspecialchars($d['keterangan'] ?: '-') ?></td>
                     </tr>
                     <?php endwhile; ?>
@@ -328,7 +357,12 @@ $bg_kategori    = $pr['kategori_pr'] === 'IT' ? '#dbeafe'  : '#fee2e2';
                 <tfoot>
                     <tr>
                         <td colspan="5" class="text-end d-none d-md-table-cell fw-bold">TOTAL ESTIMASI</td>
-                        <td class="text-end fw-bold text-danger fs-5" data-label="Grand Total">Rp <?= number_format($grand_total,0,',','.') ?></td>
+                        <td class="text-end fw-bold <?= $use_usd ? 'text-primary fs-5' : 'text-danger fs-5' ?>" data-label="Grand Total">
+                            <span class="currency-symbol <?= $use_usd ? 'currency-usd' : 'currency-rp' ?>">
+                                <?= $use_usd ? 'USD' : 'Rp' ?>
+                            </span>
+                            <?= number_format($grand_total,0,',','.') ?>
+                        </td>
                         <td class="d-none d-md-table-cell"></td>
                     </tr>
                 </tfoot>
@@ -368,25 +402,47 @@ $bg_kategori    = $pr['kategori_pr'] === 'IT' ? '#dbeafe'  : '#fee2e2';
                 <div class="col-6 col-md-3">
                     <div class="p-3 bg-light rounded-3 text-center border">
                         <div class="info-label">Subtotal</div>
-                        <div class="fw-bold">Rp <?= number_format($po['subtotal'], 0, ',', '.') ?></div>
+                        <div class="fw-bold">
+                            <span class="currency-symbol <?= $use_usd ? 'currency-usd' : 'currency-rp' ?>">
+                                <?= $use_usd ? 'USD' : 'Rp' ?>
+                            </span>
+                            <?= number_format($po['subtotal'], 0, ',', '.') ?>
+                        </div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="p-3 bg-light rounded-3 text-center border">
                         <div class="info-label">Diskon</div>
-                        <div class="fw-bold text-danger"><?= $po['diskon'] > 0 ? '(Rp '.number_format($po['diskon'], 0, ',', '.').')' : '-' ?></div>
+                        <div class="fw-bold text-danger">
+                            <?php if ($po['diskon'] > 0): ?>
+                                <span class="currency-symbol <?= $use_usd ? 'currency-usd' : 'currency-rp' ?>">
+                                    <?= $use_usd ? 'USD' : 'Rp' ?>
+                                </span>
+                                <?= number_format($po['diskon'], 0, ',', '.') ?>
+                            <?php else: ?>
+                                -
+                            <?php endif; ?>
+                        </div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="p-3 bg-light rounded-3 text-center border">
                         <div class="info-label">PPN (<?= (float)$po['ppn_persen'] ?>%)</div>
-                        <div class="fw-bold text-dark">Rp <?= number_format($po['ppn_nominal'], 0, ',', '.') ?></div>
+                        <div class="fw-bold text-dark">
+                            <span class="currency-symbol <?= $use_usd ? 'currency-usd' : 'currency-rp' ?>">
+                                <?= $use_usd ? 'USD' : 'Rp' ?>
+                            </span>
+                            <?= number_format($po['ppn_nominal'], 0, ',', '.') ?>
+                        </div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="p-3 rounded-3 text-center text-white shadow-sm" style="background:#1e3a8a;">
                         <div class="info-label text-white-50">Grand Total</div>
-                        <div class="fw-bold fs-6">Rp <?= number_format($po['grand_total'], 0, ',', '.') ?></div>
+                        <div class="fw-bold fs-6">
+                            <span class="currency-symbol"><?= $use_usd ? 'USD' : 'Rp' ?></span>
+                            <?= number_format($po['grand_total'], 0, ',', '.') ?>
+                        </div>
                     </div>
                 </div>
             </div>
