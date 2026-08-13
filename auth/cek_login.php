@@ -20,7 +20,7 @@ $password      = $_POST['password'];
 $login_sebagai = mysqli_real_escape_string($koneksi, $_POST['login_sebagai']);
 
 // Validasi: pastikan nilai login_sebagai adalah role yang valid
-$role_valid = ['administrator', 'manager', 'admin_gudang', 'bagian_pembelian', 'pemesan_pr_besar', 'finance', 'it'];
+$role_valid = ['administrator', 'manager', 'admin_gudang', 'bagian_pembelian', 'pemesan_pr_besar', 'bagian_produksi', 'finance', 'it'];
 if (!in_array($login_sebagai, $role_valid)) {
     header("location:../login.php?pesan=gagal");
     exit();

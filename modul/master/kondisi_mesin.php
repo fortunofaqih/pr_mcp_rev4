@@ -25,6 +25,16 @@ if ($_SESSION['status'] != "login") {
         .card { border-radius: 12px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
         .badge-baik { background-color: #28a745; color: white; }
         .badge-diservice { background-color: #ffc107; color: #000; }
+        .badge-dibongkar { background-color: #dc3545; color: white; }
+        .badge-dipoles { background-color: #17a2b8; color: white; }
+        .badge-dipopok { background-color: #6f42c1; color: white; }
+        .badge-dibubut { background-color: #fd7e14; color: white; }
+        .badge-dibubut { background-color: #fd7e14; color: white; }
+        .badge-dibubut { background-color: #fd7e14; color: white; }
+        .badge-spei { background-color: #20c997; color: white; }
+        .badge-stell { background-color: #e83e8c; color: white; }
+        .badge-gulung-dinamo { background-color: #6c757d; color: white; }
+        
         .btn-kondisi {
             background: #ffc107;
             color: #000;
@@ -66,14 +76,7 @@ if ($_SESSION['status'] != "login") {
 </nav>
 
 <div class="container-fluid px-3 px-sm-4">
-    <div class="alert alert-light border small mb-3">
-        <i class="fas fa-circle-info text-primary me-1"></i>
-        Kelola kondisi mesin. 
-        <span class="badge badge-baik">BAIK</span> = mesin dalam kondisi baik,
-        <span class="badge badge-diservice">DISERVICE</span> = mesin sedang dalam perbaikan.
-        <span class="badge bg-warning text-dark">AKTIF</span> = service sedang berjalan,
-        <span class="badge bg-success text-white">SELESAI</span> = service sudah selesai.
-    </div>
+   
 
     <div class="card">
         <div class="card-body">
@@ -104,9 +107,20 @@ if ($_SESSION['status'] != "login") {
                             $status_text = $aktif ? 'AKTIF' : 'SELESAI';
                             $status_class = $aktif ? 'bg-warning text-dark' : 'bg-success text-white';
                             
-                            $badge_kondisi = $d['kondisi_mesin'] == 'BAIK' 
-                                ? '<span class="badge badge-baik"><i class="fas fa-check-circle me-1"></i>BAIK</span>'
-                                : '<span class="badge badge-diservice"><i class="fas fa-tools me-1"></i>DISERVICE</span>';
+                            // Mapping kondisi ke badge
+                            $badge_map = [
+                                'BAIK' => '<span class="badge badge-baik"><i class="fas fa-check-circle me-1"></i>BAIK</span>',
+                                'DISERVICE' => '<span class="badge badge-diservice"><i class="fas fa-tools me-1"></i>DISERVICE</span>',
+                                'DIBONGKAR' => '<span class="badge badge-dibongkar"><i class="fas fa-wrench me-1"></i>DIBONGKAR</span>',
+                                'DIPOLES' => '<span class="badge badge-dipoles"><i class="fas fa-brush me-1"></i>DIPOLES</span>',
+                                'DI POPOK' => '<span class="badge badge-dipopok"><i class="fas fa-baby me-1"></i>DI POPOK</span>',
+                                'DI BUBUT' => '<span class="badge badge-dibubut"><i class="fas fa-cog me-1"></i>DI BUBUT</span>',
+                                'SPEI' => '<span class="badge badge-spei"><i class="fas fa-gear me-1"></i>SPEI</span>',
+                                'STELL' => '<span class="badge badge-stell"><i class="fas fa-circle me-1"></i>STELL</span>',
+                                'GULUNG DINAMO' => '<span class="badge badge-gulung-dinamo"><i class="fas fa-bolt me-1"></i>GULUNG DINAMO</span>'
+                            ];
+                            
+                            $badge_kondisi = isset($badge_map[$d['kondisi_mesin']]) ? $badge_map[$d['kondisi_mesin']] : '<span class="badge bg-secondary">' . htmlspecialchars($d['kondisi_mesin']) . '</span>';
                         ?>
                         <tr>
                             <td class="fw-bold text-primary"><?= htmlspecialchars($d['id_mesin']) ?></td>
@@ -174,6 +188,13 @@ if ($_SESSION['status'] != "login") {
                         <select class="form-select" id="kondisi_mesin" name="kondisi_mesin" required>
                             <option value="BAIK">BAIK</option>
                             <option value="DISERVICE">DISERVICE</option>
+                            <option value="DIBONGKAR">DIBONGKAR</option>
+                            <option value="DIPOLES">DIPOLES</option>
+                            <option value="DI POPOK">DI POPOK</option>
+                            <option value="DI BUBUT">DI BUBUT</option>
+                            <option value="SPEI">SPEI</option>
+                            <option value="STELL">STELL</option>
+                            <option value="GULUNG DINAMO">GULUNG DINAMO</option>
                         </select>
                     </div>
                     <div class="mb-3">
@@ -226,6 +247,13 @@ if ($_SESSION['status'] != "login") {
                         <select class="form-select" id="kondisi_selesai" name="kondisi_mesin">
                             <option value="BAIK">BAIK</option>
                             <option value="DISERVICE">DISERVICE</option>
+                            <option value="DIBONGKAR">DIBONGKAR</option>
+                            <option value="DIPOLES">DIPOLES</option>
+                            <option value="DI POPOK">DI POPOK</option>
+                            <option value="DI BUBUT">DI BUBUT</option>
+                            <option value="SPEI">SPEI</option>
+                            <option value="STELL">STELL</option>
+                            <option value="GULUNG DINAMO">GULUNG DINAMO</option>
                         </select>
                         <small class="text-muted">Pilih kondisi setelah service selesai</small>
                     </div>

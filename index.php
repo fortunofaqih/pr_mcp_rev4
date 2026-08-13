@@ -360,6 +360,11 @@ if ($is_finance) {
                 <li class="nav-item"><a href="modul/transaksi/tambah_request_besar.php" class="nav-link text-warning fw-bold"><i class="fas fa-cart-plus me-2"></i> Form PR (Besar)</a></li>
                 <li class="nav-item"><a href="modul/transaksi/update_status_ban.php" class="nav-link"><i class="fas fa-car me-2"></i> Update Status PO</a></li>
             <?php endif; ?>
+            <!-- MENU BAGIAN PRODUKSI -->
+                <?php if ($role == 'bagian_produksi') : ?>
+                    <div class="nav-category">Master Data</div>
+                    <li class="nav-item"><a href="modul/master/mesin.php" class="nav-link text-warning fw-bold"><i class="fas fa-industry me-2"></i> Master Mesin</a></li>
+            <?php endif; ?>
                 <!-- MENU BAGIAN PEMESAN PR -->
             <?php if ($is_pemesan_pr) : ?>
 				<div class="nav-category">-- Step 1 - Master Data --</div>

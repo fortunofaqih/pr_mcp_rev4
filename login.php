@@ -157,6 +157,7 @@ if (isset($_SESSION['status']) && $_SESSION['status'] == 'login') {
                     <option value="admin_gudang">📦 Admin Gudang</option>
                     <option value="bagian_pembelian">🛒 Bagian Pembelian</option>
                     <option value="pemesan_pr_besar">📋 Pemesan PR Besar</option>
+                    <option value="bagian_produksi">⚙️ Bagian Produksi</option>
                     <option value="finance">💰 Finance</option>
                     <option value="it">💻 IT</option>
                 </select>

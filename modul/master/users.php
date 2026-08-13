@@ -79,6 +79,7 @@ $daftar_role = [
     'bagian_pembelian'  => '🛒 Bagian Pembelian',
     'manager'           => '🏢 Manager',
     'pemesan_pr_besar'  => '📋 Pemesan PR Besar',
+    'bagian_produksi'   => '🏭 Bagian Produksi',
     'finance'           => '💰 Finance',
     'it'                => '💻 IT',
 ];
@@ -89,6 +90,7 @@ $badge_role = [
     'admin_gudang'      => 'bg-success',
     'bagian_pembelian'  => 'bg-info',
     'pemesan_pr_besar'  => 'bg-warning text-dark',
+    'bagian_produksi'   => 'bg-danger text-white',
     'finance'           => 'bg-purple text-white',
     'it'                => 'bg-info text-white',
 ];

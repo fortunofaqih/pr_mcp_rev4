@@ -50,6 +50,13 @@ while ($row = mysqli_fetch_assoc($result_kondisi)) {
         .badge-inactive { background-color: #dc3545; color: white; }
         .badge-baik { background-color: #28a745; color: white; }
         .badge-diservice { background-color: #ffc107; color: #000; }
+        .badge-dibongkar { background-color: #dc3545; color: white; }
+        .badge-dipoles { background-color: #17a2b8; color: white; }
+        .badge-dipopok { background-color: #6f42c1; color: white; }
+        .badge-dibubut { background-color: #fd7e14; color: white; }
+        .badge-spei { background-color: #20c997; color: white; }
+        .badge-stell { background-color: #e83e8c; color: white; }
+        .badge-gulung-dinamo { background-color: #6c757d; color: white; }
         .btn-kondisi {
             background: #ffc107;
             color: #000;
@@ -117,14 +124,7 @@ while ($row = mysqli_fetch_assoc($result_kondisi)) {
 </nav>
 
 <div class="container-fluid px-3 px-sm-4">
-    <div class="alert alert-light border small mb-3">
-        <i class="fas fa-circle-info text-primary me-1"></i>
-        Kelola data mesin yang digunakan di perusahaan. 
-        <span class="badge badge-active">AKTIF</span> = mesin masih digunakan,
-        <span class="badge badge-inactive">NONAKTIF</span> = mesin sudah tidak digunakan.
-        <span class="badge badge-baik">BAIK</span> = kondisi mesin baik,
-        <span class="badge badge-diservice">DISERVICE</span> = mesin sedang dalam perbaikan.
-    </div>
+   
 
     <div class="card">
         <div class="card-body">
@@ -162,9 +162,20 @@ while ($row = mysqli_fetch_assoc($result_kondisi)) {
                                 $end_date = $kondisi_terakhir[$id_mesin]['end_date'] ?? '-';
                             }
                             
-                            $badge_kondisi = $kondisi == 'BAIK' 
-                                ? '<span class="badge badge-baik"><i class="fas fa-check-circle me-1"></i>BAIK</span>'
-                                : '<span class="badge badge-diservice"><i class="fas fa-tools me-1"></i>DISERVICE</span>';
+                            // Mapping kondisi ke badge dengan semua pilihan
+                            $badge_map = [
+                                'BAIK' => '<span class="badge badge-baik"><i class="fas fa-check-circle me-1"></i>BAIK</span>',
+                                'DISERVICE' => '<span class="badge badge-diservice"><i class="fas fa-tools me-1"></i>DISERVICE</span>',
+                                'DIBONGKAR' => '<span class="badge badge-dibongkar"><i class="fas fa-wrench me-1"></i>DIBONGKAR</span>',
+                                'DIPOLES' => '<span class="badge badge-dipoles"><i class="fas fa-brush me-1"></i>DIPOLES</span>',
+                                'DI POPOK' => '<span class="badge badge-dipopok"><i class="fas fa-baby me-1"></i>DI POPOK</span>',
+                                'DI BUBUT' => '<span class="badge badge-dibubut"><i class="fas fa-cog me-1"></i>DI BUBUT</span>',
+                                'SPEI' => '<span class="badge badge-spei"><i class="fas fa-gear me-1"></i>SPEI</span>',
+                                'STELL' => '<span class="badge badge-stell"><i class="fas fa-circle me-1"></i>STELL</span>',
+                                'GULUNG DINAMO' => '<span class="badge badge-gulung-dinamo"><i class="fas fa-bolt me-1"></i>GULUNG DINAMO</span>'
+                            ];
+                            
+                            $badge_kondisi = isset($badge_map[$kondisi]) ? $badge_map[$kondisi] : '<span class="badge bg-secondary">' . htmlspecialchars($kondisi) . '</span>';
                         ?>
                         <tr>
                             <td class="fw-bold text-primary"><?= htmlspecialchars($d['id_mesin']) ?></td>
