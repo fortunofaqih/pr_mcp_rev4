@@ -1,8 +1,7 @@
 <?php
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
-
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 if ($_SESSION['status'] != "login") {
     header("location:../../login.php?pesan=belum_login");
@@ -35,6 +34,19 @@ if ($h['status_request'] == 'PROSES') {
 }
 
 $nama_user_login = isset($_SESSION['username']) ? strtoupper($_SESSION['username']) : "USER";
+
+// ── Cek apakah ada item dari kategori IT ──────────────────────
+$query_cek_it = mysqli_query($koneksi, 
+    "SELECT COUNT(*) as total_it FROM tr_request_detail 
+     WHERE id_request = '$id' AND kategori_barang LIKE '%IT%'"
+);
+$cek_it = mysqli_fetch_assoc($query_cek_it);
+$has_it_item = ($cek_it['total_it'] > 0);
+
+// ── Ambil data PO untuk lampiran ──────────────────────────────
+$po_data = mysqli_fetch_assoc(mysqli_query($koneksi,
+    "SELECT * FROM tr_purchase_order WHERE id_request='$id' LIMIT 1"
+));
 
 // ════════════════════════════════════════════════════════════════
 // Ambil semua data master SEKALI, simpan ke array
@@ -152,11 +164,38 @@ mysqli_free_result($res_detail);
             padding: 3px 5px; 
             display: block; 
         }
+        /* Style untuk section lampiran IT */
+        .lampiran-it-box {
+            background: #f0f7ff;
+            border: 1px solid #b6d4fe;
+            border-radius: 8px;
+            padding: 15px 18px;
+            margin-top: 15px;
+        }
+        .lampiran-it-box .title {
+            font-weight: 700;
+            color: #0d6efd;
+            font-size: 0.85rem;
+        }
+        .lampiran-it-box .file-info {
+            font-size: 0.8rem;
+            color: #495057;
+        }
+        .lampiran-it-box .file-info a {
+            color: #0d6efd;
+            text-decoration: none;
+        }
+        .lampiran-it-box .file-info a:hover {
+            text-decoration: underline;
+        }
+        .select2-container--open {
+            z-index: 99999 !important;
+        }
     </style>
 </head>
 <body class="py-4">
 <div class="container-fluid">
-    <form action="proses_edit_request.php" method="POST">
+    <form action="proses_edit_request.php" method="POST" enctype="multipart/form-data">
         <input type="hidden" name="id_request" value="<?= $h['id_request'] ?>">
 
         <div class="row justify-content-center">
@@ -290,6 +329,11 @@ mysqli_free_result($res_detail);
                                                         <option value="<?= $kat ?>" <?= $d['kategori_barang'] == $kat ? 'selected' : '' ?>><?= $kat ?></option>
                                                     <?php endforeach; ?>
                                                 </optgroup>
+                                                <optgroup label="IT">
+                                                    <?php foreach (['IT','INVESTASI IT'] as $kat): ?>
+                                                        <option value="<?= $kat ?>" <?= $d['kategori_barang'] == $kat ? 'selected' : '' ?>><?= $kat ?></option>
+                                                    <?php endforeach; ?>
+                                                </optgroup>
                                             </select>
                                         <?php endif; ?>
                                     </td>
@@ -381,6 +425,45 @@ mysqli_free_result($res_detail);
                             <i class="fas fa-plus me-1"></i> Tambah Baris
                         </button>
 
+                        <?php if ($has_it_item): ?>
+                        <!-- ─── LAMPIRAN PDF KHUSUS IT ───────────────────────────────── -->
+                        <div class="lampiran-it-box">
+                            <div class="title">
+                                <i class="fas fa-file-pdf text-danger me-2"></i>
+                                LAMPIRAN PENAWARAN / SPESIFIKASI IT
+                            </div>
+                            <p class="text-muted small mt-2 mb-2">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Karena terdapat item dengan kategori IT, silakan upload file penawaran/spesifikasi (format PDF, maks. 5MB).
+                            </p>
+
+                            <?php if ($po_data && !empty($po_data['file_penawaran'])): ?>
+                                <div class="file-info alert alert-light border py-2 px-3 mb-2">
+                                    <i class="fas fa-file-pdf text-danger me-1"></i>
+                                    File saat ini:
+                                    <a href="../../uploads/penawaran/<?= htmlspecialchars($po_data['file_penawaran']) ?>" 
+                                       target="_blank" 
+                                       class="fw-bold">
+                                        <?= htmlspecialchars($po_data['file_penawaran']) ?>
+                                    </a>
+                                    <span class="text-muted ms-2">(Upload file baru untuk mengganti)</span>
+                                </div>
+                            <?php endif; ?>
+
+                            <input type="file"
+                                   name="file_penawaran"
+                                   id="filePenawaran"
+                                   class="form-control form-control-sm"
+                                   accept=".pdf"
+                                   style="text-transform:none; max-width: 500px;">
+
+                            <small class="text-muted">
+                                <i class="fas fa-file-pdf text-danger me-1"></i>
+                                Format: PDF saja. Jika dikosongkan, file lama tetap dipakai (jika ada).
+                            </small>
+                        </div>
+                        <?php endif; ?>
+
                     </div><!-- /.card-body -->
 
                     <div class="card-footer bg-white py-3">
@@ -415,6 +498,10 @@ var OPSI_KATEGORI =
         '<option value="KANTOR">KANTOR</option>'     +
         '<option value="BANGUNAN">BANGUNAN</option>' +
         '<option value="UMUM">UMUM</option>'         +
+    '</optgroup>' +
+    '<optgroup label="IT">' +
+        '<option value="IT">IT</option>' +
+        '<option value="INVESTASI IT">INVESTASI IT</option>' +
     '</optgroup>';
 </script>
 
@@ -451,27 +538,22 @@ $(document).ready(function () {
     });
 
     // ── Hapus baris ──────────────────────────────────────────────
-	 // ── Hapus baris ──────────────────────────────────────────────
-	$(document).on('click', '.remove-row', function () {
-		// Menghitung SEMUA baris yang ada di tabel (termasuk yang locked)
-		var totalBaris = $('#tableItem tbody tr').length;
+    $(document).on('click', '.remove-row', function () {
+        var totalBaris = $('#tableItem tbody tr').length;
 
-		if (totalBaris > 1) {
-			$(this).closest('tr').remove();
-		} else {
-			Swal.fire({
-				icon: 'error',
-				title: 'Gagal Menghapus',
-				text: 'Request harus memiliki minimal 1 item barang.',
-				confirmButtonColor: '#0000FF'
-			});
-		}
-	});
+        if (totalBaris > 1) {
+            $(this).closest('tr').remove();
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal Menghapus',
+                text: 'Request harus memiliki minimal 1 item barang.',
+                confirmButtonColor: '#0000FF'
+            });
+        }
+    });
 
     // ── Tambah baris baru ─────────────────────────────────────────
-    // Menggunakan variabel JS (OPSI_*) bukan DOM query,
-    // sehingga aman di semua environment termasuk Windows Server.
-    // Baris baru TIDAK memiliki hidden input locked — hanya pakai select/input biasa.
     $('#addRow').on('click', function () {
 
         var newRow = $('<tr class="item-row"></tr>');
@@ -570,7 +652,7 @@ $(document).ready(function () {
 
         // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
         if (now - lastServerUpdate > 300000) {
-            fetch('/pr_mcp_rev4/auth/keep_alive.php')
+            fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
                 .then(response => response.json())
                 .then(data => {
                     if (data.status !== 'success') {
@@ -589,7 +671,7 @@ $(document).ready(function () {
     function forceLogout() {
         alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
         // Redirect ke logout.php agar session server juga dihancurkan
-        window.location.href = "/pr_mcp_rev4/auth/logout.php?pesan=timeout";
+        window.location.href = "http://192.168.31.200/pr_mcp/auth/logout.php?pesan=timeout";
     }
 
     // Pantau aktivitas user
@@ -604,7 +686,7 @@ $(document).ready(function () {
     setInterval(function() {
         idleTime++;
         // Cek session ke server juga
-        fetch('/pr_mcp_rev4/auth/keep_alive.php')
+        fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
             .then(response => response.json())
             .then(data => {
                 if (data.status !== 'success') {
