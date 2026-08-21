@@ -100,8 +100,8 @@ if ($is_finance) {
     $r = mysqli_fetch_assoc(mysqli_query($koneksi,
         "SELECT COUNT(*) AS c FROM tr_request
          WHERE kategori_pr='BESAR'
-           AND status_approval NOT IN ('APPROVED','DISETUJUI')
-           AND status_request NOT IN ('SELESAI','REJECTED')"));
+           AND status_request NOT IN ('SELESAI','BATAL')  -- ✅ BATAL tidak dihitung
+           AND status_approval NOT IN ('APPROVED','DISETUJUI')"));
     $fin_pr_tunggu = (int)$r['c'];
 
     // Bln lalu untuk perbandingan nilai
@@ -129,13 +129,13 @@ if ($is_finance) {
         $fin_tren[] = ['label' => $label, 'nilai' => (float)$r['t']];
     }
 
-    // PR Besar 10 terbaru
+    // PR Besar 10 terbaru - ✅ status BATAL tidak ditampilkan
     $fin_pr_besar = mysqli_query($koneksi,
         "SELECT no_request, nama_pemesan, tgl_request,
                 status_request, status_approval, keterangan
          FROM tr_request
          WHERE kategori_pr='BESAR'
-           AND status_request NOT IN ('REJECTED')
+           AND status_request NOT IN ('REJECTED','BATAL')  -- ✅ BATAL tidak ditampilkan
          ORDER BY id_request DESC LIMIT 10");
 
     // PO Open terbaru
@@ -320,6 +320,8 @@ if ($is_finance) {
                     <li class="nav-item"><a href="modul/master/data_satuan.php" class="nav-link text-warning fw-bold"><i class="fas fa-ruler-horizontal me-2"></i> Master Satuan</a></li>
                     <li class="nav-item"><a href="modul/master/data_rak.php" class="nav-link text-warning fw-bold"><i class="fas fa-warehouse me-2"></i> Master Rak</a></li>
                     <li class="nav-item"><a href="modul/master/mesin.php" class="nav-link text-warning fw-bold"><i class="fas fa-industry me-2"></i> Master Mesin</a></li>
+                    <li class="nav-item"><a href="modul/master/master_kawat.php" class="nav-link text-warning fw-bold"><i class="fas fa-cubes me-2"></i> Master Kawat</a></li>
+                    <li class="nav-item"><a href="modul/master/master_oli.php" class="nav-link text-warning fw-bold"><i class="fas fa-gas-pump me-2"></i> Master Oli</a></li>
 
                     <div class="nav-category">-- Transaksi Gudang --</div>
                     <li class="nav-item"><a href="modul/transaksi/tambah_request.php" class="nav-link text-warning fw-bold"><i class="fas fa-file-invoice me-2"></i> Form PR (Kecil)</a></li>
@@ -329,10 +331,11 @@ if ($is_finance) {
                     <li class="nav-item"><a href="modul/transaksi/verifikasi_pembelian.php" class="nav-link text-warning fw-bold"><i class="fas fa-check-double me-2"></i> Verifikasi Pembelian</a></li>
                     <li class="nav-item"><a href="modul/transaksi/pengambilan.php" class="nav-link text-warning fw-bold"><i class="fas fa-dolly me-2"></i> Bon Pengambilan</a></li>
                     <li class="nav-item"><a href="modul/transaksi/retur.php" class="nav-link text-warning fw-bold"><i class="fas fa-undo me-2"></i> Retur Barang</a></li>
-
+                    
                     <div class="nav-category">-- Stok Ban Luar (Bekas) --</div>
                     <li class="nav-item"><a href="modul/ban/cek_status_ban_luar.php" class="nav-link text-warning fw-bold"><i class="fas fa-car me-2"></i> Cek Status Ban</a></li>
-                     <li class="nav-item"><a href="modul/ban/laporan_stok_ban_luar.php" class="nav-link text-warning fw-bold"><i class="fas fa-file-invoice-dollar me-2"></i> Laporan Stok Ban Luar</a></li>
+                    <li class="nav-item"><a href="modul/ban/laporan_stok_ban_luar.php" class="nav-link text-warning fw-bold"><i class="fas fa-file-invoice-dollar me-2"></i> Laporan Stok Ban Luar</a></li>
+
 
                     <div class="nav-category">-- Penyesuaian --</div>
                     <li class="nav-item"><a href="modul/transaksi/koreksi.php" class="nav-link text-warning fw-bold"><i class="fas fa-sync me-2"></i> Koreksi Stok</a></li>
@@ -354,20 +357,22 @@ if ($is_finance) {
                     <div class="nav-category">Master Data</div>
                     <li class="nav-item"><a href="modul/master/data_barang.php" class="nav-link text-warning fw-bold"><i class="fas fa-boxes me-2"></i> Master Barang</a></li>
                     <li class="nav-item"><a href="modul/master/data_supplier.php" class="nav-link text-warning fw-bold"><i class="fa-brands fa-shopify me-2"></i> Master Supplier</a></li>
+                    <li class="nav-item"><a href="modul/master/master_kawat.php" class="nav-link text-warning fw-bold"><i class="fas fa-cubes me-2"></i> Master Kawat</a></li>
                 <div class="nav-category">Pembelian</div>
                 <li class="nav-item"><a href="modul/pembelian/index.php" class="nav-link"><i class="fas fa-shopping-cart me-2"></i> Halaman Pembelian</a></li>
                 <!--<li class="nav-item"><a href="modul/transaksi/tambah_request.php" class="nav-link"><i class="fas fa-clipboard me-2"></i> Form PR (Kecil)</a></li>-->
                 <li class="nav-item"><a href="modul/transaksi/tambah_request_besar.php" class="nav-link text-warning fw-bold"><i class="fas fa-cart-plus me-2"></i> Form PR (Besar)</a></li>
                 <li class="nav-item"><a href="modul/transaksi/update_status_ban.php" class="nav-link"><i class="fas fa-car me-2"></i> Update Status PO</a></li>
             <?php endif; ?>
-            <!-- MENU BAGIAN PRODUKSI -->
+             <!-- MENU BAGIAN PRODUKSI -->
                 <?php if ($role == 'bagian_produksi') : ?>
                     <div class="nav-category">Master Data</div>
                     <li class="nav-item"><a href="modul/master/mesin.php" class="nav-link text-warning fw-bold"><i class="fas fa-industry me-2"></i> Master Mesin</a></li>
+                    <li class="nav-item"><a href="modul/master/master_oli.php" class="nav-link text-warning fw-bold"><i class="fas fa-gas-pump me-2"></i> Master Oli</a></li>
             <?php endif; ?>
                 <!-- MENU BAGIAN PEMESAN PR -->
             <?php if ($is_pemesan_pr) : ?>
-				<div class="nav-category">-- Step 1 - Master Data --</div>
+                <div class="nav-category">-- Step 1 - Master Data --</div>
                     <li class="nav-item"><a href="modul/master/data_barang.php" class="nav-link text-warning fw-bold"><i class="fas fa-boxes me-2"></i> Master Barang</a></li>
                     <li class="nav-item"><a href="modul/master/data_supplier.php" class="nav-link text-warning fw-bold"><i class="fa-brands fa-shopify me-2"></i> Master Supplier</a></li>
                 <div class="nav-category">-- Step 2 - Form Request --</div>
@@ -381,10 +386,10 @@ if ($is_finance) {
                         <i class="fas fa-bars-progress me-2"></i> Progress PR
                     </a>
                 </li>
-				<div class="nav-category">-- Step 3 - Pembelian --</div>
+                <div class="nav-category">-- Step 3 - Pembelian --</div>
                 <li class="nav-item"><a href="modul/pembelian/index.php" class="nav-link text-warning fw-bold"><i class="fas fa-shopping-cart me-2"></i> Halaman Pembelian</a></li>
-				<li class="nav-item"><a href="modul/transaksi/verifikasi_pembelian.php" class="nav-link text-warning fw-bold"><i class="fas fa-check-double me-2"></i> Verifikasi Pembelian</a></li>
-				<li class="nav-item"><a href="modul/transaksi/update_status_ban.php" class="nav-link text-warning fw-bold"><i class="fas fa-car me-2"></i> Update Status PO</a></li>
+                <li class="nav-item"><a href="modul/transaksi/verifikasi_pembelian.php" class="nav-link text-warning fw-bold"><i class="fas fa-check-double me-2"></i> Verifikasi Pembelian</a></li>
+                <li class="nav-item"><a href="modul/transaksi/update_status_ban.php" class="nav-link text-warning fw-bold"><i class="fas fa-car me-2"></i> Update Status PO</a></li>
                  
             <?php endif; ?>
                  <!-- MENU FINANCE -->
@@ -400,7 +405,7 @@ if ($is_finance) {
                             <i class="fas fa-file-invoice me-2"></i> Purchase Request (PR)
                         </a>
                     </li>
-                     <li class="nav-item">
+                      <li class="nav-item">
                         <a href="modul/laporan/data_pembelian_finance.php" class="nav-link">
                             <i class="fas fa-file-alt me-2"></i> Buku Pembelian
                         </a>
@@ -863,6 +868,7 @@ if ($is_finance) {
 .fb-proses  { background: #dbeafe; color: #1e40af; }
 .fb-selesai { background: #dcfce7; color: #166534; }
 .fb-pending { background: #f1f5f9; color: #64748b; }
+.fb-batal   { background: #fee2e2; color: #991b1b; }  /* ✅ Badge baru untuk status BATAL */
 
 /* Mini bar chart (CSS-only) */
 .mini-bar-wrap {
@@ -957,11 +963,12 @@ $r = mysqli_fetch_assoc(mysqli_query($koneksi,
        AND DATE(r.updated_at) BETWEEN '$bln_lalu_awal' AND '$bln_lalu_akhir'"));
 $fin_nilai_close_lalu = (float)$r['t'];
 
+// ✅ Query PR tunggu - BATAL tidak dihitung
 $r = mysqli_fetch_assoc(mysqli_query($koneksi,
     "SELECT COUNT(*) AS c FROM tr_request
      WHERE kategori_pr='BESAR'
-       AND status_approval NOT IN ('APPROVED','DISETUJUI')
-       AND status_request NOT IN ('SELESAI','REJECTED')"));
+       AND status_request NOT IN ('SELESAI','BATAL')
+       AND status_approval NOT IN ('APPROVED','DISETUJUI')"));
 $fin_pr_tunggu = (int)$r['c'];
 
 // Tren 6 bulan
@@ -984,13 +991,13 @@ for ($i = 5; $i >= 0; $i--) {
     if ((float)$r['t'] > $fin_tren_max) $fin_tren_max = (float)$r['t'];
 }
 
-// PR Besar terbaru
+// ✅ PR Besar terbaru - BATAL dan REJECTED tidak ditampilkan
 $fin_pr_besar = mysqli_query($koneksi,
     "SELECT no_request, nama_pemesan, tgl_request,
             status_request, status_approval, keterangan
      FROM tr_request
      WHERE kategori_pr='BESAR'
-       AND status_request NOT IN ('REJECTED')
+       AND status_request NOT IN ('REJECTED','BATAL')
      ORDER BY id_request DESC LIMIT 8");
 
 // PO Open terbaru
@@ -1073,7 +1080,7 @@ function fin_rp(float $n): string {
             <div class="fin-stat-icon"><i class="fas fa-hourglass-half"></i></div>
             <div class="fin-stat-lbl">PR Besar Menunggu</div>
             <div class="fin-stat-val"><?= $fin_pr_tunggu ?></div>
-            <div class="fin-stat-sub">Belum disetujui</div>
+            <div class="fin-stat-sub">Belum disetujui (excl. BATAL)</div>
         </div>
 
         <div class="fin-stat s4">
@@ -1163,6 +1170,7 @@ function fin_rp(float $n): string {
             <div class="fin-panel-title">
                 <i class="fas fa-clipboard-list"></i>
                 PR Kategori Besar — Terbaru
+                <span style="font-size:.65rem;color:#94a3b8;font-weight:400;margin-left:4px;">(excl. BATAL)</span>
             </div>
             <a href="modul/finance/index.php" style="font-size:.72rem;color:#1d4ed8;font-weight:700;text-decoration:none;">
                 Monitor lengkap <i class="fas fa-arrow-right ms-1"></i>
@@ -1188,10 +1196,12 @@ function fin_rp(float $n): string {
                         $has_pr = true;
                         $sr = $pr['status_request'];
                         $is_appr = in_array($pr['status_approval'], ['APPROVED','DISETUJUI']);
+                        $is_batal = ($sr === 'BATAL');
 
                         if ($sr === 'PENDING')  $sc = 'fb-pending';
                         elseif ($sr === 'PROSES') $sc = 'fb-proses';
                         elseif ($sr === 'SELESAI') $sc = 'fb-selesai';
+                        elseif ($sr === 'BATAL') $sc = 'fb-batal';
                         else $sc = 'fb-pending';
                 ?>
                 <tr>
@@ -1200,7 +1210,9 @@ function fin_rp(float $n): string {
                     <td class="d-none d-md-table-cell" style="font-weight:600;font-size:.78rem;"><?= htmlspecialchars(strtoupper($pr['nama_pemesan'])) ?></td>
                     <td><span class="fbdg <?= $sc ?>"><?= htmlspecialchars($sr) ?></span></td>
                     <td>
-                        <?php if ($is_appr): ?>
+                        <?php if ($is_batal): ?>
+                            <span class="fbdg fb-batal"><i class="fas fa-ban me-1"></i>BATAL</span>
+                        <?php elseif ($is_appr): ?>
                             <span class="fbdg fb-appr"><i class="fas fa-check-circle me-1"></i>APPROVED</span>
                         <?php else: ?>
                             <span class="fbdg fb-tunggu"><i class="fas fa-hourglass-half me-1"></i>MENUNGGU</span>
@@ -1212,7 +1224,7 @@ function fin_rp(float $n): string {
                 </tr>
                 <?php endwhile; } ?>
                 <?php if (!$has_pr): ?>
-                <tr><td colspan="6" class="fin-empty"><i class="fas fa-inbox"></i>Tidak ada PR Besar.</td></tr>
+                <tr><td colspan="6" class="fin-empty"><i class="fas fa-inbox"></i>Tidak ada PR Besar aktif.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
@@ -1303,9 +1315,9 @@ function fin_rp(float $n): string {
 <?php if ($is_gudang_access) : ?>
     <?php
     // --- LANGKAH 1: HITUNG SEMUA DATA DULU ---
-	$labels = []; 
-	$data_biaya = []; 
-	$data_qty = [];
+    $labels = []; 
+    $data_biaya = []; 
+    $data_qty = [];
     $query_bulanan = mysqli_query($koneksi, "
         SELECT m.bulan,
                COALESCE(pb.jml_beli, 0) as jml_beli,

@@ -182,19 +182,46 @@ try {
     $ppn_nominal = $total_po * ($ppn_persen / 100);
     $grand_total = $total_po + $ppn_nominal;
 
-    // Generate nomor PO draft
+    // ── GENERATE NOMOR PO (RESET KE 1 SETIAP BULAN) ──────────
+    // Format: MCP-0001/IX/26
+    // 🔥 NOMOR AKAN RESET KE 1 SETIAP PERGANTIAN BULAN
+    
     $bln_po  = (int)date('n', strtotime($tgl_po));
     $thn_po  = date('y', strtotime($tgl_po));
-    $suf_po  = "/" . $bulan_romawi[$bln_po] . "/" . $thn_po;
-    $cek_po  = mysqli_fetch_array(mysqli_query($koneksi,
-        "SELECT no_po FROM tr_purchase_order WHERE no_po LIKE 'MCP-%' ORDER BY id_po DESC LIMIT 1"
-    ));
+    $romawi_po = $bulan_romawi[$bln_po];
+    $suffix_po = "/" . $romawi_po . "/" . $thn_po;
+    
+    // 🔥 CARI NOMOR URUT TERTINGGI UNTUK BULAN DAN TAHUN YANG SAMA
+    // Contoh: jika sekarang Agustus 2026, cari pola 'MCP-%/VIII/26'
+    $cek_po = mysqli_query($koneksi,
+        "SELECT no_po FROM tr_purchase_order 
+         WHERE no_po LIKE 'MCP-%/" . $romawi_po . "/" . $thn_po . "'
+         ORDER BY id_po DESC LIMIT 1"
+    );
+    
     $urut_po = 1;
-    if ($cek_po) {
-        preg_match('/MCP-(\d+)/', $cek_po['no_po'], $match_po);
-        $urut_po = (int)($match_po[1] ?? 0) + 1;
+    if ($cek_po && mysqli_num_rows($cek_po) > 0) {
+        $last_po = mysqli_fetch_array($cek_po);
+        // Ekstrak nomor urut dari MCP-XXXX/IX/26
+        // Contoh: MCP-0067/VIII/26 → ambil 0067
+        preg_match('/MCP-(\d+)\/' . $romawi_po . '\/' . $thn_po . '/', $last_po['no_po'], $match_po);
+        if (isset($match_po[1])) {
+            $urut_po = (int)$match_po[1] + 1;
+        } else {
+            // Fallback: jika pattern tidak match, coba cara alternatif
+            $parts_po = explode('/', $last_po['no_po']);
+            if (isset($parts_po[0])) {
+                $mcp_part = $parts_po[0]; // MCP-0067
+                $num_part = explode('-', $mcp_part);
+                if (isset($num_part[1])) {
+                    $urut_po = (int)$num_part[1] + 1;
+                }
+            }
+        }
     }
-    $no_po = "MCP-" . str_pad($urut_po, 4, '0', STR_PAD_LEFT) . $suf_po;
+    
+    // Format nomor urut dengan 4 digit (0001, 0002, dst)
+    $no_po = "MCP-" . str_pad($urut_po, 4, '0', STR_PAD_LEFT) . $suffix_po;
 
     // PO status DRAFT saat simpan, berubah OPEN saat semua approval selesai
     $sql_po = "INSERT INTO tr_purchase_order

@@ -34,6 +34,7 @@ $result_po_open = mysqli_query($koneksi,
      JOIN tr_request r ON p.id_request = r.id_request
      LEFT JOIN master_supplier s ON p.id_supplier = s.id_supplier
      WHERE p.status_po = 'OPEN'
+     AND r.status_request NOT IN ('BATAL')  -- ✅ BATAL tidak ditampilkan
      $where_search_open
      ORDER BY p.tgl_approve DESC");
 
@@ -51,6 +52,7 @@ $result_po_close = mysqli_query($koneksi,
      JOIN tr_request r ON p.id_request = r.id_request
      LEFT JOIN master_supplier s ON p.id_supplier = s.id_supplier
      WHERE p.status_po = 'CLOSE'
+     AND r.status_request NOT IN ('BATAL')  -- ✅ BATAL tidak ditampilkan
      $where_search_close
      ORDER BY r.updated_at DESC");
 
@@ -72,6 +74,7 @@ $po_detail        = null;
 $detail_items     = null;
 $id_request_sel   = 0;
 $total_nota_aktual = 0.0;
+$is_usd = false; // Flag untuk menentukan mata uang
 
 if ($id_po_filter) {
     $id_po_safe = (int)$id_po_filter; // sudah int, aman
@@ -88,10 +91,20 @@ if ($id_po_filter) {
          JOIN tr_request r ON p.id_request = r.id_request
          LEFT JOIN master_supplier s ON p.id_supplier = s.id_supplier
          WHERE p.id_po = $id_po_safe
+         AND r.status_request NOT IN ('BATAL')  -- ✅ BATAL tidak ditampilkan
          LIMIT 1"));
 
     if ($po_detail) {
         $id_request_sel = (int)$po_detail['id_request'];
+
+        // Cek apakah ada item dengan keterangan USD
+        $cek_usd = mysqli_query($koneksi,
+            "SELECT COUNT(*) AS total_usd 
+             FROM tr_request_detail 
+             WHERE id_request = $id_request_sel 
+             AND keterangan LIKE '%USD%'");
+        $data_usd = mysqli_fetch_assoc($cek_usd);
+        $is_usd = ($data_usd['total_usd'] > 0);
 
         // Total realisasi dari nota pembelian (qty × harga)
         $q_realisasi       = mysqli_query($koneksi,
@@ -102,20 +115,22 @@ if ($id_po_filter) {
         $data_realisasi    = mysqli_fetch_assoc($q_realisasi);
         $total_nota_aktual = (float)($data_realisasi['total_nota'] ?? 0);
 
-        $detail_items = mysqli_query($koneksi,
-            "SELECT d.*,
-                    b.nama_barang AS nama_master,
-                    m.plat_nomor,
-                    pb.tgl_beli_barang,
-                    pb.id_user_beli,
-                    u.nama_lengkap AS nama_petugas_beli
-             FROM tr_request_detail d
-             LEFT JOIN master_barang b  ON d.id_barang  = b.id_barang
-             LEFT JOIN master_mobil  m  ON d.id_mobil   = m.id_mobil
-             LEFT JOIN pembelian     pb ON d.id_detail  = pb.id_request_detail
-             LEFT JOIN users         u  ON pb.id_user_beli = u.id_user
-             WHERE d.id_request = $id_request_sel
-             ORDER BY d.id_detail ASC");
+		   $detail_items = mysqli_query($koneksi,
+		"SELECT d.*,
+				d.tgl_pasang   AS tgl_pasang,    
+				d.pasang_oleh  AS pasang_oleh,  
+				b.nama_barang AS nama_master,
+				m.plat_nomor,
+				pb.tgl_beli_barang,
+				pb.id_user_beli,
+				u.nama_lengkap AS nama_petugas_beli
+		 FROM tr_request_detail d
+		 LEFT JOIN master_barang b  ON d.id_barang  = b.id_barang
+		 LEFT JOIN master_mobil  m  ON d.id_mobil   = m.id_mobil
+		 LEFT JOIN pembelian     pb ON d.id_detail  = pb.id_request_detail
+		 LEFT JOIN users         u  ON pb.id_user_beli = u.id_user
+		 WHERE d.id_request = $id_request_sel
+		 ORDER BY d.id_detail ASC");
     }
 }
 
@@ -143,7 +158,10 @@ $periode   = $bulan_id[(int)date('m')] . ' ' . date('Y');
 
 $r = mysqli_fetch_assoc(mysqli_query($koneksi,
     "SELECT COALESCE(SUM(grand_total), 0) AS total
-     FROM tr_purchase_order WHERE status_po = 'OPEN'"));
+     FROM tr_purchase_order p
+     JOIN tr_request r ON p.id_request = r.id_request
+     WHERE p.status_po = 'OPEN'
+     AND r.status_request NOT IN ('BATAL')"));  // ✅ BATAL tidak dihitung
 $nilai_open = (float)$r['total'];
 
 $r = mysqli_fetch_assoc(mysqli_query($koneksi,
@@ -151,14 +169,15 @@ $r = mysqli_fetch_assoc(mysqli_query($koneksi,
      FROM tr_purchase_order p
      JOIN tr_request r ON p.id_request = r.id_request
      WHERE p.status_po = 'CLOSE'
+     AND r.status_request NOT IN ('BATAL')  -- ✅ BATAL tidak dihitung
        AND DATE(r.updated_at) BETWEEN '$bln_awal' AND '$bln_akhir'"));
 $po_close_bulan = (int)$r['c'];
 
 $r = mysqli_fetch_assoc(mysqli_query($koneksi,
     "SELECT COUNT(*) AS c FROM tr_request
      WHERE kategori_pr = 'BESAR'
-       AND status_approval NOT IN ('APPROVED','DISETUJUI')
-       AND status_request  NOT IN ('SELESAI','REJECTED')"));
+       AND status_request NOT IN ('SELESAI','REJECTED','BATAL')  -- ✅ BATAL tidak dihitung
+       AND status_approval NOT IN ('APPROVED','DISETUJUI')"));
 $pr_tunggu_appr = (int)$r['c'];
 
 // ── Helper format rupiah ───────────────────────────────────────
@@ -448,6 +467,7 @@ body {
 .bdg-tunggu  { background: var(--amber-lt); color: #92400e; }
 .bdg-proses  { background: var(--blue-lt);  color: var(--navy-mid); }
 .bdg-selesai { background: var(--green-lt); color: #065f46; }
+.bdg-batal   { background: var(--red-lt);   color: #991b1b; }  /* ✅ Badge untuk status BATAL */
 
 /* ── DETAIL PANEL ─────────────────────── */
 .detail-card {
@@ -698,7 +718,7 @@ body {
             <div class="stat-icon"><i class="fas fa-hourglass-half"></i></div>
             <div class="stat-label">PR Besar Menunggu</div>
             <div class="stat-value"><?= $pr_tunggu_appr ?></div>
-            <div class="stat-sub">Belum disetujui</div>
+            <div class="stat-sub">Belum disetujui (excl. BATAL)</div>
         </div>
         <div class="stat-card sc-nilai">
             <div class="stat-icon"><i class="fas fa-wallet"></i></div>
@@ -809,6 +829,7 @@ body {
         <?php
         $is_close_view = ($po_detail['status_po'] === 'CLOSE');
         $is_approved   = in_array($po_detail['status_approval'] ?? '', ['APPROVED', 'DISETUJUI']);
+        $is_batal      = ($po_detail['status_request'] ?? '') === 'BATAL';
         ?>
 
         <div class="detail-head">
@@ -817,7 +838,9 @@ body {
                     <!-- Nomor PO + badges -->
                     <div class="po-number"><?= htmlspecialchars($po_detail['no_po']) ?></div>
                     <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;">
-                        <?php if ($is_close_view): ?>
+                        <?php if ($is_batal): ?>
+                            <span class="bdg bdg-batal"><i class="fas fa-ban me-1"></i>BATAL</span>
+                        <?php elseif ($is_close_view): ?>
                             <span class="bdg bdg-close"><i class="fas fa-check-double me-1"></i>CLOSE</span>
                         <?php else: ?>
                             <span class="bdg bdg-open"><i class="fas fa-circle me-1" style="font-size:.4rem;"></i>OPEN</span>
@@ -825,7 +848,9 @@ body {
                         <span class="bdg <?= ($po_detail['kategori_pr'] ?? '') === 'BESAR' ? 'bdg-besar' : 'bdg-kecil' ?>">
                             <?= htmlspecialchars($po_detail['kategori_pr'] ?? '-') ?>
                         </span>
-                        <?php if ($is_approved): ?>
+                        <?php if ($is_batal): ?>
+                            <span class="bdg bdg-batal"><i class="fas fa-ban me-1"></i>BATAL</span>
+                        <?php elseif ($is_approved): ?>
                             <span class="bdg bdg-appr"><i class="fas fa-check-circle me-1"></i>APPROVED</span>
                         <?php else: ?>
                             <span class="bdg bdg-tunggu"><i class="fas fa-hourglass-half me-1"></i>MENUNGGU APPROVAL</span>
@@ -897,19 +922,19 @@ body {
                     <div class="info-lbl">Pemesan</div>
                     <div class="info-val"><?= htmlspecialchars(strtoupper($po_detail['nama_pemesan'])) ?></div>
                 </div>
-                <div>
-                    <div class="info-lbl">Grand Total (Sesuai Nota)</div>
-                    <div class="info-val text-money <?= $total_nota_aktual > 0 ? 'text-success' : 'text-danger' ?>">
-                        Rp <?= number_format($total_nota_aktual > 0 ? $total_nota_aktual : (float)$po_detail['grand_total'], 0, ',', '.') ?>
-                        <div style="font-size:.65rem;font-weight:normal;margin-top:2px;color:#666;">
-                            <?php if ($total_nota_aktual > 0): ?>
-                                <i class="fas fa-info-circle me-1"></i> Terupdate dari nota pembelian
-                            <?php else: ?>
-                                <i class="fas fa-exclamation-triangle me-1" style="color:#f39c12;"></i> Masih harga estimasi PO
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
+               <div>
+					<div class="info-lbl">Grand Total (Sesuai Nota)</div>
+					<div class="info-val text-money <?= $total_nota_aktual > 0 ? 'text-success' : 'text-danger' ?>">
+						<?= $is_usd ? '$' : 'Rp' ?> <?= number_format($total_nota_aktual > 0 ? $total_nota_aktual : (float)$po_detail['grand_total'], 0, ',', '.') ?>
+						<div style="font-size:.65rem;font-weight:normal;margin-top:2px;color:#666;">
+							<?php if ($total_nota_aktual > 0): ?>
+								<i class="fas fa-info-circle me-1"></i> Terupdate dari nota pembelian
+							<?php else: ?>
+								<i class="fas fa-exclamation-triangle me-1" style="color:#f39c12;"></i> Masih harga estimasi PO
+							<?php endif; ?>
+						</div>
+					</div>
+				</div>
                 <div>
                     <div class="info-lbl">Keperluan</div>
                     <div class="info-val" style="font-weight:500;"><?= htmlspecialchars($po_detail['tujuan'] ?? '-') ?></div>
@@ -1016,13 +1041,23 @@ body {
                             <?php endif; ?>
                         </td>
                         <td style="text-align:center;">
-                            <?php if ($is_ban): ?>
-                                <?php if ($status_pasang === 'TERPASANG'): ?>
-                                    <span class="bdg st-terpasang"><i class="fas fa-check me-1"></i>TERPASANG</span>
-                                     <div style="font-size:.65rem;color:var(--slate);">tanggal pasang</div>
-                                    <i class="far fa-calendar-alt me-1"></i>
-                                    <?= date('d/m/Y', strtotime($d['tgl_pasang'])) ?>
-                                </div>
+                           <?php if ($is_ban): ?>
+									<?php if ($status_pasang === 'TERPASANG'): ?>
+										<span class="bdg st-terpasang">
+											<i class="fas fa-check me-1"></i>TERPASANG
+										</span>
+										<div style="font-size:.65rem;color:var(--slate);">
+											Dipasang tanggal
+											<i class="far fa-calendar-alt me-1"></i>
+											<?php 
+											// Perbaikan untuk menangani null atau empty date
+											if (!empty($d['tgl_pasang']) && $d['tgl_pasang'] !== null):
+												echo date('d/m/Y', strtotime($d['tgl_pasang']));
+											else:
+												echo '-';
+											endif;
+											?>
+										</div>
                                 <?php else: ?>
                                     <span class="bdg st-belum-pasang"><i class="fas fa-clock me-1"></i>BELUM PASANG</span>
                                 <?php endif; ?>

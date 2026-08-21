@@ -3,7 +3,6 @@
 // proses_simpan_it.php
 // Simpan PR IT (kategori_pr=IT) tanpa PO
 // Mendukung alur 2-3 approval manager
-// + AUTO-CREATE DRAFT PO untuk keperluan ttd approval manager
 // ============================================================
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
@@ -37,9 +36,6 @@ $nama_pemesan = mysqli_real_escape_string($koneksi, strtoupper($_POST['nama_peme
 $nama_pembeli = mysqli_real_escape_string($koneksi, strtoupper($_POST['nama_pembeli'] ?? ''));
 $keterangan   = mysqli_real_escape_string($koneksi, strtoupper($_POST['keterangan']   ?? ''));
 $created_by   = mysqli_real_escape_string($koneksi, $_SESSION['username']  ?? 'SYSTEM');
-
-// Sanitasi grand_total secara defensif
-$grand_total_post = (float)($_POST['grand_total'] ?? 0);
 
 // ── 3. MULAI TRANSAKSI ───────────────────────────────────────
 mysqli_begin_transaction($koneksi);
@@ -80,7 +76,6 @@ try {
         throw new Exception("Tidak ada item barang yang dikirim.");
     }
 
-    $subtotal_total = 0;
     $item_tersimpan = 0;
 
     // ── 5. SIMPAN DETAIL ITEM tr_request_detail ──────────────
@@ -126,7 +121,6 @@ try {
             throw new Exception("Gagal simpan detail baris ke-" . ($i + 1) . ": " . mysqli_error($koneksi));
         }
 
-        $subtotal_total += $subtotal;
         $item_tersimpan++;
     }
 
@@ -135,16 +129,9 @@ try {
         throw new Exception("Tidak ada item valid yang dapat disimpan.");
     }
 
-    // ── 6. AUTO-CREATE DRAFT PO untuk keperluan TTD approval ─
-    //
-    // Draft PO dibuat otomatis dengan status DRAFT.
-    // id_supplier = 0 karena supplier belum ditentukan saat PR,
-    // akan diisi oleh bagian pembelian sebelum/setelah approval.
-    //
-    // Format no_po : DRAFT-PRI/{bulan_romawi}/{tahun}/{nomor}
-    // Contoh       : DRAFT-PRI/V/25/0001
-    // ─────────────────────────────────────────────────────────
-    $prefix_po = "DRAFT-PRI/" . $bulan_romawi[$bln] . "/" . $thn;
+    // ── 6. AUTO-CREATE PO untuk keperluan approval ──────────
+    // Format no_po: PRI/VIII/26/0001 (tanpa DRAFT)
+    $prefix_po = "PRI/" . $bulan_romawi[$bln] . "/" . $thn;
 
     $cek_po = mysqli_query($koneksi,
         "SELECT no_po FROM tr_purchase_order
@@ -159,13 +146,24 @@ try {
     }
     $no_po = $prefix_po . '/' . str_pad($urut_po, 4, '0', STR_PAD_LEFT);
 
-    // PPN default 0% — bisa diupdate saat PO resmi dibuat oleh pembelian
+    // Hitung subtotal dari semua item
+    $subtotal_total = 0;
+    $q_subtotal = mysqli_query($koneksi,
+        "SELECT SUM(subtotal_estimasi) as total 
+         FROM tr_request_detail 
+         WHERE id_request = $id_request"
+    );
+    if ($q_subtotal && $row_sub = mysqli_fetch_assoc($q_subtotal)) {
+        $subtotal_total = (float)($row_sub['total'] ?? 0);
+    }
+
+    // PPN default 0%
     $ppn_persen  = 0.00;
     $ppn_nominal = 0.00;
-    $grand_total = $subtotal_total; // Grand total = subtotal (tanpa PPN dulu)
+    $grand_total = $subtotal_total;
 
     $catatan_po = mysqli_real_escape_string($koneksi,
-        "DRAFT OTOMATIS DARI PR IT NO. $no_request — MENUNGGU APPROVAL MANAGER"
+        "PO DARI PR IT NO. $no_request — MENUNGGU APPROVAL MANAGER"
     );
 
     $sql_po = "INSERT INTO tr_purchase_order
@@ -181,13 +179,11 @@ try {
          '$subtotal_total', 0.00, '$subtotal_total',
          '$ppn_persen', '$ppn_nominal', '$grand_total',
          '$catatan_po', '$nama_pemesan', NULL, NULL,
-         'DRAFT', '$created_by')";
+         'OPEN', '$created_by')";
 
     if (!mysqli_query($koneksi, $sql_po)) {
-        throw new Exception("Gagal buat draft PO: " . mysqli_error($koneksi));
+        throw new Exception("Gagal buat PO: " . mysqli_error($koneksi));
     }
-    // Jika di masa depan perlu insert detail ke tabel tr_po_detail, gunakan:
-    // $id_po = mysqli_insert_id($koneksi);
 
     // ── 7. COMMIT ────────────────────────────────────────────
     mysqli_commit($koneksi);
