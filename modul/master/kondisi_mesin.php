@@ -117,6 +117,9 @@ if ($_SESSION['status'] != "login") {
                                 'DI BUBUT' => '<span class="badge badge-dibubut"><i class="fas fa-cog me-1"></i>DI BUBUT</span>',
                                 'SPEI' => '<span class="badge badge-spei"><i class="fas fa-gear me-1"></i>SPEI</span>',
                                 'STELL' => '<span class="badge badge-stell"><i class="fas fa-circle me-1"></i>STELL</span>',
+                                'DI COR' => '<span class="badge badge-dibongkar"><i class="fas fa-wrench me-1"></i>DI COR</span>',
+                                'DI SELEP' => '<span class="badge badge-dibongkar"><i class="fas fa-wrench me-1"></i>DI SELEP</span>',
+                                'DI GANTI' => '<span class="badge badge-dibongkar"><i class="fas fa-wrench me-1"></i>DI GANTI</span>',
                                 'GULUNG DINAMO' => '<span class="badge badge-gulung-dinamo"><i class="fas fa-bolt me-1"></i>GULUNG DINAMO</span>'
                             ];
                             
@@ -194,6 +197,9 @@ if ($_SESSION['status'] != "login") {
                             <option value="DI BUBUT">DI BUBUT</option>
                             <option value="SPEI">SPEI</option>
                             <option value="STELL">STELL</option>
+                            <option value="DI COR">DI COR</option>
+                            <option value="DI SELEP">DI SELEP</option>
+                            <option value="DI GANTI">DI GANTI</option>
                             <option value="GULUNG DINAMO">GULUNG DINAMO</option>
                         </select>
                     </div>
@@ -254,6 +260,9 @@ if ($_SESSION['status'] != "login") {
                             <option value="SPEI">SPEI</option>
                             <option value="STELL">STELL</option>
                             <option value="GULUNG DINAMO">GULUNG DINAMO</option>
+                            <option value="DI COR">DI COR</option>
+                            <option value="DI SELEP">DI SELEP</option>
+                            <option value="DI GANTI">DI GANTI</option>
                         </select>
                         <small class="text-muted">Pilih kondisi setelah service selesai</small>
                     </div>
