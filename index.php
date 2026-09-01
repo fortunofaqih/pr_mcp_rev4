@@ -410,6 +410,11 @@ if ($is_finance) {
                             <i class="fas fa-file-alt me-2"></i> Buku Pembelian
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a href="modul/finance/fund_transfer.php" class="nav-link">
+                            <i class="fas fa-money-bill-transfer me-2"></i> Fund Transfer
+                        </a>
+                    </li>
                    <!-- <li class="nav-item"><a href="modul/finance/update_pr_besar.php" class="nav-link"><i class="fas fa-bell me-2"></i> Update Status PR</a></li>-->
                 <?php endif; ?>
 

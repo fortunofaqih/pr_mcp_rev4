@@ -1,4 +1,7 @@
 <?php
+/* =========================================================
+   master oli
+   ========================================================= */
 session_start();
 
 require_once __DIR__ . '/../../config/koneksi.php';
@@ -468,8 +471,17 @@ body {
                     href="laporan_oli.php?bulan=<?= date('m') ?>&tahun=<?= date('Y') ?>"
                     class="btn btn-success btn-sm"
                 >
-                    Excel
+                    OLI Excel
                 </a>
+				
+
+				<a
+					href="laporan_solar.php?bulan=<?= date('m') ?>&tahun=<?= date('Y') ?>"
+					class="btn btn-info btn-sm"
+				>
+					<i class="fas fa-gas-pump me-1"></i>
+					Solar Excel
+				</a>
 
                 <a
                     href="../../index.php"
@@ -719,7 +731,7 @@ body {
                     href="master_oli.php"
                     class="btn btn-outline-secondary"
                 >
-                    Bulan Ini
+                    Reset
                 </a>
 
             </div>
