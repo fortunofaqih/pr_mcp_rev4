@@ -157,10 +157,10 @@
             /* Tanggal: kiri 1cm, bawah 0.5cm; jarak DD MM YY = 0.5cm */
             .p-tgl {
                 position: absolute;
-                top: 15mm;
-                left: 12mm;
-                font-size: 9pt;
-                letter-spacing: 3mm;
+                top: 10mm;
+                left: 19mm;
+                font-size: 8pt;
+                letter-spacing: 2mm;
                 word-spacing: 5mm;
             }
             /* Jenis */
@@ -173,29 +173,36 @@
             }
 
             /* ===== A (kiri) +1cm kanan ===== */
-            .p-rek-penerima { position: absolute; top: 26mm; left: 26mm; width: 85mm; font-size: 8pt; }
-            .p-nama-penerima { position: absolute; top: 33mm; left: 26mm; width: 85mm; font-size: 8pt; }
-            .p-alamat-penerima { position: absolute; top: 40mm; left: 26mm; width: 85mm; font-size: 8pt; }
-            .p-kota-penerima { position: absolute; top: 47mm; left: 26mm; width: 85mm; font-size: 8pt; }
+            .p-rek-penerima { position: absolute; top: 25mm; left: 26mm; width: 85mm; font-size: 8pt; }
+            .p-nama-penerima { position: absolute; top: 30mm; left: 26mm; width: 85mm; font-size: 8pt; }
+            .p-alamat-penerima { position: absolute; top: 35mm; left: 26mm; width: 85mm; font-size: 8pt; }
+            .p-kota-penerima { position: absolute; top: 39mm; left: 26mm; width: 85mm; font-size: 8pt; }
             .p-kode-negara-penerima { position: absolute; top: 61mm; left: 26mm; width: 40mm; font-size: 8pt; }
             .p-tipe-a { position: absolute; top: 54mm; left: 26mm; font-size: 7pt; font-weight: 600; }
             .p-status-a { position: absolute; top: 54mm; left: 65mm; font-size: 7pt; font-weight: 600; }
             .p-kw-a { position: absolute; top: 57.5mm; left: 16mm; font-size: 7pt; font-weight: 600; }
 
             /* ===== B (kanan) +1cm kanan ===== */
-            .p-nama-bank { position: absolute; top: 26mm; left: 120mm; width: 85mm; font-size: 8pt; }
-            .p-alamat-bank { position: absolute; top: 33mm; left: 120mm; width: 85mm; font-size: 8pt; }
-            .p-kota-bank { position: absolute; top: 40mm; left: 120mm; width: 85mm; font-size: 8pt; }
-            .p-state-bank { position: absolute; top: 47mm; left: 120mm; width: 85mm; font-size: 8pt; }
-            .p-negara-bank { position: absolute; top: 54mm; left: 120mm; width: 50mm; font-size: 8pt; }
-            .p-kode-negara-bank { position: absolute; top: 61mm; left: 120mm; width: 40mm; font-size: 8pt; }
-            .p-swift { position: absolute; top: 68mm; left: 120mm; width: 85mm; font-size: 8pt; }
+            .p-nama-bank { position: absolute; top: 25mm; left: 131mm; width: 85mm; font-size: 8pt; }
+            .p-alamat-bank { position: absolute; top: 30mm; left: 131mm; width: 85mm; font-size: 8pt; }
+            .p-kota-bank { position: absolute; top: 38mm; left: 131mm; width: 85mm; font-size: 8pt; }
+            .p-state-bank { position: absolute; top: 40mm; left: 131mm; width: 85mm; font-size: 8pt; }
+            .p-negara-bank { position: absolute; top: 42mm; left: 131mm; width: 50mm; font-size: 8pt; }
+            .p-kode-negara-bank { position: absolute; top: 44mm; left: 131mm; width: 40mm; font-size: 8pt; }
+            .p-swift { position: absolute; top: 42mm; left: 120mm; width: 85mm; font-size: 8pt; }
 
             /* ===== C (kiri bawah) +1cm kanan ===== */
-            .p-nama-pengirim { position: absolute; top: 80mm; left: 26mm; width: 85mm; font-size: 8pt; }
-            .p-alamat-pengirim { position: absolute; top: 87mm; left: 26mm; width: 85mm; font-size: 8pt; }
-            .p-kontak { position: absolute; top: 94mm; left: 26mm; width: 50mm; font-size: 8pt; }
-            .p-hp { position: absolute; top: 101mm; left: 26mm; width: 50mm; font-size: 8pt; }
+            .p-nama-pengirim { position: absolute; top: 82mm; left: 26mm; width: 85mm; font-size: 8pt; }
+            .p-ktp { 
+                position: absolute; 
+                top: 84mm; 
+                left: 26mm; 
+                width: 50mm; 
+                font-size: 8pt; 
+            }
+            .p-alamat-pengirim { position: absolute; top: 86mm; left: 26mm; width: 85mm; font-size: 8pt; }
+            .p-kontak { position: absolute; top: 89mm; left: 26mm; width: 50mm; font-size: 8pt; }
+            .p-hp { position: absolute; top: 90mm; left: 26mm; width: 50mm; font-size: 8pt; }
             .p-kota-pengirim { position: absolute; top: 108mm; left: 26mm; width: 50mm; font-size: 8pt; }
             .p-rek-bca { position: absolute; top: 122mm; left: 26mm; width: 60mm; font-size: 8pt; }
             .p-tipe-c { position: absolute; top: 114mm; left: 26mm; font-size: 7pt; font-weight: 600; }
@@ -215,15 +222,15 @@
 
             /* Jumlah */
             /* Mata uang +0.8cm kanan; valas -2cm kiri; kurs -2.5cm kiri; rupiah/total -4.5cm kiri */
-            .p-mata-uang { position: absolute; top: 150mm; left: 14mm; width: 20mm; font-size: 8pt; }
-            .p-jml-valas { position: absolute; top: 150mm; left: 8mm; width: 40mm; text-align: right; font-size: 8pt; }
-            .p-kurs { position: absolute; top: 150mm; left: 47mm; width: 28mm; text-align: right; font-size: 8pt; }
-            .p-jml-rupiah { position: absolute; top: 150mm; left: 60mm; width: 45mm; text-align: right; font-size: 8pt; }
-            .p-provisi { position: absolute; top: 163mm; left: 8mm; width: 40mm; text-align: right; font-size: 8pt; }
+            .p-mata-uang { position: absolute; top: 156mm; left: 21mm; width: 20mm; font-size: 8pt; }
+            .p-jml-valas { position: absolute; top: 156mm; left: 8mm; width: 40mm; text-align: right; font-size: 8pt; }
+            .p-kurs { position: absolute; top: 156mm; left: 47mm; width: 28mm; text-align: right; font-size: 8pt; }
+            .p-jml-rupiah { position: absolute; top: 156mm; left: 60mm; width: 45mm; text-align: right; font-size: 8pt; }
+            .p-provisi { position: absolute; top: 170mm; left: 8mm; width: 40mm; text-align: right; font-size: 8pt; }
             .p-biaya { position: absolute; top: 171mm; left: 8mm; width: 40mm; text-align: right; font-size: 8pt; }
-            .p-total { position: absolute; top: 162mm; left: 60mm; width: 45mm; text-align: right; font-size: 8pt; }
+            .p-total { position: absolute; top: 172mm; left: 60mm; width: 45mm; text-align: right; font-size: 8pt; }
             /* Terbilang naik 0.5cm */
-            .p-terbilang { position: absolute; top: 170mm; left: 12mm; width: 170mm; font-size: 8pt; white-space: normal; }
+            .p-terbilang { position: absolute; top: 179mm; left: 12mm; width: 170mm; font-size: 8pt; white-space: normal; }
         }
     </style>
 </head>
@@ -708,6 +715,7 @@
     <div class="p-swift val" id="pSwift"></div>
 
     <div class="p-nama-pengirim val" id="pNamaPengirim"></div>
+    <div class="p-ktp val" id="pKtp"></div>
     <div class="p-alamat-pengirim val" id="pAlamatPengirim"></div>
     <div class="p-kontak val" id="pKontak"></div>
     <div class="p-hp val" id="pHp"></div>
@@ -867,6 +875,7 @@
         document.getElementById('pSwift').textContent = document.getElementById('swiftCode').value;
 
         document.getElementById('pNamaPengirim').textContent = document.getElementById('namaPengirim').value;
+        document.getElementById('pKtp').textContent = document.getElementById('noKTP').value;
         document.getElementById('pAlamatPengirim').textContent = document.getElementById('alamatPengirim').value;
         document.getElementById('pKontak').textContent = document.getElementById('kontakPerson').value;
         document.getElementById('pHp').textContent = document.getElementById('noHP').value;
