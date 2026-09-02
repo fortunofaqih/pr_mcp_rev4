@@ -321,8 +321,8 @@ if ($is_finance) {
                     <li class="nav-item"><a href="modul/master/data_rak.php" class="nav-link text-warning fw-bold"><i class="fas fa-warehouse me-2"></i> Master Rak</a></li>
                     <li class="nav-item"><a href="modul/master/mesin.php" class="nav-link text-warning fw-bold"><i class="fas fa-industry me-2"></i> Master Mesin</a></li>
                     <li class="nav-item"><a href="modul/master/master_kawat.php" class="nav-link text-warning fw-bold"><i class="fas fa-cubes me-2"></i> Master Kawat</a></li>
-                    <li class="nav-item"><a href="modul/master/master_oli.php" class="nav-link text-warning fw-bold"><i class="fas fa-gas-pump me-2"></i> Master Oli</a></li>
-
+					<li class="nav-item"><a href="modul/master/master_oli.php" class="nav-link text-warning fw-bold"><i class="fas fa-gas-pump me-2"></i> Master Oli & Solar</a></li>
+                    
                     <div class="nav-category">-- Transaksi Gudang --</div>
                     <li class="nav-item"><a href="modul/transaksi/tambah_request.php" class="nav-link text-warning fw-bold"><i class="fas fa-file-invoice me-2"></i> Form PR (Kecil)</a></li>
                     <li class="nav-item"><a href="modul/transaksi/tambah_request_besar.php" class="nav-link text-warning fw-bold"><i class="fas fa-cart-plus me-2"></i> Form PR (Besar)</a></li>
@@ -363,12 +363,14 @@ if ($is_finance) {
                 <!--<li class="nav-item"><a href="modul/transaksi/tambah_request.php" class="nav-link"><i class="fas fa-clipboard me-2"></i> Form PR (Kecil)</a></li>-->
                 <li class="nav-item"><a href="modul/transaksi/tambah_request_besar.php" class="nav-link text-warning fw-bold"><i class="fas fa-cart-plus me-2"></i> Form PR (Besar)</a></li>
                 <li class="nav-item"><a href="modul/transaksi/update_status_ban.php" class="nav-link"><i class="fas fa-car me-2"></i> Update Status PO</a></li>
+				<div class="nav-category">-- Cek approval --</div>
+                 <li class="nav-item"><a href="modul/pimpinan/approval_pimpinan_user.php" class="nav-link text-warning fw-bold"><i class="fas fa-check-double me-2"></i> Cek Approval</a></li>
             <?php endif; ?>
              <!-- MENU BAGIAN PRODUKSI -->
                 <?php if ($role == 'bagian_produksi') : ?>
                     <div class="nav-category">Master Data</div>
                     <li class="nav-item"><a href="modul/master/mesin.php" class="nav-link text-warning fw-bold"><i class="fas fa-industry me-2"></i> Master Mesin</a></li>
-                    <li class="nav-item"><a href="modul/master/master_oli.php" class="nav-link text-warning fw-bold"><i class="fas fa-gas-pump me-2"></i> Master Oli</a></li>
+					<li class="nav-item"><a href="modul/master/master_oli.php" class="nav-link text-warning fw-bold"><i class="fas fa-gas-pump me-2"></i> Master Oli</a></li>
             <?php endif; ?>
                 <!-- MENU BAGIAN PEMESAN PR -->
             <?php if ($is_pemesan_pr) : ?>
@@ -390,7 +392,8 @@ if ($is_finance) {
                 <li class="nav-item"><a href="modul/pembelian/index.php" class="nav-link text-warning fw-bold"><i class="fas fa-shopping-cart me-2"></i> Halaman Pembelian</a></li>
                 <li class="nav-item"><a href="modul/transaksi/verifikasi_pembelian.php" class="nav-link text-warning fw-bold"><i class="fas fa-check-double me-2"></i> Verifikasi Pembelian</a></li>
                 <li class="nav-item"><a href="modul/transaksi/update_status_ban.php" class="nav-link text-warning fw-bold"><i class="fas fa-car me-2"></i> Update Status PO</a></li>
-                 
+                 <div class="nav-category">-- Step 4 - Cek approval --</div>
+                 <li class="nav-item"><a href="modul/pimpinan/approval_pimpinan_user.php" class="nav-link text-warning fw-bold"><i class="fas fa-check-double me-2"></i> Cek Approval</a></li>
             <?php endif; ?>
                  <!-- MENU FINANCE -->
                 <?php if ($is_finance) : ?>
@@ -401,7 +404,7 @@ if ($is_finance) {
                         </a>
                     </li>
                      <li class="nav-item">
-                        <a href="modul/transaksi/pr_finance.php" class="nav-link">
+                        <a href="modul/transaksi/pr_finance.php" class="nav-link">s
                             <i class="fas fa-file-invoice me-2"></i> Purchase Request (PR)
                         </a>
                     </li>
@@ -410,9 +413,9 @@ if ($is_finance) {
                             <i class="fas fa-file-alt me-2"></i> Buku Pembelian
                         </a>
                     </li>
-                    <li class="nav-item">
+					 <li class="nav-item">
                         <a href="modul/finance/fund_transfer.php" class="nav-link">
-                            <i class="fas fa-money-bill-transfer me-2"></i> Fund Transfer
+                            <i class="fas fa-money-bill-transfer me-2"></i> Cetak Fund Transfer
                         </a>
                     </li>
                    <!-- <li class="nav-item"><a href="modul/finance/update_pr_besar.php" class="nav-link"><i class="fas fa-bell me-2"></i> Update Status PR</a></li>-->
