@@ -36,15 +36,25 @@ if ($filter_keyword) {
 }
 
 // ============================================================
-// 2. AMBIL DATA ASET + RIWAYAT (LEFT JOIN supaya aset tanpa riwayat tetap ikut)
+// 2. AMBIL DATA ASET + RIWAYAT TERAKHIR (kondisi terbaru saja)
 // ============================================================
 $query = "SELECT
             a.id_asset, a.lokasi, a.keterangan_penempatan, a.nama_asset, a.keterangan, a.pengguna,
-            h.id_history, h.kondisi_sebelum, h.kondisi_sesudah, h.tgl_kejadian, h.keterangan AS h_keterangan
+            h.id_history, h.kondisi_sesudah, h.tgl_kejadian, h.keterangan AS h_keterangan
           FROM master_it_asset a
-          LEFT JOIN tr_it_asset_history h ON h.id_asset = a.id_asset
+          LEFT JOIN (
+              SELECT h1.* 
+              FROM tr_it_asset_history h1
+              INNER JOIN (
+                  SELECT id_asset, MAX(tgl_kejadian) as max_tgl, MAX(id_history) as max_id
+                  FROM tr_it_asset_history
+                  GROUP BY id_asset
+              ) h2 ON h1.id_asset = h2.id_asset 
+                  AND h1.tgl_kejadian = h2.max_tgl 
+                  AND h1.id_history = h2.max_id
+          ) h ON h.id_asset = a.id_asset
           $where
-          ORDER BY a.id_asset ASC, h.tgl_kejadian ASC, h.id_history ASC";
+          ORDER BY a.id_asset ASC";
 
 $result = mysqli_query($koneksi, $query);
 
@@ -89,10 +99,8 @@ table { border-collapse: collapse; width: 100%; }
     $no = 1;
     while ($d = mysqli_fetch_assoc($result)):
 
-        $riwayat_kondisi = '';
-        if ($d['kondisi_sebelum'] || $d['kondisi_sesudah']) {
-            $riwayat_kondisi = ($d['kondisi_sebelum'] ?: '-') . ' -> ' . ($d['kondisi_sesudah'] ?: '-');
-        }
+        // Hanya ambil kondisi_sesudah (kondisi terbaru)
+        $riwayat_kondisi = $d['kondisi_sesudah'] ?: '-';
         $riwayat_tanggal = $d['tgl_kejadian'] ? date('d/m/Y', strtotime($d['tgl_kejadian'])) : '-';
     ?>
     <tr>
@@ -102,7 +110,7 @@ table { border-collapse: collapse; width: 100%; }
         <td><?= htmlspecialchars($d['nama_asset']            ?: '-') ?></td>
         <td><?= htmlspecialchars($d['keterangan']            ?: '-') ?></td>
         <td><?= htmlspecialchars($d['pengguna']               ?: '-') ?></td>
-        <td><?= htmlspecialchars($riwayat_kondisi              ?: '-') ?></td>
+        <td><?= htmlspecialchars($riwayat_kondisi) ?></td>
         <td class="str"><?= $riwayat_tanggal ?></td>
         <td><?= htmlspecialchars($d['h_keterangan']           ?: '-') ?></td>
     </tr>
