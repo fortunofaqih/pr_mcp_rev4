@@ -1,6 +1,9 @@
 <?php
 /**
  * AJAX: Menandai mobil SELESAI SERVIS (menutup episode yang sedang berjalan).
+ * 
+ * Perubahan: Jika bengkel belum diisi, maka user harus mengisi bengkel terlebih dahulu
+ * sebelum bisa menandai selesai.
  */
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
@@ -15,12 +18,16 @@ if ($_SESSION['status'] != "login") {
 
 $id_kondisi = $_POST['id_kondisi'] ?? '';
 $end_date   = $_POST['end_date']   ?? '';
+$bengkel    = $_POST['bengkel']    ?? ''; // Tambahan field bengkel
 $updated_by = $_SESSION['username'] ?? 'system';
 
 if (empty($id_kondisi) || empty($end_date)) {
     echo json_encode(['status' => 'error', 'message' => 'Tanggal selesai servis wajib diisi.']);
     exit;
 }
+
+// Validasi bengkel yang diizinkan
+$bengkel_valid = ['MISTARI', 'RUDI H.', 'EDI M.', 'M. ULUM', 'SAIFUL'];
 
 // 🔧 FIX: Konversi format tanggal ke yyyy-mm-dd (support多种 format)
 function convertDateToYMD($date_str) {
@@ -88,8 +95,8 @@ if ($end_date_sql === null) {
     exit;
 }
 
-// 1. Ambil data episode untuk validasi
-$cek = mysqli_prepare($koneksi, "SELECT start_date, end_date FROM kondisi_kendaraan WHERE id_kondisi = ?");
+// 1. Ambil data episode untuk validasi dan informasi
+$cek = mysqli_prepare($koneksi, "SELECT start_date, end_date, bengkel FROM kondisi_kendaraan WHERE id_kondisi = ?");
 mysqli_stmt_bind_param($cek, "i", $id_kondisi);
 mysqli_stmt_execute($cek);
 $row = mysqli_stmt_get_result($cek)->fetch_assoc();
@@ -104,6 +111,29 @@ if ($row['end_date'] !== null) {
     exit;
 }
 
+// ============= VALIDASI BENGKEL =============
+// Jika bengkel belum diisi atau kosong, maka harus diisi
+if (empty($row['bengkel']) || is_null($row['bengkel'])) {
+    // Cek apakah user mengirimkan bengkel melalui POST
+    if (empty($bengkel)) {
+        echo json_encode([
+            'status' => 'error', 
+            'message' => 'Bengkel belum diisi. Silakan pilih bengkel terlebih dahulu sebelum menandai selesai.',
+            'requires_bengkel' => true // Flag untuk frontend mengetahui bahwa ini membutuhkan input bengkel
+        ]);
+        exit;
+    }
+    
+    // Validasi bengkel yang dikirim
+    if (!in_array($bengkel, $bengkel_valid, true)) {
+        echo json_encode([
+            'status' => 'error', 
+            'message' => 'Pilih bengkel yang valid: ' . implode(', ', $bengkel_valid)
+        ]);
+        exit;
+    }
+}
+
 // Validasi: tanggal selesai tidak boleh sebelum tanggal mulai
 if ($row['start_date'] && $end_date_sql < $row['start_date']) {
     echo json_encode([
@@ -115,14 +145,27 @@ if ($row['start_date'] && $end_date_sql < $row['start_date']) {
     exit;
 }
 
-// 2. Tutup episode
-$stmt = mysqli_prepare($koneksi,
-    "UPDATE kondisi_kendaraan SET end_date = ?, updated_by = ?, updated_at = NOW() WHERE id_kondisi = ?"
-);
-mysqli_stmt_bind_param($stmt, "ssi", $end_date_sql, $updated_by, $id_kondisi);
+// 2. Tutup episode - update end_date dan bengkel jika diperlukan
+if (empty($row['bengkel']) || is_null($row['bengkel'])) {
+    // Jika bengkel sebelumnya kosong, update bengkel juga
+    $stmt = mysqli_prepare($koneksi,
+        "UPDATE kondisi_kendaraan SET end_date = ?, bengkel = ?, updated_by = ?, updated_at = NOW() WHERE id_kondisi = ?"
+    );
+    mysqli_stmt_bind_param($stmt, "sssi", $end_date_sql, $bengkel, $updated_by, $id_kondisi);
+} else {
+    // Jika bengkel sudah ada, update end_date saja
+    $stmt = mysqli_prepare($koneksi,
+        "UPDATE kondisi_kendaraan SET end_date = ?, updated_by = ?, updated_at = NOW() WHERE id_kondisi = ?"
+    );
+    mysqli_stmt_bind_param($stmt, "ssi", $end_date_sql, $updated_by, $id_kondisi);
+}
 
 if (mysqli_stmt_execute($stmt)) {
-    echo json_encode(['status' => 'success', 'message' => 'Servis ditandai selesai. Mobil otomatis berstatus BAIK kembali.']);
+    $bengkel_info = !empty($row['bengkel']) ? ' di bengkel ' . $row['bengkel'] : ' di bengkel ' . $bengkel;
+    echo json_encode([
+        'status' => 'success', 
+        'message' => 'Servis' . $bengkel_info . ' ditandai selesai. Mobil otomatis berstatus BAIK kembali.'
+    ]);
 } else {
     echo json_encode(['status' => 'error', 'message' => 'Gagal menyimpan: ' . mysqli_error($koneksi)]);
 }

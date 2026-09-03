@@ -102,6 +102,7 @@ if ($_SESSION['status'] != "login") {
                             <th>Plat Nomor</th>
                             <th>Driver</th>
                             <th>Kondisi</th>
+                            <th>Bengkel</th>
                             <th>Mulai</th>
                             <th>Selesai</th>
                             <th>Durasi</th>
@@ -139,6 +140,7 @@ if ($_SESSION['status'] != "login") {
                             <td class="fw-bold text-primary"><?= htmlspecialchars($d['plat_nomor']) ?></td>
                             <td class="text-uppercase"><?= htmlspecialchars($d['driver_tetap'] ?? '-') ?></td>
                             <td><span class="badge <?= $badge_kondisi ?>"><?= htmlspecialchars($d['kondisi']) ?></span></td>
+                            <td><?= htmlspecialchars($d['bengkel'] ?? '-') ?></td>
                             <td><?= $d['start_date'] ? date('d-M-Y', strtotime($d['start_date'])) : '-' ?></td>
                             <td><?= $d['end_date'] ? date('d-M-Y', strtotime($d['end_date'])) : '-' ?></td>
                             <td><?= $durasi_teks ?></td>
@@ -198,12 +200,11 @@ if ($_SESSION['status'] != "login") {
                     <div class="row mb-3">
                         <div class="col-12 col-md-6">
                             <label class="form-label fw-bold">Kondisi <span class="text-danger">*</span></label>
-                            <select class="form-select" id="kondisi_mulai" required>
-                                <option value="">Pilih Kondisi</option>
-                                <option value="DISERVICE">DISERVICE</option>
-                                <option value="RUSAK RINGAN">RUSAK RINGAN</option>
-                                <option value="RUSAK BERAT">RUSAK BERAT</option>
+                            <select class="form-select" id="kondisi_mulai" required disabled>
+                                <option value="DISERVICE" selected>DISERVICE</option>
                             </select>
+                            <input type="hidden" id="kondisi_mulai_hidden" value="DISERVICE">
+                            <small class="text-muted">Kondisi default: DISERVICE (readonly)</small>
                         </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label fw-bold">Tanggal Masuk Servis <span class="text-danger">*</span></label>
@@ -211,6 +212,20 @@ if ($_SESSION['status'] != "login") {
                                 <input type="text" class="form-control datepicker" id="start_date_mulai" placeholder="DD-MMM-YYYY" autocomplete="off" required>
                                 <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
                             </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Bengkel <span class="text-danger">*</span></label>
+                            <select class="form-select" id="bengkel_mulai" required>
+                                <option value="">Pilih Bengkel</option>
+                                <option value="MISTARI">MISTARI</option>
+                                <option value="RUDI H.">RUDI H.</option>
+                                <option value="EDI M.">EDI M.</option>
+                                <option value="M. ULUM">M. ULUM</option>
+                                <option value="SAIFUL">SAIFUL</option>
+                            </select>
                         </div>
                     </div>
 
@@ -229,6 +244,7 @@ if ($_SESSION['status'] != "login") {
 </div>
 
 <!-- Modal: Selesaikan Servis -->
+
 <div class="modal fade" id="modalSelesai" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -243,7 +259,23 @@ if ($_SESSION['status'] != "login") {
                         <div class="mobil-info-item"><span class="mobil-info-label">Plat Nomor</span><span class="mobil-info-value" id="selesai_plat">-</span></div>
                         <div class="mobil-info-item"><span class="mobil-info-label">Kondisi</span><span class="mobil-info-value" id="selesai_kondisi">-</span></div>
                         <div class="mobil-info-item"><span class="mobil-info-label">Mulai Servis</span><span class="mobil-info-value" id="selesai_mulai">-</span></div>
+                        <div class="mobil-info-item"><span class="mobil-info-label">Bengkel</span><span class="mobil-info-value" id="selesai_bengkel">-</span></div>
                     </div>
+
+                    <!-- Field Bengkel (hanya muncul jika bengkel belum diisi) -->
+                    <div id="bengkel_selesai_wrapper" style="display:none;" class="mb-3">
+                        <label class="form-label fw-bold">Bengkel <span class="text-danger">*</span></label>
+                        <select class="form-select" id="bengkel_selesai">
+                            <option value="">Pilih Bengkel</option>
+                            <option value="MISTARI">MISTARI</option>
+                            <option value="RUDI H.">RUDI H.</option>
+                            <option value="EDI M.">EDI M.</option>
+                            <option value="M. ULUM">M. ULUM</option>
+                            <option value="SAIFUL">SAIFUL</option>
+                        </select>
+                        <small class="text-danger" id="bengkel_selesai_error" style="display:none;">Silakan pilih bengkel terlebih dahulu.</small>
+                    </div>
+
                     <label class="form-label fw-bold">Tanggal Selesai Servis <span class="text-danger">*</span></label>
                     <div class="input-group date">
                         <input type="text" class="form-control datepicker" id="end_date_selesai" placeholder="DD-MMM-YYYY" autocomplete="off" required>
@@ -273,13 +305,12 @@ $(document).ready(function () {
     $('#tabelKondisi').DataTable({
         pageLength: 10,
         language: { url: "//cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json" },
-        columnDefs: [{ orderable: false, targets: 7 }],
+        columnDefs: [{ orderable: false, targets: 8 }],
         responsive: true
     });
 
-   // Di bagian datepicker initialization
     $('.datepicker').datepicker({
-        format: 'dd-mm-yyyy',  // Ubah dari 'dd-M-yyyy' menjadi 'dd-mm-yyyy'
+        format: 'dd-mm-yyyy',
         autoclose: true,
         todayHighlight: true,
         language: 'id',
@@ -317,6 +348,8 @@ function resetFormMulai() {
     $('#id_mobil, #plat_nomor').val('');
     $('#cari_plat').val(null).trigger('change');
     $('#start_date_mulai').datepicker('update', '');
+    $('#kondisi_mulai').val('DISERVICE').prop('disabled', true);
+    $('#bengkel_mulai').val('');
 }
 
 function ambilDataMobil(plat) {
@@ -344,14 +377,15 @@ function ambilDataMobil(plat) {
 $('#formMulai').on('submit', function (e) {
     e.preventDefault();
     if (!$('#id_mobil').val()) { alert('Pilih plat nomor mobil terlebih dahulu.'); return; }
-    if (!$('#kondisi_mulai').val()) { alert('Pilih kondisi terlebih dahulu.'); return; }
     if (!$('#start_date_mulai').val()) { alert('Isi tanggal masuk servis.'); return; }
+    if (!$('#bengkel_mulai').val()) { alert('Pilih bengkel terlebih dahulu.'); return; }
 
     $.post('ajax_mulai_service.php', {
         id_mobil: $('#id_mobil').val(),
         plat_nomor: $('#plat_nomor').val(),
-        kondisi: $('#kondisi_mulai').val(),
+        kondisi: 'DISERVICE', // Selalu DISERVICE
         start_date: $('#start_date_mulai').val(),
+        bengkel: $('#bengkel_mulai').val(),
         keterangan: $('#keterangan_mulai').val()
     }, function (res) {
         alert(res.message);
@@ -360,12 +394,24 @@ $('#formMulai').on('submit', function (e) {
 });
 
 // Update fungsi bukaModalSelesai
-function bukaModalSelesai(id_kondisi, plat, kondisi, start_date) {
+function bukaModalSelesai(id_kondisi, plat, kondisi, start_date, bengkel) {
     $('#id_kondisi_selesai').val(id_kondisi);
     $('#selesai_plat').text(plat);
     $('#selesai_kondisi').text(kondisi);
+    $('#selesai_bengkel').text(bengkel || '-');
     
-    // Format tanggal untuk ditampilkan
+    // Cek apakah bengkel sudah ada atau belum
+    if (!bengkel || bengkel === '' || bengkel === '-') {
+        // Tampilkan field bengkel untuk diisi
+        $('#bengkel_selesai_wrapper').show();
+        $('#bengkel_selesai').val('');
+        $('#bengkel_selesai_error').hide();
+    } else {
+        // Sembunyikan field bengkel karena sudah ada
+        $('#bengkel_selesai_wrapper').hide();
+        $('#bengkel_selesai').val('');
+    }
+    
     if (start_date) {
         var dateObj = new Date(start_date);
         var day = ('0' + dateObj.getDate()).slice(-2);
@@ -376,7 +422,6 @@ function bukaModalSelesai(id_kondisi, plat, kondisi, start_date) {
         $('#selesai_mulai').text('-');
     }
     
-    // Set default tanggal selesai ke hari ini
     var today = new Date();
     var day = ('0' + today.getDate()).slice(-2);
     var month = getMonthName(today.getMonth());
@@ -387,7 +432,52 @@ function bukaModalSelesai(id_kondisi, plat, kondisi, start_date) {
     $('#modalSelesai').modal('show');
 }
 
-// Helper function untuk mendapatkan nama bulan (3 huruf)
+// Update form submit untuk selesai
+$('#formSelesai').on('submit', function (e) {
+    e.preventDefault();
+    
+    if (!$('#end_date_selesai').val()) {
+        alert('Isi tanggal selesai servis.');
+        return;
+    }
+    
+    // Cek apakah field bengkel ditampilkan (berarti bengkel belum ada)
+    if ($('#bengkel_selesai_wrapper').is(':visible')) {
+        var bengkel = $('#bengkel_selesai').val();
+        if (!bengkel) {
+            $('#bengkel_selesai_error').show();
+            return;
+        }
+        $('#bengkel_selesai_error').hide();
+    } else {
+        var bengkel = '';
+    }
+
+    // Siapkan data yang akan dikirim
+    var postData = {
+        id_kondisi: $('#id_kondisi_selesai').val(),
+        end_date: $('#end_date_selesai').val()
+    };
+    
+    // Jika bengkel ditampilkan dan diisi, kirim juga bengkel
+    if ($('#bengkel_selesai_wrapper').is(':visible')) {
+        postData.bengkel = $('#bengkel_selesai').val();
+    }
+
+    $.post('ajax_selesai_service.php', postData, function (res) {
+        if (res.status === 'error' && res.requires_bengkel) {
+            // Jika server meminta bengkel, tampilkan field bengkel
+            $('#bengkel_selesai_wrapper').show();
+            $('#bengkel_selesai_error').show().text('Silakan pilih bengkel terlebih dahulu.');
+            return;
+        }
+        alert(res.message);
+        if (res.status === 'success') location.reload();
+    }, 'json').fail(function () { 
+        alert('Gagal menghubungi server.'); 
+    });
+});
+
 function getMonthName(monthIndex) {
     var months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
     return months[monthIndex];

@@ -19,15 +19,25 @@ if ($_SESSION['status'] != "login") {
 
 $id_mobil   = $_POST['id_mobil']   ?? '';
 $plat_nomor = $_POST['plat_nomor'] ?? '';
-$kondisi    = $_POST['kondisi']    ?? '';
+$kondisi    = $_POST['kondisi']    ?? 'DISERVICE'; // Default DISERVICE
 $start_date = $_POST['start_date'] ?? '';
+$bengkel    = $_POST['bengkel']    ?? ''; // Tambahan field bengkel
 $keterangan = $_POST['keterangan'] ?? '';
 $created_by = $_SESSION['username'] ?? 'system';
 
-$kondisi_valid = ['DISERVICE', 'RUSAK RINGAN', 'RUSAK BERAT'];
+// Validasi kondisi - hanya DISERVICE yang diizinkan untuk input baru
+$kondisi_valid = ['DISERVICE']; // Hanya DISERVICE
+
+// Validasi bengkel
+$bengkel_valid = ['MISTARI', 'RUDI H.', 'EDI M.', 'M. ULUM', 'SAIFUL'];
 
 if (empty($id_mobil) || empty($plat_nomor) || !in_array($kondisi, $kondisi_valid, true) || empty($start_date)) {
-    echo json_encode(['status' => 'error', 'message' => 'Mobil, kondisi, dan tanggal masuk servis wajib diisi.']);
+    echo json_encode(['status' => 'error', 'message' => 'Mobil, kondisi (DISERVICE), dan tanggal masuk servis wajib diisi.']);
+    exit;
+}
+
+if (empty($bengkel) || !in_array($bengkel, $bengkel_valid, true)) {
+    echo json_encode(['status' => 'error', 'message' => 'Pilih bengkel yang valid.']);
     exit;
 }
 
@@ -127,15 +137,15 @@ if ($row_aktif) {
     exit;
 }
 
-// 2. Simpan episode baru
+// 2. Simpan episode baru dengan field bengkel
 $stmt = mysqli_prepare($koneksi,
-    "INSERT INTO kondisi_kendaraan (id_mobil, plat_nomor, kondisi, keterangan, start_date, created_by)
-     VALUES (?, ?, ?, ?, ?, ?)"
+    "INSERT INTO kondisi_kendaraan (id_mobil, plat_nomor, kondisi, bengkel, keterangan, start_date, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?)"
 );
-mysqli_stmt_bind_param($stmt, "isssss", $id_mobil, $plat_nomor, $kondisi, $keterangan, $start_date_sql, $created_by);
+mysqli_stmt_bind_param($stmt, "issssss", $id_mobil, $plat_nomor, $kondisi, $bengkel, $keterangan, $start_date_sql, $created_by);
 
 if (mysqli_stmt_execute($stmt)) {
-    echo json_encode(['status' => 'success', 'message' => 'Mobil berhasil dicatat masuk servis.']);
+    echo json_encode(['status' => 'success', 'message' => 'Mobil berhasil dicatat masuk servis di bengkel ' . $bengkel . '.']);
 } else {
     echo json_encode(['status' => 'error', 'message' => 'Gagal menyimpan data: ' . mysqli_error($koneksi)]);
 }

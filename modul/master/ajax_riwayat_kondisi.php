@@ -1,12 +1,6 @@
 <?php
 /**
  * AJAX: Menampilkan riwayat episode servis untuk satu mobil.
- *
- * Versi ini sengaja pakai mysqli_query() biasa (bukan prepared
- * statement) untuk keperluan tes -- membandingkan apakah error
- * "Error memuat data!" hilang atau tidak dibanding versi bind_result.
- * id_mobil di-cast ke integer supaya tetap aman dari SQL injection
- * walau tanpa prepared statement.
  */
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
@@ -18,8 +12,7 @@ if (!isset($_POST['id_mobil']) || empty($_POST['id_mobil'])) {
 
 $id = (int) $_POST['id_mobil'];
 
-// Perbaikan ORDER BY: urutkan dari yang paling awal (start_date ASC)
-$query = "SELECT id_kondisi, kondisi, keterangan, start_date, end_date, created_at
+$query = "SELECT id_kondisi, kondisi, keterangan, start_date, end_date, created_at, bengkel
           FROM kondisi_kendaraan
           WHERE id_mobil = $id
           ORDER BY start_date ASC, created_at ASC";
@@ -56,6 +49,11 @@ if (mysqli_num_rows($result) > 0) {
         echo '</h6>';
         echo '<small>' . date('d-M-Y', strtotime($row['created_at'])) . '</small>';
         echo '</div>';
+
+        // Tampilkan bengkel
+        if ($row['bengkel']) {
+            echo '<div class="mb-1 small"><strong>Bengkel:</strong> ' . htmlspecialchars($row['bengkel']) . '</div>';
+        }
 
         if ($row['keterangan']) {
             echo '<p class="mb-1 small">' . nl2br(htmlspecialchars($row['keterangan'])) . '</p>';

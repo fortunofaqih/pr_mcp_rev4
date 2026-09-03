@@ -27,7 +27,7 @@ if (!$mobil) {
 }
 
 // PERBAIKAN: Urutkan dari yang paling awal (start_date ASC)
-$query_riwayat = "SELECT id_kondisi, kondisi, keterangan, start_date, end_date, created_at
+$query_riwayat = "SELECT id_kondisi, kondisi, keterangan, start_date, end_date, created_at, bengkel
                   FROM kondisi_kendaraan
                   WHERE id_mobil = $id_mobil
                   ORDER BY start_date ASC, created_at ASC";
@@ -113,12 +113,13 @@ function formatDateIndo($date) {
         <thead>
             <tr>
                 <th style="width:5%;">No</th>
-                <th style="width:15%;">Kondisi</th>
-                <th style="width:25%;">Keterangan</th>
+                <th style="width:12%;">Kondisi</th>
+                <th style="width:12%;">Bengkel</th>
+                <th style="width:21%;">Keterangan</th>
                 <th style="width:15%;">Mulai</th>
                 <th style="width:15%;">Selesai</th>
                 <th style="width:10%;">Durasi</th>
-                <th style="width:15%;">Status</th>
+                <th style="width:10%;">Status</th>
             </tr>
         </thead>
         <tbody>
@@ -134,10 +135,14 @@ function formatDateIndo($date) {
             }
             $status_class = $aktif ? 'status-aktif' : 'status-selesai';
             $status_text = $aktif ? 'AKTIF' : 'SELESAI';
+            
+            // Badge untuk kondisi
+            $badge_class = $row['kondisi'] == 'BAIK' ? 'style="color:#28a745;"' : 'style="color:#dc3545;"';
         ?>
             <tr>
                 <td style="text-align:center;"><?= $no++ ?></td>
-                <td style="text-align:center;"><?= $row['kondisi'] ?></td>
+                <td style="text-align:center;"><strong <?= $badge_class ?>><?= $row['kondisi'] ?></strong></td>
+                <td style="text-align:center;"><?= htmlspecialchars($row['bengkel'] ?? '-') ?></td>
                 <td><?= $row['keterangan'] ?? '-' ?></td>
                 <td style="text-align:center;"><?= formatDateIndo($row['start_date']) ?></td>
                 <td style="text-align:center;"><?= $aktif ? '-' : formatDateIndo($row['end_date']) ?></td>

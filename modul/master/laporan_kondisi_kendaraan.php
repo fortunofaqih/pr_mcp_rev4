@@ -8,11 +8,15 @@ if ($_SESSION['status'] != "login") {
     exit;
 }
 
-// Filter bulan dan tahun (di-cast ke integer, lebih aman dari SQL injection)
-$bulan = isset($_GET['bulan']) ? (int) $_GET['bulan'] : (int) date('m');
-$tahun = isset($_GET['tahun']) ? (int) $_GET['tahun'] : (int) date('Y');
-if ($bulan < 1 || $bulan > 12) $bulan = (int) date('m');
-$bulan_str = sprintf('%02d', $bulan);
+// Filter rentang tanggal
+$start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
+$end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-d');
+
+// Jika tidak ada filter, default bulan berjalan
+if (empty($start_date) || empty($end_date)) {
+    $start_date = date('Y-m-01');
+    $end_date = date('Y-m-d');
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -23,6 +27,7 @@ $bulan_str = sprintf('%02d', $bulan);
     <link rel="icon" type="image/png" href="/pr_mcp/assets/img/logo_mcp.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --mcp-blue: #0000FF; }
@@ -48,8 +53,6 @@ $bulan_str = sprintf('%02d', $bulan);
 
         .badge-baik { background-color: #28a745; color: white; }
         .badge-diservice { background-color: #ffc107; color: black; }
-        .badge-rusak-ringan { background-color: #fd7e14; color: white; }
-        .badge-rusak-berat { background-color: #dc3545; color: white; }
 
         .chart-box { position: relative; height: 280px; }
 
@@ -97,28 +100,26 @@ $bulan_str = sprintf('%02d', $bulan);
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
                 <div class="col-6 col-md-3">
-                    <label class="form-label fw-bold">Bulan</label>
-                    <select name="bulan" class="form-select">
-                        <?php for ($i = 1; $i <= 12; $i++): ?>
-                            <option value="<?= sprintf('%02d', $i) ?>" <?= $bulan == $i ? 'selected' : '' ?>>
-                                <?= date('F', mktime(0, 0, 0, $i, 1)) ?>
-                            </option>
-                        <?php endfor; ?>
-                    </select>
+                    <label class="form-label fw-bold">Tanggal Mulai</label>
+                    <div class="input-group date">
+                        <input type="text" class="form-control datepicker" id="start_date" name="start_date" 
+                               placeholder="DD-MM-YYYY" value="<?= date('d-m-Y', strtotime($start_date)) ?>" autocomplete="off">
+                        <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                    </div>
                 </div>
                 <div class="col-6 col-md-3">
-                    <label class="form-label fw-bold">Tahun</label>
-                    <select name="tahun" class="form-select">
-                        <?php for ($i = (int)date('Y'); $i >= (int)date('Y') - 5; $i--): ?>
-                            <option value="<?= $i ?>" <?= $tahun == $i ? 'selected' : '' ?>><?= $i ?></option>
-                        <?php endfor; ?>
-                    </select>
+                    <label class="form-label fw-bold">Tanggal Selesai</label>
+                    <div class="input-group date">
+                        <input type="text" class="form-control datepicker" id="end_date" name="end_date" 
+                               placeholder="DD-MM-YYYY" value="<?= date('d-m-Y', strtotime($end_date)) ?>" autocomplete="off">
+                        <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                    </div>
                 </div>
                 <div class="col-6 col-md-2">
                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter"></i> Filter</button>
                 </div>
                 <div class="col-6 col-md-2">
-                    <a href="print_laporan_kondisi.php?bulan=<?= $bulan_str ?>&tahun=<?= $tahun ?>" class="btn btn-success w-100" target="_blank">
+                    <a href="print_laporan_kondisi.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>" class="btn btn-success w-100" target="_blank">
                         <i class="fas fa-file-excel"></i> Excel
                     </a>
                 </div>
@@ -128,19 +129,35 @@ $bulan_str = sprintf('%02d', $bulan);
 
     <!-- ================= STATISTIK ================= -->
     <?php
+    // Konversi tanggal ke format MySQL
+    $start_date_sql = date('Y-m-d', strtotime($start_date));
+    $end_date_sql = date('Y-m-d', strtotime($end_date));
+
     $total_mobil = mysqli_fetch_assoc(mysqli_query($koneksi, "SELECT COUNT(*) as total FROM master_mobil"))['total'];
 
     $total_aktif = mysqli_fetch_assoc(mysqli_query($koneksi,
         "SELECT COUNT(DISTINCT id_mobil) as total FROM kondisi_kendaraan WHERE end_date IS NULL"
     ))['total'];
 
+    // Total selesai dalam rentang tanggal
     $stmt = mysqli_prepare($koneksi,
         "SELECT COUNT(*) as total FROM kondisi_kendaraan
-         WHERE end_date IS NOT NULL AND MONTH(end_date) = ? AND YEAR(end_date) = ?"
+         WHERE end_date IS NOT NULL AND end_date BETWEEN ? AND ?"
     );
-    mysqli_stmt_bind_param($stmt, "ii", $bulan, $tahun);
+    mysqli_stmt_bind_param($stmt, "ss", $start_date_sql, $end_date_sql);
     mysqli_stmt_execute($stmt);
     mysqli_stmt_bind_result($stmt, $total_selesai);
+    mysqli_stmt_fetch($stmt);
+    mysqli_stmt_close($stmt);
+
+    // Total servis dimulai dalam rentang tanggal
+    $stmt = mysqli_prepare($koneksi,
+        "SELECT COUNT(*) as total FROM kondisi_kendaraan
+         WHERE start_date BETWEEN ? AND ?"
+    );
+    mysqli_stmt_bind_param($stmt, "ss", $start_date_sql, $end_date_sql);
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_bind_result($stmt, $total_mulai);
     mysqli_stmt_fetch($stmt);
     mysqli_stmt_close($stmt);
 
@@ -170,7 +187,7 @@ $bulan_str = sprintf('%02d', $bulan);
             <div class="stat-card selesai">
                 <i class="fas fa-check-circle stat-icon"></i>
                 <div class="stat-number"><?= $total_selesai ?></div>
-                <div class="stat-label">Selesai Servis Bulan Ini</div>
+                <div class="stat-label">Selesai Servis (<?= date('d-M-Y', strtotime($start_date)) ?> - <?= date('d-M-Y', strtotime($end_date)) ?>)</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
@@ -206,10 +223,11 @@ $bulan_str = sprintf('%02d', $bulan);
         </div>
     </div>
 
-    <!-- ================= TABEL: RIWAYAT BULANAN ================= -->
+    <!-- ================= TABEL: MUTASI SERVIS ================= -->
     <div class="card mt-4">
         <div class="card-header bg-light">
-            <h6 class="mb-0"><i class="fas fa-history me-2"></i>Riwayat Servis Dimulai Bulan <?= date('F Y', mktime(0, 0, 0, $bulan, 1, $tahun)) ?></h6>
+            <h6 class="mb-0"><i class="fas fa-history me-2"></i>Mutasi Servis Kendaraan</h6>
+            <small class="text-muted">Periode: <?= date('d-M-Y', strtotime($start_date)) ?> s/d <?= date('d-M-Y', strtotime($end_date)) ?></small>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -219,6 +237,7 @@ $bulan_str = sprintf('%02d', $bulan);
                             <th style="width:36px;"></th>
                             <th>Plat Nomor</th>
                             <th>Driver</th>
+                            <th>Bengkel</th>
                             <th class="text-center">Jumlah Servis</th>
                             <th>Status Terakhir</th>
                         </tr>
@@ -226,19 +245,30 @@ $bulan_str = sprintf('%02d', $bulan);
                     <tbody>
                         <?php
                         $stmt_riwayat = mysqli_prepare($koneksi, "
-                            SELECT k.kondisi, k.plat_nomor, k.start_date, k.end_date, m.driver_tetap
+                            SELECT k.kondisi, k.plat_nomor, k.start_date, k.end_date, k.bengkel, m.driver_tetap
                             FROM kondisi_kendaraan k
                             JOIN master_mobil m ON k.id_mobil = m.id_mobil
-                            WHERE MONTH(k.start_date) = ? AND YEAR(k.start_date) = ?
+                            WHERE (k.start_date BETWEEN ? AND ?) OR (k.end_date BETWEEN ? AND ?)
                             ORDER BY k.start_date DESC
                         ");
-                        mysqli_stmt_bind_param($stmt_riwayat, "ii", $bulan, $tahun);
+                        mysqli_stmt_bind_param($stmt_riwayat, "ssss", $start_date_sql, $end_date_sql, $start_date_sql, $end_date_sql);
                         mysqli_stmt_execute($stmt_riwayat);
-                        mysqli_stmt_bind_result($stmt_riwayat, $r_kondisi, $r_plat, $r_start, $r_end, $r_driver);
+                        mysqli_stmt_bind_result($stmt_riwayat, $r_kondisi, $r_plat, $r_start, $r_end, $r_bengkel, $r_driver);
 
                         $riwayat_grouped = [];
                         while (mysqli_stmt_fetch($stmt_riwayat)) {
-                            $riwayat_grouped[$r_plat]['driver'] = $r_driver;
+                            // Simpan semua episode untuk setiap plat
+                            if (!isset($riwayat_grouped[$r_plat])) {
+                                $riwayat_grouped[$r_plat] = [
+                                    'driver' => $r_driver,
+                                    'bengkel' => $r_bengkel,
+                                    'episodes' => []
+                                ];
+                            }
+                            // Update bengkel jika ada yang berbeda
+                            if ($r_bengkel && empty($riwayat_grouped[$r_plat]['bengkel'])) {
+                                $riwayat_grouped[$r_plat]['bengkel'] = $r_bengkel;
+                            }
                             $riwayat_grouped[$r_plat]['episodes'][] = [
                                 'kondisi' => $r_kondisi,
                                 'start'   => $r_start,
@@ -248,15 +278,14 @@ $bulan_str = sprintf('%02d', $bulan);
                         mysqli_stmt_close($stmt_riwayat);
 
                         $badge_map = [
-                            'DISERVICE'    => 'bg-warning text-dark',
-                            'RUSAK RINGAN' => 'bg-warning',
-                            'RUSAK BERAT'  => 'bg-danger',
+                            'DISERVICE' => 'bg-warning text-dark',
+                            'BAIK'      => 'bg-success',
                         ];
                         ?>
 
                         <?php if (empty($riwayat_grouped)): ?>
                         <tr>
-                            <td colspan="5" class="text-center text-muted py-3">Tidak ada servis yang dimulai pada bulan ini.</td>
+                            <td colspan="6" class="text-center text-muted py-3">Tidak ada data servis pada periode ini.</td>
                         </tr>
                         <?php else: foreach ($riwayat_grouped as $plat => $data):
                             $episodes = $data['episodes'];
@@ -268,6 +297,7 @@ $bulan_str = sprintf('%02d', $bulan);
                             <td class="text-center text-muted"><i class="fas fa-chevron-right toggle-icon"></i></td>
                             <td class="fw-bold text-primary"><?= htmlspecialchars($plat) ?></td>
                             <td><?= htmlspecialchars($data['driver']) ?></td>
+                            <td><?= htmlspecialchars($data['bengkel'] ?? '-') ?></td>
                             <td class="text-center"><span class="badge bg-secondary"><?= count($episodes) ?>x</span></td>
                             <td>
                                 <?= $aktif_terakhir
@@ -276,7 +306,7 @@ $bulan_str = sprintf('%02d', $bulan);
                             </td>
                         </tr>
                         <tr>
-                            <td colspan="5" class="p-0 border-0">
+                            <td colspan="6" class="p-0 border-0">
                                 <div class="collapse" id="<?= $collapse_id ?>">
                                     <div class="p-2 ps-4 bg-light">
                                         <table class="table table-sm mb-0 bg-white">
@@ -328,9 +358,21 @@ $bulan_str = sprintf('%02d', $bulan);
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/locales/bootstrap-datepicker.id.min.js"></script>
 <script>
+$(document).ready(function() {
+    $('.datepicker').datepicker({
+        format: 'dd-mm-yyyy',
+        autoclose: true,
+        todayHighlight: true,
+        language: 'id',
+        orientation: 'bottom'
+    });
+});
+
 <?php
-$status_data = ['BAIK' => 0, 'DISERVICE' => 0, 'RUSAK RINGAN' => 0, 'RUSAK BERAT' => 0];
+$status_data = ['BAIK' => 0, 'DISERVICE' => 0];
 
 $q_mobil = mysqli_query($koneksi, "SELECT id_mobil FROM master_mobil");
 $stmt_cek = mysqli_prepare($koneksi,
@@ -367,15 +409,13 @@ while ($row = mysqli_fetch_assoc($query_durasi)) {
 new Chart(document.getElementById('chartStatus').getContext('2d'), {
     type: 'doughnut',
     data: {
-        labels: ['BAIK', 'DISERVICE', 'RUSAK RINGAN', 'RUSAK BERAT'],
+        labels: ['BAIK', 'DISERVICE'],
         datasets: [{
             data: [
                 <?= $status_data['BAIK'] ?>,
-                <?= $status_data['DISERVICE'] ?>,
-                <?= $status_data['RUSAK RINGAN'] ?>,
-                <?= $status_data['RUSAK BERAT'] ?>
+                <?= $status_data['DISERVICE'] ?>
             ],
-            backgroundColor: ['#28a745', '#ffc107', '#fd7e14', '#dc3545'],
+            backgroundColor: ['#28a745', '#ffc107'],
             borderWidth: 2
         }]
     },

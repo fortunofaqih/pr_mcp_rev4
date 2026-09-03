@@ -1,4 +1,5 @@
 <?php
+//laporan_kondisi_kendaraaan_excel.php
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
 require_once __DIR__ . '/../../auth/check_session.php';
@@ -8,15 +9,23 @@ if ($_SESSION['status'] != "login") {
     exit;
 }
 
-$bulan = isset($_GET['bulan']) ? (int) $_GET['bulan'] : (int) date('m');
-$tahun = isset($_GET['tahun']) ? (int) $_GET['tahun'] : (int) date('Y');
-if ($bulan < 1 || $bulan > 12) $bulan = (int) date('m');
+// Filter rentang tanggal
+$start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
+$end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-d');
 
-$nama_bulan = date('F', mktime(0, 0, 0, $bulan, 1, $tahun));
+if (empty($start_date) || empty($end_date)) {
+    $start_date = date('Y-m-01');
+    $end_date = date('Y-m-d');
+}
+
+$start_date_sql = date('Y-m-d', strtotime($start_date));
+$end_date_sql = date('Y-m-d', strtotime($end_date));
+
+$periode_label = date('d-M-Y', strtotime($start_date)) . ' s/d ' . date('d-M-Y', strtotime($end_date));
 
 // ================= PERSIAPAN HEADER DOWNLOAD EXCEL =================
 header("Content-Type: application/vnd.ms-excel; charset=utf-8");
-header("Content-Disposition: attachment; filename=Laporan_Riwayat_Service_Kendaraan_MCP_" . $nama_bulan . "_" . $tahun . ".xls");
+header("Content-Disposition: attachment; filename=Laporan_Mutasi_Service_Kendaraan_" . date('d-m-Y', strtotime($start_date)) . "_sampai_" . date('d-m-Y', strtotime($end_date)) . ".xls");
 header("Pragma: no-cache");
 header("Expires: 0");
 
@@ -29,9 +38,9 @@ $total_aktif = mysqli_fetch_assoc(mysqli_query($koneksi,
 
 $stmt = mysqli_prepare($koneksi,
     "SELECT COUNT(*) as total FROM kondisi_kendaraan
-     WHERE end_date IS NOT NULL AND MONTH(end_date) = ? AND YEAR(end_date) = ?"
+     WHERE end_date IS NOT NULL AND end_date BETWEEN ? AND ?"
 );
-mysqli_stmt_bind_param($stmt, "ii", $bulan, $tahun);
+mysqli_stmt_bind_param($stmt, "ss", $start_date_sql, $end_date_sql);
 mysqli_stmt_execute($stmt);
 mysqli_stmt_bind_result($stmt, $total_selesai);
 mysqli_stmt_fetch($stmt);
@@ -43,29 +52,29 @@ $row_durasi = mysqli_fetch_assoc(mysqli_query($koneksi,
 ));
 $rata2_durasi = $row_durasi['rata2'] !== null ? round($row_durasi['rata2'], 1) : 0;
 
-// ================= QUERY UNTUK REKAP BULANAN =================
+// ================= QUERY UNTUK REKAP MUTASI =================
 $query_rekap = "
     SELECT 
         k.id_kondisi,
         k.plat_nomor,
         k.kondisi,
+        k.bengkel,
         k.keterangan,
         k.start_date,
         k.end_date,
         k.created_at,
         m.driver_tetap,
         m.merk_tipe,
-        m.tahun_kendaraan
+        m.tahun_kendaraan,
+        DATEDIFF(COALESCE(k.end_date, NOW()), k.start_date) as durasi_hari
     FROM kondisi_kendaraan k
     JOIN master_mobil m ON k.id_mobil = m.id_mobil
-    WHERE (MONTH(k.start_date) = ? AND YEAR(k.start_date) = ?)
-       OR (MONTH(k.end_date) = ? AND YEAR(k.end_date) = ?)
-       OR (MONTH(k.created_at) = ? AND YEAR(k.created_at) = ?)
+    WHERE (k.start_date BETWEEN ? AND ?) OR (k.end_date BETWEEN ? AND ?)
     ORDER BY k.plat_nomor ASC, k.start_date ASC, k.created_at ASC
 ";
 
 $stmt_rekap = mysqli_prepare($koneksi, $query_rekap);
-mysqli_stmt_bind_param($stmt_rekap, "iiiiii", $bulan, $tahun, $bulan, $tahun, $bulan, $tahun);
+mysqli_stmt_bind_param($stmt_rekap, "ssss", $start_date_sql, $end_date_sql, $start_date_sql, $end_date_sql);
 mysqli_stmt_execute($stmt_rekap);
 $result_rekap = mysqli_stmt_get_result($stmt_rekap);
 ?>
@@ -80,7 +89,7 @@ $result_rekap = mysqli_stmt_get_result($stmt_rekap);
         <x:ExcelWorkbook>
             <x:ExcelWorksheets>
                 <x:ExcelWorksheet>
-                    <x:Name>Laporan Service</x:Name>
+                    <x:Name>Mutasi Service</x:Name>
                     <x:WorksheetOptions>
                         <x:DisplayGridlines/>
                     </x:WorksheetOptions>
@@ -187,16 +196,16 @@ $result_rekap = mysqli_stmt_get_result($stmt_rekap);
     <!-- Judul Laporan -->
     <table style="border: none; margin-bottom: 10px; width: 100%;">
         <tr>
-            <td colspan="7" class="title-report">PT MUTIARA CAHAYA PLASTINDO</td>
+            <td colspan="9" class="title-report">PT MUTIARA CAHAYA PLASTINDO</td>
         </tr>
         <tr>
-            <td colspan="7" style="font-size: 14px; font-weight: bold; text-align: center;">LAPORAN REKAP BULANAN RIWAYAT SERVICE KENDARAAN</td>
+            <td colspan="9" style="font-size: 14px; font-weight: bold; text-align: center;">LAPORAN MUTASI SERVICE KENDARAAN</td>
         </tr>
         <tr>
-            <td colspan="7" class="sub-title">Periode: <?= $nama_bulan ?> <?= $tahun ?></td>
+            <td colspan="9" class="sub-title">Periode: <?= $periode_label ?></td>
         </tr>
         <tr>
-            <td colspan="7" style="font-size: 10px; text-align: center; color: #666;">Tanggal Cetak: <?= date('d F Y H:i:s') ?></td>
+            <td colspan="9" style="font-size: 10px; text-align: center; color: #666;">Tanggal Cetak: <?= date('d F Y H:i:s') ?></td>
         </tr>
     </table>
 
@@ -205,12 +214,12 @@ $result_rekap = mysqli_stmt_get_result($stmt_rekap);
     <!-- Ringkasan Statistik -->
     <table class="kpi-table">
         <tr>
-            <td colspan="4" class="header-kpi text-center">RINGKASAN STATISTIK SERVICE BULAN <?= strtoupper($nama_bulan) ?> <?= $tahun ?></td>
+            <td colspan="4" class="header-kpi text-center">RINGKASAN STATISTIK SERVICE PERIODE <?= strtoupper($periode_label) ?></td>
         </tr>
         <tr>
             <td class="text-bold" style="width: 20%;">Total Armada</td>
             <td style="width: 30%;"><?= $total_mobil ?> Unit</td>
-            <td class="text-bold" style="width: 20%;">Selesai Servis Bulan Ini</td>
+            <td class="text-bold" style="width: 20%;">Selesai Servis</td>
             <td style="width: 30%;"><?= $total_selesai ?> Unit</td>
         </tr>
         <tr>
@@ -223,43 +232,39 @@ $result_rekap = mysqli_stmt_get_result($stmt_rekap);
 
     <br>
 
-    <!-- Tabel Utama Rekap Service -->
+    <!-- Tabel Utama Mutasi Service -->
     <div style="font-weight: bold; margin-bottom: 5px; font-size: 12px;">
-        REKAP SERVICE KENDARAAN BULAN <?= strtoupper($nama_bulan) ?> <?= $tahun ?>
+        MUTASI SERVICE KENDARAAN PERIODE <?= strtoupper($periode_label) ?>
     </div>
     
     <table class="table-data">
         <thead>
             <tr>
                 <th style="width: 4%;">No</th>
+                <th style="width: 15%;">Plat Nomor</th>
                 <th style="width: 15%;">Nama Driver</th>
-                <th style="width: 10%;">Tgl Masuk</th>
-                <th style="width: 42%;">Kerusakan</th>
-                <th style="width: 10%;">Tgl Selesai</th>
-                <th style="width: 8%;">Durasi</th>
-                <th style="width: 11%;">Status</th>
+                <th style="width: 12%;">Tgl Masuk</th>
+                <th style="width: 12%;">Tgl Selesai</th>
+                <th style="width: 25%;">Keterangan</th>
+                <th style="width: 7%;">Durasi</th>
+                <th style="width: 10%;">Bengkel</th>
+                <th style="width: 10%;">Status</th>
             </tr>
         </thead>
         <tbody>
             <?php
             $hasData = false;
-            $total_durasi = 0;
-            $jumlah_data = 0;
             $current_plat = '';
+            $no = 0;
 
             while ($row = mysqli_fetch_assoc($result_rekap)) {
                 $hasData = true;
+                $no++;
                 $aktif = is_null($row['end_date']);
                 
-                // Hitung durasi
-                $durasi_hari = 0;
-                if ($row['start_date']) {
-                    $start_dt = new DateTime($row['start_date']);
-                    $sampai_dt = $aktif ? new DateTime() : new DateTime($row['end_date']);
-                    $durasi_hari = $start_dt->diff($sampai_dt)->days + 1;
-                    $total_durasi += $durasi_hari;
-                    $jumlah_data++;
-                }
+                // Durasi
+                $durasi_hari = $row['durasi_hari'] ?? 0;
+                if ($durasi_hari < 0) $durasi_hari = 0;
                 
                 $status_terakhir = $aktif ? 'Masih Diservice' : 'SELESAI';
                 
@@ -273,44 +278,46 @@ $result_rekap = mysqli_stmt_get_result($stmt_rekap);
                 // Cek apakah plat nomor baru (untuk grouping)
                 if ($current_plat != $row['plat_nomor']) {
                     $current_plat = $row['plat_nomor'];
-                    
-                    // Tampilkan header group plat nomor
                     ?>
                     <tr class="plat-group">
-                        <td colspan="7">
+                        <td colspan="9">
                             <span style="font-size: 13px;"><b><?= htmlspecialchars($row['plat_nomor']) ?></b></span>
                         </td>
                     </tr>
                     <?php
-                    // Reset counter untuk no urut di dalam group
-                    $sub_no = 1;
                 }
                 
                 // Tampilkan baris data
-                $row_class = ($sub_no % 2 == 0) ? 'bg-even' : 'bg-odd';
+                $row_class = ($no % 2 == 0) ? 'bg-even' : 'bg-odd';
                 
-                // Keterangan kerusakan
+                // Keterangan
                 $keterangan = htmlspecialchars($row['keterangan'] ?? '-');
                 if (empty(trim($keterangan))) {
                     $keterangan = '-';
                 }
             ?>
                 <tr class="<?= $row_class ?>">
-                    <td class="text-center" style="font-size: 10px;"><?= $sub_no++ ?></td>
+                    <td class="text-center" style="font-size: 10px;"><?= $no ?></td>
+                    <td class="text-left" style="font-size: 10px;">
+                        <b><?= htmlspecialchars($row['plat_nomor']) ?></b>
+                    </td>
                     <td class="text-left" style="font-size: 10px;">
                         <?= htmlspecialchars($row['driver_tetap'] ?? '-') ?>
                     </td>
                     <td class="text-center no-wrap" style="font-size: 10px;">
                         <?= $tgl_mulai ?>
                     </td>
-                    <td class="text-left kerusakan-text">
-                        <?= $keterangan ?>
-                    </td>
                     <td class="text-center no-wrap" style="font-size: 10px;">
                         <?= $tgl_selesai ?>
                     </td>
+                    <td class="text-left kerusakan-text">
+                        <?= $keterangan ?>
+                    </td>
                     <td class="text-center" style="font-size: 10px;">
-                        <?= $durasi_hari > 0 ? $durasi_hari : '-' ?>
+                        <?= $durasi_hari > 0 ? $durasi_hari . ' hari' : '-' ?>
+                    </td>
+                    <td class="text-center" style="font-size: 10px;">
+                        <?= htmlspecialchars($row['bengkel'] ?? '-') ?>
                     </td>
                     <td class="text-center <?= $status_class ?>" style="font-size: 9px;">
                         <?= $status_terakhir ?>
@@ -322,7 +329,7 @@ $result_rekap = mysqli_stmt_get_result($stmt_rekap);
             mysqli_stmt_close($stmt_rekap);
 
             if (!$hasData) {
-                echo '<tr><td colspan="7" class="text-center" style="font-style: italic; color: #777; padding: 20px;">Tidak ada data riwayat service untuk periode ini.</td></tr>';
+                echo '<tr><td colspan="9" class="text-center" style="font-style: italic; color: #777; padding: 20px;">Tidak ada data mutasi service untuk periode ini.</td></tr>';
             }
             ?>
         </tbody>
