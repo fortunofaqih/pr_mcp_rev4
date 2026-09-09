@@ -1,3 +1,8 @@
+<?php
+session_start();
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
+?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -113,7 +118,7 @@
             font-size: 12px;
             padding: 3px 6px;
         }
-        .note-small { font-size: 11px; color: #666; font-style: italic; }
+        .note-small { font-size: 11px; color: #cf1111; font-style: italic; }
 
         /* ===================== PRINT SHEET ===================== */
         .print-sheet { display: none; }
@@ -154,83 +159,62 @@
                 text-overflow: ellipsis;
             }
 
-            /* Tanggal: kiri 1cm, bawah 0.5cm; jarak DD MM YY = 0.5cm */
+            /*
+             * CATATAN REVISI:
+             * Field-field yang sumbernya checkbox/radio (Jenis Pengiriman,
+             * Tipe Nasabah, Status, Kewarganegaraan, Hubungan Keuangan,
+             * Biaya Koresponden, dan seluruh Sumber Dana) SUDAH TIDAK DICETAK.
+             * User akan mencentang manual di kertas dengan ballpoint.
+             * Posisi CSS untuk field-field tersebut sudah dihapus dari sini,
+             * dan elemen HTML-nya juga sudah dihapus dari #printSheet di bawah.
+             */
+
             .p-tgl {
                 position: absolute;
-                top: 10mm;
-                left: 19mm;
+                top: 11mm;
+                left: 10mm;
                 font-size: 8pt;
                 letter-spacing: 2mm;
                 word-spacing: 5mm;
             }
-            /* Jenis */
-            .p-jenis {
-                position: absolute;
-                top: 15mm;
-                left: 95mm;
-                font-size: 7.5pt;
-                font-weight: 600;
-            }
 
-            /* ===== A (kiri) +1cm kanan ===== */
-            .p-rek-penerima { position: absolute; top: 25mm; left: 26mm; width: 85mm; font-size: 8pt; }
-            .p-nama-penerima { position: absolute; top: 30mm; left: 26mm; width: 85mm; font-size: 8pt; }
-            .p-alamat-penerima { position: absolute; top: 35mm; left: 26mm; width: 85mm; font-size: 8pt; }
-            .p-kota-penerima { position: absolute; top: 39mm; left: 26mm; width: 85mm; font-size: 8pt; }
-            .p-kode-negara-penerima { position: absolute; top: 61mm; left: 26mm; width: 40mm; font-size: 8pt; }
-            .p-tipe-a { position: absolute; top: 54mm; left: 26mm; font-size: 7pt; font-weight: 600; }
-            .p-status-a { position: absolute; top: 54mm; left: 65mm; font-size: 7pt; font-weight: 600; }
-            .p-kw-a { position: absolute; top: 57.5mm; left: 16mm; font-size: 7pt; font-weight: 600; }
+            .p-rek-penerima { position: absolute; top: 26mm; left: 17mm; width: 85mm; font-size: 8pt; }
+            .p-nama-penerima { position: absolute; top: 31mm; left: 17mm; width: 85mm; font-size: 8pt; }
+            .p-alamat-penerima { position: absolute; top: 36mm; left: 17mm; width: 85mm; font-size: 8pt; }
+            .p-kota-penerima { position: absolute; top: 40mm; left: 17mm; width: 85mm; font-size: 8pt; }
+            .p-kode-negara-penerima { position: absolute; top: 62mm; left: 17mm; width: 40mm; font-size: 8pt; }
 
-            /* ===== B (kanan) +1cm kanan ===== */
-            .p-nama-bank { position: absolute; top: 25mm; left: 131mm; width: 85mm; font-size: 8pt; }
-            .p-alamat-bank { position: absolute; top: 30mm; left: 131mm; width: 85mm; font-size: 8pt; }
-            .p-kota-bank { position: absolute; top: 38mm; left: 131mm; width: 85mm; font-size: 8pt; }
-            .p-state-bank { position: absolute; top: 40mm; left: 131mm; width: 85mm; font-size: 8pt; }
-            .p-negara-bank { position: absolute; top: 42mm; left: 131mm; width: 50mm; font-size: 8pt; }
-            .p-kode-negara-bank { position: absolute; top: 44mm; left: 131mm; width: 40mm; font-size: 8pt; }
-            .p-swift { position: absolute; top: 42mm; left: 120mm; width: 85mm; font-size: 8pt; }
+            .p-nama-bank { position: absolute; top: 26mm; left: 122mm; width: 85mm; font-size: 8pt; }
+            .p-alamat-bank { position: absolute; top: 31mm; left: 122mm; width: 85mm; font-size: 8pt; }
+            .p-kota-bank { position: absolute; top: 39mm; left: 122mm; width: 85mm; font-size: 8pt; }
+            .p-state-bank { position: absolute; top: 41mm; left: 122mm; width: 85mm; font-size: 8pt; }
+            .p-negara-bank { position: absolute; top: 43mm; left: 122mm; width: 50mm; font-size: 8pt; }
+            .p-kode-negara-bank { position: absolute; top: 45mm; left: 122mm; width: 40mm; font-size: 8pt; }
+            .p-swift { position: absolute; top: 43mm; left: 111mm; width: 85mm; font-size: 8pt; }
 
-            /* ===== C (kiri bawah) +1cm kanan ===== */
-            .p-nama-pengirim { position: absolute; top: 82mm; left: 26mm; width: 85mm; font-size: 8pt; }
-            .p-ktp { 
-                position: absolute; 
-                top: 84mm; 
-                left: 26mm; 
-                width: 50mm; 
-                font-size: 8pt; 
-            }
-            .p-alamat-pengirim { position: absolute; top: 86mm; left: 26mm; width: 85mm; font-size: 8pt; }
-            .p-kontak { position: absolute; top: 89mm; left: 26mm; width: 50mm; font-size: 8pt; }
-            .p-hp { position: absolute; top: 90mm; left: 26mm; width: 50mm; font-size: 8pt; }
-            .p-kota-pengirim { position: absolute; top: 108mm; left: 26mm; width: 50mm; font-size: 8pt; }
-            .p-rek-bca { position: absolute; top: 122mm; left: 26mm; width: 60mm; font-size: 8pt; }
-            .p-tipe-c { position: absolute; top: 114mm; left: 26mm; font-size: 7pt; font-weight: 600; }
-            .p-status-c { position: absolute; top: 114mm; left: 65mm; font-size: 7pt; font-weight: 600; }
-           .p-kw-c { position: absolute; top: 122.5mm; left: 16mm; font-size: 7pt; font-weight: 600; }
+            .p-nama-pengirim { position: absolute; top: 83mm; left: 17mm; width: 85mm; font-size: 8pt; }
+            .p-ktp { position: absolute; top: 85mm; left: 17mm; width: 50mm; font-size: 8pt; }
+            .p-alamat-pengirim { position: absolute; top: 87mm; left: 17mm; width: 85mm; font-size: 8pt; }
+            .p-kontak { position: absolute; top: 90mm; left: 17mm; width: 50mm; font-size: 8pt; }
+            .p-hp { position: absolute; top: 91mm; left: 17mm; width: 50mm; font-size: 8pt; }
+            .p-kota-pengirim { position: absolute; top: 109mm; left: 17mm; width: 50mm; font-size: 8pt; }
+            .p-rek-bca { position: absolute; top: 123mm; left: 17mm; width: 60mm; font-size: 8pt; }
 
-            /* ===== D (kanan bawah) +1cm kanan ===== */
-            .p-hub-keuangan { position: absolute; top: 85mm; left: 120mm; font-size: 8pt; }
-            .p-tujuan { position: absolute; top: 92mm; left: 120mm; width: 85mm; font-size: 8pt; }
-            .p-berita { position: absolute; top: 99mm; left: 120mm; width: 85mm; font-size: 8pt; }
-            .p-sumber-dana { position: absolute; top: 110mm; left: 120mm; width: 85mm; font-size: 7.5pt; }
+            .p-tujuan { position: absolute; top: 93mm; left: 111mm; width: 85mm; font-size: 8pt; }
+            .p-berita { position: absolute; top: 100mm; left: 111mm; width: 85mm; font-size: 8pt; }
 
-            /* Biaya kor + Operator (+1cm untuk konsistensi kiri) */
-            .p-biaya-kor { position: absolute; top: 140mm; left: 16mm; font-size: 8pt; }
-            .p-operator { position: absolute; top: 140mm; left: 140mm; width: 28mm; font-size: 8pt; }
-            .p-verifier { position: absolute; top: 140mm; left: 172mm; width: 25mm; font-size: 8pt; }
+            .p-operator { position: absolute; top: 141mm; left: 131mm; width: 28mm; font-size: 8pt; }
+            .p-verifier { position: absolute; top: 141mm; left: 163mm; width: 25mm; font-size: 8pt; }
 
-            /* Jumlah */
-            /* Mata uang +0.8cm kanan; valas -2cm kiri; kurs -2.5cm kiri; rupiah/total -4.5cm kiri */
-            .p-mata-uang { position: absolute; top: 156mm; left: 21mm; width: 20mm; font-size: 8pt; }
-            .p-jml-valas { position: absolute; top: 156mm; left: 8mm; width: 40mm; text-align: right; font-size: 8pt; }
-            .p-kurs { position: absolute; top: 156mm; left: 47mm; width: 28mm; text-align: right; font-size: 8pt; }
-            .p-jml-rupiah { position: absolute; top: 156mm; left: 60mm; width: 45mm; text-align: right; font-size: 8pt; }
-            .p-provisi { position: absolute; top: 170mm; left: 8mm; width: 40mm; text-align: right; font-size: 8pt; }
-            .p-biaya { position: absolute; top: 171mm; left: 8mm; width: 40mm; text-align: right; font-size: 8pt; }
-            .p-total { position: absolute; top: 172mm; left: 60mm; width: 45mm; text-align: right; font-size: 8pt; }
-            /* Terbilang naik 0.5cm */
-            .p-terbilang { position: absolute; top: 179mm; left: 12mm; width: 170mm; font-size: 8pt; white-space: normal; }
+            /* ===== JUMLAH: TURUN 1,5cm DAN KE KIRI 0,5cm ===== */
+            .p-mata-uang { position: absolute; top: 163.5mm; left: 12.5mm; width: 20mm; font-size: 8pt; }
+            .p-jml-valas { position: absolute; top: 163.5mm; left: -0.5mm; width: 40mm; text-align: right; font-size: 8pt; }
+            .p-kurs { position: absolute; top: 163.5mm; left: 38.5mm; width: 28mm; text-align: right; font-size: 8pt; }
+            .p-jml-rupiah { position: absolute; top: 163.5mm; left: 51.5mm; width: 45mm; text-align: right; font-size: 8pt; }
+            .p-provisi { position: absolute; top: 177.5mm; left: -0.5mm; width: 40mm; text-align: right; font-size: 8pt; }
+            .p-biaya { position: absolute; top: 178.5mm; left: -0.5mm; width: 40mm; text-align: right; font-size: 8pt; }
+            .p-total { position: absolute; top: 179.5mm; left: 51.5mm; width: 45mm; text-align: right; font-size: 8pt; }
+            .p-terbilang { position: absolute; top: 186.5mm; left: 3.5mm; width: 170mm; font-size: 8pt; white-space: normal; }
         }
     </style>
 </head>
@@ -246,8 +230,11 @@
             <a href="../../index.php" class="btn btn-danger fw-bold me-2">
                 <i class="fas fa-arrow-left me-1"></i> KEMBALI
             </a>
-            <button onclick="preparePrint()" class="btn btn-success-custom me-2">
-                <i class="fas fa-print me-2"></i>CETAK BLANKO
+            <a href="list_data.php" class="btn btn-info fw-bold me-2 text-white">
+                <i class="fas fa-list me-1"></i> DATA TERSIMPAN
+            </a>
+            <button onclick="saveAndPrint()" class="btn btn-success-custom me-2">
+                <i class="fas fa-save me-2"></i>SIMPAN & CETAK
             </button>
             <button onclick="resetForm()" class="btn btn-secondary">
                 <i class="fas fa-undo me-2"></i>RESET
@@ -255,405 +242,404 @@
         </div>
     </div>
 
-    <div class="form-card no-print" id="formCard">
+    <form id="formTransfer" method="POST" action="proses_simpan.php">
+        <div class="form-card no-print" id="formCard">
 
-        <div class="row mb-3 align-items-end">
-            <div class="col-md-3">
-                <label class="form-label"><i class="far fa-calendar-alt me-1"></i>Tanggal / Date</label>
-                <div class="date-input-group">
-                    <input type="text" id="tglHari" maxlength="2" placeholder="DD" class="form-control text-center">
-                    <span>/</span>
-                    <input type="text" id="tglBulan" maxlength="2" placeholder="MM" class="form-control text-center">
-                    <span>/</span>
-                    <input type="text" id="tglTahun" maxlength="2" placeholder="YY" class="form-control text-center">
+            <div class="row mb-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label"><i class="far fa-calendar-alt me-1"></i>Tanggal / Date</label>
+                    <div class="date-input-group">
+                        <input type="text" id="tglHari" name="tglHari" maxlength="2" placeholder="DD" class="form-control text-center">
+                        <span>/</span>
+                        <input type="text" id="tglBulan" name="tglBulan" maxlength="2" placeholder="MM" class="form-control text-center">
+                        <span>/</span>
+                        <input type="text" id="tglTahun" name="tglTahun" maxlength="2" placeholder="YY" class="form-control text-center">
+                    </div>
+                    <input type="hidden" id="tanggal" name="tanggal">
                 </div>
-            </div>
-            <div class="col-md-9">
-                <label class="form-label">Jenis Pengiriman</label>
-                <div class="jenis-pengiriman">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="jpKawat" value="Kawat">
-                        <label class="form-check-label" for="jpKawat">Kawat</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="jpWesel" value="Wesel">
-                        <label class="form-check-label" for="jpWesel">Wesel</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="jpRTGS" value="RTGS">
-                        <label class="form-check-label" for="jpRTGS">RTGS</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="jpBIFAST" value="BI-FAST">
-                        <label class="form-check-label" for="jpBIFAST">BI-FAST</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="jpSKN" value="SKN">
-                        <label class="form-check-label" for="jpSKN">SKN</label>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="section-divider"></div>
-
-        <h4><i class="fas fa-user-check"></i> A. PENERIMA / BENEFICIARY</h4>
-        <div class="row g-2">
-            <div class="col-md-4">
-                <label class="form-label">Nomor Rekening Penerima</label>
-                <input type="text" id="rekPenerima" class="form-control" value="">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Nama Penerima</label>
-                <input type="text" id="namaPenerima" class="form-control text-uppercase" value="">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Alamat Penerima</label>
-                <input type="text" id="alamatPenerima" class="form-control text-uppercase" value="">
-            </div>
-        </div>
-        <div class="row g-2 mt-1">
-            <div class="col-md-3">
-                <label class="form-label">Kota</label>
-                <input type="text" id="kotaPenerima" class="form-control text-uppercase" value="">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Negara Bagian</label>
-                <input type="text" id="statePenerima" class="form-control text-uppercase">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Negara</label>
-                <input type="text" id="negaraPenerima" class="form-control text-uppercase">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Kode Negara</label>
-                <input type="text" id="kodeNegaraPenerima" class="form-control text-uppercase" value="">
-            </div>
-        </div>
-        <div class="row g-2 mt-2">
-            <div class="col-md-4">
-                <label class="form-label">Tipe Nasabah</label>
-                <div class="checkbox-group">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="tipeNasabah" id="tnPerorangan" value="Perorangan">
-                        <label class="form-check-label" for="tnPerorangan">Perorangan</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="tipeNasabah" id="tnPerusahaan" value="Perusahaan">
-                        <label class="form-check-label" for="tnPerusahaan">Perusahaan</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="tipeNasabah" id="tnPemerintah" value="Pemerintah">
-                        <label class="form-check-label" for="tnPemerintah">Pemerintah</label>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Status</label>
-                <div class="checkbox-group">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="statusNasabah" id="stPenduduk" value="Penduduk">
-                        <label class="form-check-label" for="stPenduduk">Penduduk</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="statusNasabah" id="stNonPenduduk" value="Non Penduduk">
-                        <label class="form-check-label" for="stNonPenduduk">Non Penduduk</label>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Kewarganegaraan</label>
-                <div class="checkbox-group">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="kewarganegaraan" id="kwWNI" value="WNI">
-                        <label class="form-check-label" for="kwWNI">WNI</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="kewarganegaraan" id="kwWNA" value="WNA">
-                        <label class="form-check-label" for="kwWNA">WNA</label>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="section-divider"></div>
-
-        <h4><i class="fas fa-university"></i> B. BANK PENERIMA</h4>
-        <div class="row g-2">
-            <div class="col-md-4">
-                <label class="form-label">Nama Bank</label>
-                <input type="text" id="namaBank" class="form-control text-uppercase" value="">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Alamat Bank</label>
-                <input type="text" id="alamatBank" class="form-control text-uppercase" value="">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Kota</label>
-                <input type="text" id="kotaBank" class="form-control text-uppercase" value="">
-            </div>
-        </div>
-        <div class="row g-2 mt-1">
-            <div class="col-md-3">
-                <label class="form-label">Negara Bagian</label>
-                <input type="text" id="stateBank" class="form-control text-uppercase">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Negara</label>
-                <input type="text" id="negaraBank" class="form-control text-uppercase">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Kode Negara</label>
-                <input type="text" id="kodeNegaraBank" class="form-control text-uppercase">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Kode SWIFT</label>
-                <input type="text" id="swiftCode" class="form-control text-uppercase">
-            </div>
-        </div>
-
-        <div class="section-divider"></div>
-
-        <h4><i class="fas fa-user-edit"></i> C. PENGIRIM / REMITTER</h4>
-        <div class="row g-2">
-            <div class="col-md-5">
-                <label class="form-label">Nama Pengirim</label>
-                <input type="text" id="namaPengirim" class="form-control text-uppercase" value="PT. MUTIARACAHAYA PLASTINDO">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">No. Kartu Identitas</label>
-                <input type="text" id="noKTP" class="form-control">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Alamat Pengirim</label>
-                <input type="text" id="alamatPengirim" class="form-control text-uppercase" value="MASTRIP 33 SURABAYA">
-            </div>
-        </div>
-        <div class="row g-2 mt-1">
-            <div class="col-md-3">
-                <label class="form-label">Nama yang dihubungi</label>
-                <input type="text" id="kontakPerson" class="form-control text-uppercase" value="SUSAN">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">No. Handphone</label>
-                <input type="text" id="noHP" class="form-control" value="0816528099">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">No. Telepon</label>
-                <input type="text" id="noTelp" class="form-control">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Email</label>
-                <input type="email" id="emailPengirim" class="form-control">
-            </div>
-        </div>
-        <div class="row g-2 mt-1">
-            <div class="col-md-3">
-                <label class="form-label">Kota</label>
-                <input type="text" id="kotaPengirim" class="form-control text-uppercase" value="">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Tipe Nasabah</label>
-                <div class="checkbox-group">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="tipeNasabahPengirim" id="tnpPerorangan" value="Perorangan">
-                        <label class="form-check-label" for="tnpPerorangan">Perorangan</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="tipeNasabahPengirim" id="tnpPerusahaan" value="Perusahaan">
-                        <label class="form-check-label" for="tnpPerusahaan">Perusahaan</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="tipeNasabahPengirim" id="tnpPemerintah" value="Pemerintah">
-                        <label class="form-check-label" for="tnpPemerintah">Pemerintah</label>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Status</label>
-                <div class="checkbox-group">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="statusPengirim" id="stpPenduduk" value="Penduduk">
-                        <label class="form-check-label" for="stpPenduduk">Penduduk</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="statusPengirim" id="stpNonPenduduk" value="Non Penduduk">
-                        <label class="form-check-label" for="stpNonPenduduk">Non Penduduk</label>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Kewarganegaraan</label>
-                <div class="checkbox-group">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="kwPengirim" id="kwpWNI" value="WNI">
-                        <label class="form-check-label" for="kwpWNI">WNI</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="kwPengirim" id="kwpWNA" value="WNA">
-                        <label class="form-check-label" for="kwpWNA">WNA</label>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="row g-2 mt-1">
-            <div class="col-md-4">
-                <label class="form-label">No. Rekening di BCA</label>
-                <input type="text" id="rekBCA" class="form-control" value="">
-            </div>
-        </div>
-
-        <div class="section-divider"></div>
-
-        <h4><i class="fas fa-database"></i> D. DATA</h4>
-        <div class="row g-2">
-            <div class="col-md-4">
-                <label class="form-label">Hubungan Keuangan</label>
-                <div class="radio-inline mt-1">
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="hubKeuangan" id="hkYa" value="Ya">
-                        <label class="form-check-label" for="hkYa">Ya</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="hubKeuangan" id="hkTidak" value="Tidak">
-                        <label class="form-check-label" for="hkTidak">Tidak</label>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Tujuan Transaksi</label>
-                <input type="text" id="tujuanTransaksi" class="form-control text-uppercase" value="">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Berita / Message</label>
-                <input type="text" id="berita" class="form-control text-uppercase" value="">
-            </div>
-        </div>
-        <div class="row g-2 mt-2">
-            <div class="col-md-12">
-                <label class="form-label">Sumber Dana</label>
-                <div class="mt-1">
-                    <div class="sumber-dana-row">
+                <div class="col-md-9">
+                    <label class="form-label">Jenis Pengiriman <span class="note-small">(akan dicentang manual di kertas)</span></label>
+                    <div class="jenis-pengiriman">
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="sdTunai" value="Tunai">
-                            <label class="form-check-label" for="sdTunai">Tunai</label>
+                            <input class="form-check-input" type="checkbox" id="jpKawat" name="jenis_pengiriman[]" value="Kawat">
+                            <label class="form-check-label" for="jpKawat">Kawat</label>
                         </div>
-                        <span class="text-muted small">Rp</span>
-                        <input type="text" id="sdTunaiRp" class="form-control form-control-sm" placeholder="0">
-                    </div>
-                    <div class="sumber-dana-row">
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="sdTabungan" value="Tabungan">
-                            <label class="form-check-label" for="sdTabungan">Tabungan</label>
+                            <input class="form-check-input" type="checkbox" id="jpWesel" name="jenis_pengiriman[]" value="Wesel">
+                            <label class="form-check-label" for="jpWesel">Wesel</label>
                         </div>
-                        <span class="text-muted small">No.</span>
-                        <input type="text" id="sdTabunganNo" class="form-control form-control-sm" placeholder="No. Rek">
-                        <span class="text-muted small">Rp</span>
-                        <input type="text" id="sdTabunganRp" class="form-control form-control-sm" placeholder="0">
-                    </div>
-                    <div class="sumber-dana-row">
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="sdCek" value="Cek BCA">
-                            <label class="form-check-label" for="sdCek">Cek BCA</label>
+                            <input class="form-check-input" type="checkbox" id="jpRTGS" name="jenis_pengiriman[]" value="RTGS">
+                            <label class="form-check-label" for="jpRTGS">RTGS</label>
                         </div>
-                        <span class="text-muted small">No.</span>
-                        <input type="text" id="sdCekNo" class="form-control form-control-sm" placeholder="No. Cek">
-                        <span class="text-muted small">Rp</span>
-                        <input type="text" id="sdCekRp" class="form-control form-control-sm" placeholder="0">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="jpBIFAST" name="jenis_pengiriman[]" value="BI-FAST">
+                            <label class="form-check-label" for="jpBIFAST">BI-FAST</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="jpSKN" name="jenis_pengiriman[]" value="SKN">
+                            <label class="form-check-label" for="jpSKN">SKN</label>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="section-divider"></div>
+            <div class="section-divider"></div>
 
-        <h4><i class="fas fa-calculator"></i> JUMLAH YANG DIKIRIM</h4>
-        <div class="row g-2">
-            <div class="col-md-2">
-                <label class="form-label">Mata Uang</label>
-                <select id="mataUang" class="form-select" onchange="hitungTotal()">
-                    <option value="IDR" selected>IDR</option>
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="SGD">SGD</option>
-                    <option value="JPY">JPY</option>
-                    <option value="AUD">AUD</option>
-                    <option value="CNY">CNY</option>
-                </select>
+            <h4><i class="fas fa-user-check"></i> A. PENERIMA / BENEFICIARY</h4>
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <label class="form-label">Nomor Rekening Penerima</label>
+                    <input type="text" id="rekPenerima" name="rekening_penerima" class="form-control" value="">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Nama Penerima</label>
+                    <input type="text" id="namaPenerima" name="nama_penerima" class="form-control text-uppercase" value="">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Alamat Penerima</label>
+                    <input type="text" id="alamatPenerima" name="alamat_penerima" class="form-control text-uppercase" value="">
+                </div>
             </div>
-            <div class="col-md-3">
-                <label class="form-label">Jumlah Valuta Asing</label>
-                <input type="number" id="jmlValas" class="form-control text-end" value="" placeholder="0" oninput="hitungTotal()">
+            <div class="row g-2 mt-1">
+                <div class="col-md-3">
+                    <label class="form-label">Kota</label>
+                    <input type="text" id="kotaPenerima" name="kota_penerima" class="form-control text-uppercase" value="">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Negara Bagian</label>
+                    <input type="text" id="statePenerima" name="state_penerima" class="form-control text-uppercase">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Negara</label>
+                    <input type="text" id="negaraPenerima" name="negara_penerima" class="form-control text-uppercase">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Kode Negara</label>
+                    <input type="text" id="kodeNegaraPenerima" name="kode_negara_penerima" class="form-control text-uppercase" value="">
+                </div>
             </div>
-            <div class="col-md-2">
-                <label class="form-label">Kurs</label>
-                <input type="number" id="kurs" class="form-control text-end" value="" placeholder="0" oninput="hitungTotal()">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Jumlah Rupiah</label>
-                <input type="text" id="jmlRupiah" class="form-control text-end fw-bold text-primary" readonly value="">
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Provisi</label>
-                <input type="number" id="provisi" class="form-control text-end" value="" placeholder="0" oninput="hitungTotal()">
-            </div>
-        </div>
-        <div class="row g-2 mt-1">
-            <div class="col-md-3">
-                <label class="form-label">Biaya / Charge</label>
-                <input type="number" id="biaya" class="form-control text-end" value="" placeholder="0" oninput="hitungTotal()">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Jumlah / Total</label>
-                <input type="text" id="jmlTotal" class="form-control text-end fw-bold text-danger" readonly value="">
-            </div>
-        </div>
-        <div class="row g-2 mt-2">
-            <div class="col-md-12">
-                <label class="form-label">Terbilang</label>
-                <div class="terbilang-box" id="terbilangDisplay">—</div>
-            </div>
-        </div>
-
-        <div class="section-divider"></div>
-
-        <div class="row g-2">
-            <div class="col-md-6">
-                <label class="form-label">Biaya bank koresponden dibebankan ke:</label>
-                <div class="radio-inline mt-1">
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="biayaKoresponden" id="bkBeneficiary" value="Penerima">
-                        <label class="form-check-label" for="bkBeneficiary">Penerima</label>
+            <div class="row g-2 mt-2">
+                <div class="col-md-4">
+                    <label class="form-label">Tipe Nasabah <span class="note-small">(dicentang manual)</span></label>
+                    <div class="checkbox-group">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="tipe_nasabah[]" id="tnPerorangan" value="Perorangan">
+                            <label class="form-check-label" for="tnPerorangan">Perorangan</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="tipe_nasabah[]" id="tnPerusahaan" value="Perusahaan">
+                            <label class="form-check-label" for="tnPerusahaan">Perusahaan</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="tipe_nasabah[]" id="tnPemerintah" value="Pemerintah">
+                            <label class="form-check-label" for="tnPemerintah">Pemerintah</label>
+                        </div>
                     </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="biayaKoresponden" id="bkRemitter" value="Pengirim">
-                        <label class="form-check-label" for="bkRemitter">Pengirim</label>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Status <span class="note-small">(dicentang manual)</span></label>
+                    <div class="checkbox-group">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="status_nasabah[]" id="stPenduduk" value="Penduduk">
+                            <label class="form-check-label" for="stPenduduk">Penduduk</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="status_nasabah[]" id="stNonPenduduk" value="Non Penduduk">
+                            <label class="form-check-label" for="stNonPenduduk">Non Penduduk</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Kewarganegaraan <span class="note-small">(dicentang manual)</span></label>
+                    <div class="checkbox-group">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="kewarganegaraan_penerima[]" id="kwWNI" value="WNI">
+                            <label class="form-check-label" for="kwWNI">WNI</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="kewarganegaraan_penerima[]" id="kwWNA" value="WNA">
+                            <label class="form-check-label" for="kwWNA">WNA</label>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <label class="form-label">Today Value</label>
-                <div class="form-check mt-2">
-                    <input class="form-check-input" type="checkbox" id="todayValue" value="Today Value">
-                    <label class="form-check-label" for="todayValue">Today Value</label>
+
+            <div class="section-divider"></div>
+
+            <h4><i class="fas fa-university"></i> B. BANK PENERIMA</h4>
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <label class="form-label">Nama Bank</label>
+                    <input type="text" id="namaBank" name="nama_bank" class="form-control text-uppercase" value="">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Alamat Bank</label>
+                    <input type="text" id="alamatBank" name="alamat_bank" class="form-control text-uppercase" value="">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Kota</label>
+                    <input type="text" id="kotaBank" name="kota_bank" class="form-control text-uppercase" value="">
                 </div>
             </div>
-            <div class="col-md-3">
-                <label class="form-label">Instruksi Khusus</label>
-                <input type="text" id="instruksiKhusus" class="form-control text-uppercase">
+            <div class="row g-2 mt-1">
+                <div class="col-md-3">
+                    <label class="form-label">Negara Bagian</label>
+                    <input type="text" id="stateBank" name="state_bank" class="form-control text-uppercase">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Negara</label>
+                    <input type="text" id="negaraBank" name="negara_bank" class="form-control text-uppercase">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Kode Negara</label>
+                    <input type="text" id="kodeNegaraBank" name="kode_negara_bank" class="form-control text-uppercase">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Kode SWIFT</label>
+                    <input type="text" id="swiftCode" name="swift_code" class="form-control text-uppercase">
+                </div>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <h4><i class="fas fa-user-edit"></i> C. PENGIRIM / REMITTER</h4>
+            <div class="row g-2">
+                <div class="col-md-5">
+                    <label class="form-label">Nama Pengirim</label>
+                    <input type="text" id="namaPengirim" name="nama_pengirim" class="form-control text-uppercase" value="PT. MUTIARACAHAYA PLASTINDO">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">No. Kartu Identitas</label>
+                    <input type="text" id="noKTP" name="no_ktp" class="form-control">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Alamat Pengirim</label>
+                    <input type="text" id="alamatPengirim" name="alamat_pengirim" class="form-control text-uppercase" value="MASTRIP 33 SURABAYA">
+                </div>
+            </div>
+            <div class="row g-2 mt-1">
+                <div class="col-md-3">
+                    <label class="form-label">Nama yang dihubungi</label>
+                    <input type="text" id="kontakPerson" name="kontak_person" class="form-control text-uppercase" value="SUSAN">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">No. Handphone</label>
+                    <input type="text" id="noHP" name="no_hp" class="form-control" value="0816528099">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">No. Telepon</label>
+                    <input type="text" id="noTelp" name="no_telp" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Email</label>
+                    <input type="email" id="emailPengirim" name="email_pengirim" class="form-control">
+                </div>
+            </div>
+            <div class="row g-2 mt-1">
+                <div class="col-md-3">
+                    <label class="form-label">Kota</label>
+                    <input type="text" id="kotaPengirim" name="kota_pengirim" class="form-control text-uppercase" value="">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Tipe Nasabah <span class="note-small">(dicentang manual)</span></label>
+                    <div class="checkbox-group">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="tipe_nasabah_pengirim[]" id="tnpPerorangan" value="Perorangan">
+                            <label class="form-check-label" for="tnpPerorangan">Perorangan</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="tipe_nasabah_pengirim[]" id="tnpPerusahaan" value="Perusahaan">
+                            <label class="form-check-label" for="tnpPerusahaan">Perusahaan</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="tipe_nasabah_pengirim[]" id="tnpPemerintah" value="Pemerintah">
+                            <label class="form-check-label" for="tnpPemerintah">Pemerintah</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status <span class="note-small">(dicentang manual)</span></label>
+                    <div class="checkbox-group">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="status_pengirim[]" id="stpPenduduk" value="Penduduk">
+                            <label class="form-check-label" for="stpPenduduk">Penduduk</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="status_pengirim[]" id="stpNonPenduduk" value="Non Penduduk">
+                            <label class="form-check-label" for="stpNonPenduduk">Non Penduduk</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Kewarganegaraan <span class="note-small">(dicentang manual)</span></label>
+                    <div class="checkbox-group">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="kewarganegaraan_pengirim[]" id="kwpWNI" value="WNI">
+                            <label class="form-check-label" for="kwpWNI">WNI</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="kewarganegaraan_pengirim[]" id="kwpWNA" value="WNA">
+                            <label class="form-check-label" for="kwpWNA">WNA</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-2 mt-1">
+                <div class="col-md-4">
+                    <label class="form-label">No. Rekening di BCA</label>
+                    <input type="text" id="rekBCA" name="rekening_bca" class="form-control" value="">
+                </div>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <h4><i class="fas fa-database"></i> D. DATA</h4>
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <label class="form-label">Hubungan Keuangan <span class="note-small">(dicentang manual)</span></label>
+                    <div class="radio-inline mt-1">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="hubungan_keuangan" id="hkYa" value="Ya">
+                            <label class="form-check-label" for="hkYa">Ya</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="hubungan_keuangan" id="hkTidak" value="Tidak">
+                            <label class="form-check-label" for="hkTidak">Tidak</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Tujuan Transaksi</label>
+                    <input type="text" id="tujuanTransaksi" name="tujuan_transaksi" class="form-control text-uppercase" value="">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Berita / Message</label>
+                    <input type="text" id="berita" name="berita" class="form-control text-uppercase" value="">
+                </div>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-md-12">
+                    <label class="form-label">Sumber Dana <span class="note-small">(seluruh bagian ini akan ditulis manual di kertas, tidak dicetak)</span></label>
+                    <div class="mt-1">
+                        <div class="sumber-dana-row">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="sdTunai" name="sd_tunai" value="1">
+                                <label class="form-check-label" for="sdTunai">Tunai</label>
+                            </div>
+                            <span class="text-muted small">Rp</span>
+                            <input type="text" id="sdTunaiRp" name="sd_tunai_rp" class="form-control form-control-sm" placeholder="0">
+                        </div>
+                        <div class="sumber-dana-row">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="sdTabungan" name="sd_tabungan" value="1">
+                                <label class="form-check-label" for="sdTabungan">Tabungan</label>
+                            </div>
+                            <span class="text-muted small">No.</span>
+                            <input type="text" id="sdTabunganNo" name="sd_tabungan_no" class="form-control form-control-sm" placeholder="No. Rek">
+                            <span class="text-muted small">Rp</span>
+                            <input type="text" id="sdTabunganRp" name="sd_tabungan_rp" class="form-control form-control-sm" placeholder="0">
+                        </div>
+                        <div class="sumber-dana-row">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="sdCek" name="sd_cek" value="1">
+                                <label class="form-check-label" for="sdCek">Cek BCA</label>
+                            </div>
+                            <span class="text-muted small">No.</span>
+                            <input type="text" id="sdCekNo" name="sd_cek_no" class="form-control form-control-sm" placeholder="No. Cek">
+                            <span class="text-muted small">Rp</span>
+                            <input type="text" id="sdCekRp" name="sd_cek_rp" class="form-control form-control-sm" placeholder="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <h4><i class="fas fa-calculator"></i> JUMLAH YANG DIKIRIM</h4>
+            <div class="row g-2">
+                <div class="col-md-2">
+                    <label class="form-label">Mata Uang</label>
+                    <select id="mataUang" name="mata_uang" class="form-select" onchange="hitungTotal()">
+                        <option value="IDR" selected>IDR</option>
+                        <option value="USD">USD</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Jumlah Valuta Asing</label>
+                    <input type="number" id="jmlValas" name="jml_valas" class="form-control text-end" value="" placeholder="0" oninput="hitungTotal()">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Kurs</label>
+                    <input type="number" id="kurs" name="kurs" class="form-control text-end" value="" placeholder="0">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Jumlah Rupiah</label>
+                    <input type="text" id="jmlRupiah" name="jml_rupiah" class="form-control text-end fw-bold text-primary" value="">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Provisi</label>
+                    <input type="number" id="provisi" name="provisi" class="form-control text-end" value="" placeholder="0">
+                </div>
+            </div>
+            <div class="row g-2 mt-1">
+                <div class="col-md-3">
+                    <label class="form-label">Biaya / Charge</label>
+                    <input type="number" id="biaya" name="biaya" class="form-control text-end" value="" placeholder="0">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Jumlah / Total</label>
+                    <input type="text" id="jmlTotal" name="jml_total" class="form-control text-end fw-bold text-danger" value="">
+                </div>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-md-12">
+                    <label class="form-label">Terbilang</label>
+                    <div class="terbilang-box" id="terbilangDisplay">—</div>
+                    <input type="hidden" id="terbilang" name="terbilang" value="">
+                </div>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <label class="form-label">Biaya bank koresponden dibebankan ke: <span class="note-small">(dicentang manual)</span></label>
+                    <div class="radio-inline mt-1">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="biaya_koresponden" id="bkBeneficiary" value="Penerima">
+                            <label class="form-check-label" for="bkBeneficiary">Penerima</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="biaya_koresponden" id="bkRemitter" value="Pengirim">
+                            <label class="form-check-label" for="bkRemitter">Pengirim</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Today Value</label>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" id="todayValue" name="today_value" value="1">
+                        <label class="form-check-label" for="todayValue">Today Value</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Instruksi Khusus</label>
+                    <input type="text" id="instruksiKhusus" name="instruksi_khusus" class="form-control text-uppercase">
+                </div>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-md-3">
+                    <label class="form-label">Operator</label>
+                    <input type="text" id="operator" name="operator" class="form-control text-uppercase">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Verifier</label>
+                    <input type="text" id="verifier" name="verifier" class="form-control text-uppercase">
+                </div>
             </div>
         </div>
-        <div class="row g-2 mt-2">
-            <div class="col-md-3">
-                <label class="form-label">Operator</label>
-                <input type="text" id="operator" class="form-control text-uppercase">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Verifier</label>
-                <input type="text" id="verifier" class="form-control text-uppercase">
-            </div>
-        </div>
-    </div>
+    </form>
 
     <div class="form-card no-print" style="background: #f8faff;">
         <h4><i class="fas fa-eye"></i> PREVIEW</h4>
@@ -683,7 +669,6 @@
             </div>
             <div class="col-md-6">
                 <div class="preview-box">
-                    <strong>TOTAL:</strong> <span id="previewTotal" class="text-danger fw-bold">Rp —</span><br>
                     <strong>Terbilang:</strong> <span id="previewTerbilang">—</span>
                 </div>
             </div>
@@ -692,19 +677,21 @@
 
 </div>
 
-<!-- LEMBAR CETAK: HANYA ISIAN (seperti teks merah di contoh) -->
+<!--
+     LEMBAR CETAK: HANYA ISIAN TEKS/ANGKA/TANGGAL
+     Field yang sumbernya checkbox/radio (Jenis Pengiriman, Tipe Nasabah,
+     Status, Kewarganegaraan, Hubungan Keuangan, Biaya Koresponden, dan
+     seluruh Sumber Dana) SUDAH DIHAPUS dari lembar cetak ini, karena akan
+     dicentang / ditulis manual oleh user di kertas menggunakan ballpoint.
+-->
 <div class="print-sheet" id="printSheet">
     <div class="p-tgl val" id="pTgl"></div>
-    <div class="p-jenis val" id="pJenis"></div>
 
     <div class="p-rek-penerima val" id="pRekPenerima"></div>
     <div class="p-nama-penerima val" id="pNamaPenerima"></div>
     <div class="p-alamat-penerima val" id="pAlamatPenerima"></div>
     <div class="p-kota-penerima val" id="pKotaPenerima"></div>
     <div class="p-kode-negara-penerima val" id="pKodeNegaraPenerima"></div>
-    <div class="p-tipe-a val" id="pTipeA"></div>
-    <div class="p-status-a val" id="pStatusA"></div>
-    <div class="p-kw-a val" id="pKwA"></div>
 
     <div class="p-nama-bank val" id="pNamaBank"></div>
     <div class="p-alamat-bank val" id="pAlamatBank"></div>
@@ -721,16 +708,10 @@
     <div class="p-hp val" id="pHp"></div>
     <div class="p-kota-pengirim val" id="pKotaPengirim"></div>
     <div class="p-rek-bca val" id="pRekBca"></div>
-    <div class="p-tipe-c val" id="pTipeC"></div>
-    <div class="p-status-c val" id="pStatusC"></div>
-    <div class="p-kw-c val" id="pKwC"></div>
 
-    <div class="p-hub-keuangan val" id="pHubKeuangan"></div>
     <div class="p-tujuan val" id="pTujuan"></div>
     <div class="p-berita val" id="pBerita"></div>
-    <div class="p-sumber-dana val" id="pSumberDana"></div>
 
-    <div class="p-biaya-kor val" id="pBiayaKor"></div>
     <div class="p-operator val" id="pOperator"></div>
     <div class="p-verifier val" id="pVerifier"></div>
 
@@ -782,51 +763,77 @@
         return parts.reverse().join(' ').trim().replace(/\s+/g, ' ') + ' Rupiah';
     }
 
+    function terbilangEnglish(angka) {
+        if (angka === 0) return 'Zero USD';
+        
+        const satuan = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+        const belasan = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+        const puluhan = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        const ribuan = ['', 'Thousand', 'Million', 'Billion', 'Trillion'];
+        
+        function convert(n) {
+            if (n < 10) return satuan[n];
+            if (n < 20) return belasan[n - 10];
+            if (n < 100) {
+                let p = Math.floor(n / 10), s = n % 10;
+                return puluhan[p] + (s ? ' ' + satuan[s] : '');
+            }
+            if (n < 1000) {
+                let r = Math.floor(n / 100), s = n % 100;
+                let h = (r === 1 ? 'One Hundred' : satuan[r] + ' Hundred');
+                if (s) h += ' ' + convert(s);
+                return h;
+            }
+            return '';
+        }
+        
+        let parts = [], num = Math.floor(angka), i = 0;
+        while (num > 0) {
+            let seg = num % 1000;
+            if (seg > 0) {
+                let ss = convert(seg);
+                if (i > 0) ss += ' ' + ribuan[i];
+                parts.push(ss);
+            }
+            num = Math.floor(num / 1000);
+            i++;
+        }
+        
+        let result = parts.reverse().join(' ').trim().replace(/\s+/g, ' ');
+        return result + ' USD';
+    }
+
     function formatRupiah(n) {
         return new Intl.NumberFormat('id-ID').format(Math.round(n));
     }
 
     function hitungTotal() {
         let valasRaw = document.getElementById('jmlValas').value;
-        let kursRaw = document.getElementById('kurs').value;
-        let provisiRaw = document.getElementById('provisi').value;
-        let biayaRaw = document.getElementById('biaya').value;
+        let mataUang = document.getElementById('mataUang').value;
 
+        // Ambil nilai manual dari input
         let valas = parseFloat(valasRaw);
-        let kurs = parseFloat(kursRaw);
-        let provisi = parseFloat(provisiRaw) || 0;
-        let biaya = parseFloat(biayaRaw) || 0;
 
-        // Jika semua kosong, tampilkan blank
-        if ((valasRaw === '' || isNaN(valas)) && (kursRaw === '' || isNaN(kurs)) && !provisiRaw && !biayaRaw) {
-            document.getElementById('jmlRupiah').value = '';
-            document.getElementById('jmlTotal').value = '';
+        // Jika valas kosong, tampilkan blank
+        if (valasRaw === '' || isNaN(valas)) {
             document.getElementById('terbilangDisplay').textContent = '—';
-            document.getElementById('previewTotal').textContent = 'Rp —';
             document.getElementById('previewTerbilang').textContent = '—';
+            document.getElementById('terbilang').value = '';
             return;
         }
 
         valas = isNaN(valas) ? 0 : valas;
-        kurs = isNaN(kurs) ? 0 : kurs;
 
-        let jmlRupiah = valas * kurs;
-        if (document.getElementById('mataUang').value === 'IDR') {
-            jmlRupiah = valas;
-            // set kurs 1 hanya jika kosong, jangan paksa overwrite input user
-            if (kursRaw === '' || isNaN(parseFloat(kursRaw))) {
-                document.getElementById('kurs').value = 1;
-                kurs = 1;
-            }
+        // ===== TERBILANG BERDASARKAN JUMLAH VALAS =====
+        let t = '';
+        if (mataUang === 'USD') {
+            t = terbilangEnglish(Math.round(valas));
+        } else {
+            t = terbilang(Math.round(valas));
         }
-
-        let total = jmlRupiah + provisi + biaya;
-        document.getElementById('jmlRupiah').value = formatRupiah(jmlRupiah);
-        document.getElementById('jmlTotal').value = formatRupiah(total);
-
-        let t = terbilang(Math.round(total));
+        
         document.getElementById('terbilangDisplay').textContent = t;
-        document.getElementById('previewTotal').textContent = 'Rp ' + formatRupiah(total);
+        document.getElementById('terbilang').value = t;
         document.getElementById('previewTerbilang').textContent = t;
     }
 
@@ -840,31 +847,71 @@
         document.getElementById('previewAlamatPengirim').textContent = document.getElementById('alamatPengirim').value || '-';
     }
 
-    function getChecked(name) {
-        return Array.from(document.querySelectorAll('input[name="' + name + '"]:checked')).map(e => e.value).join(', ');
+    function formatTanggal() {
+        var dd = document.getElementById('tglHari').value || '';
+        var mm = document.getElementById('tglBulan').value || '';
+        var yy = document.getElementById('tglTahun').value || '';
+        var fullYear = '20' + yy;
+        if (dd && mm && yy) {
+            document.getElementById('tanggal').value = fullYear + '-' + mm + '-' + dd;
+        }
+        return [dd, mm, yy].join('  ');
     }
 
+    function saveAndPrint() {
+        // Format tanggal
+        formatTanggal();
+        
+        // Kumpulkan semua data dari form
+        var formData = new FormData(document.getElementById('formTransfer'));
+        
+        // Ambil nilai perhitungan
+        var jmlRupiahValue = document.getElementById('jmlRupiah').value.replace(/\./g, '');
+        var jmlTotalValue = document.getElementById('jmlTotal').value.replace(/\./g, '');
+        var terbilangValue = document.getElementById('terbilang').value;
+        
+        formData.append('jml_rupiah', jmlRupiahValue || '0');
+        formData.append('jml_total', jmlTotalValue || '0');
+        formData.append('terbilang', terbilangValue || '');
+        
+        // Kirim ke server untuk simpan
+        fetch('proses_simpan.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Setelah berhasil simpan, lanjutkan cetak
+                preparePrint();
+                alert('Data berhasil disimpan! ID: ' + data.id);
+            } else {
+                alert('Gagal menyimpan data: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Error: ' + error);
+        });
+    }
+
+    /*
+     * preparePrint() HANYA mengisi field teks/angka/tanggal.
+     * Field checkbox/radio (jenis pengiriman, tipe nasabah, status,
+     * kewarganegaraan, hubungan keuangan, biaya koresponden, sumber dana)
+     * SENGAJA TIDAK diisi ke lembar cetak — akan dicentang/ditulis manual
+     * oleh user di kertas menggunakan ballpoint.
+     */
     function preparePrint() {
         var dd = document.getElementById('tglHari').value || '';
         var mm = document.getElementById('tglBulan').value || '';
         var yy = document.getElementById('tglTahun').value || '';
         document.getElementById('pTgl').textContent = [dd, mm, yy].join('  ');
 
-        var jenis = [];
-        ['jpKawat','jpWesel','jpRTGS','jpBIFAST','jpSKN'].forEach(function(id) {
-            var el = document.getElementById(id);
-            if (el && el.checked) jenis.push(el.value);
-        });
-        document.getElementById('pJenis').textContent = jenis.join('  |  ');
-
         document.getElementById('pRekPenerima').textContent = document.getElementById('rekPenerima').value;
         document.getElementById('pNamaPenerima').textContent = document.getElementById('namaPenerima').value;
         document.getElementById('pAlamatPenerima').textContent = document.getElementById('alamatPenerima').value;
         document.getElementById('pKotaPenerima').textContent = document.getElementById('kotaPenerima').value;
         document.getElementById('pKodeNegaraPenerima').textContent = document.getElementById('kodeNegaraPenerima').value;
-        document.getElementById('pTipeA').textContent = getChecked('tipeNasabah');
-        document.getElementById('pStatusA').textContent = getChecked('statusNasabah');
-        document.getElementById('pKwA').textContent = getChecked('kewarganegaraan');
 
         document.getElementById('pNamaBank').textContent = document.getElementById('namaBank').value;
         document.getElementById('pAlamatBank').textContent = document.getElementById('alamatBank').value;
@@ -881,26 +928,10 @@
         document.getElementById('pHp').textContent = document.getElementById('noHP').value;
         document.getElementById('pKotaPengirim').textContent = document.getElementById('kotaPengirim').value;
         document.getElementById('pRekBca').textContent = document.getElementById('rekBCA').value;
-        document.getElementById('pTipeC').textContent = getChecked('tipeNasabahPengirim');
-        document.getElementById('pStatusC').textContent = getChecked('statusPengirim');
-        document.getElementById('pKwC').textContent = getChecked('kwPengirim');
 
-        var hub = document.querySelector('input[name="hubKeuangan"]:checked');
-        document.getElementById('pHubKeuangan').textContent = hub ? hub.value : '';
         document.getElementById('pTujuan').textContent = document.getElementById('tujuanTransaksi').value;
         document.getElementById('pBerita').textContent = document.getElementById('berita').value;
 
-        var sumber = [];
-        if (document.getElementById('sdTunai').checked)
-            sumber.push('Tunai Rp ' + (document.getElementById('sdTunaiRp').value || '0'));
-        if (document.getElementById('sdTabungan').checked)
-            sumber.push('Tabungan No.' + (document.getElementById('sdTabunganNo').value || '') + ' Rp ' + (document.getElementById('sdTabunganRp').value || '0'));
-        if (document.getElementById('sdCek').checked)
-            sumber.push('Cek No.' + (document.getElementById('sdCekNo').value || '') + ' Rp ' + (document.getElementById('sdCekRp').value || '0'));
-        document.getElementById('pSumberDana').textContent = sumber.join(' | ');
-
-        var bk = document.querySelector('input[name="biayaKoresponden"]:checked');
-        document.getElementById('pBiayaKor').textContent = bk ? bk.value : '';
         document.getElementById('pOperator').textContent = document.getElementById('operator').value;
         document.getElementById('pVerifier').textContent = document.getElementById('verifier').value;
 
@@ -923,11 +954,11 @@
     document.querySelectorAll('#formCard input, #formCard select').forEach(function(el) {
         el.addEventListener('input', function() {
             updatePreview();
-            if (['jmlValas','kurs','provisi','biaya','mataUang'].indexOf(this.id) >= 0) hitungTotal();
+            if (['jmlValas','mataUang'].indexOf(this.id) >= 0) hitungTotal();
         });
         el.addEventListener('change', function() {
             updatePreview();
-            if (['jmlValas','kurs','provisi','biaya','mataUang'].indexOf(this.id) >= 0) hitungTotal();
+            if (['jmlValas','mataUang'].indexOf(this.id) >= 0) hitungTotal();
         });
     });
 
@@ -940,6 +971,9 @@
         document.getElementById('tglHari').value = String(now.getDate()).padStart(2, '0');
         document.getElementById('tglBulan').value = String(now.getMonth() + 1).padStart(2, '0');
         document.getElementById('tglTahun').value = String(now.getFullYear()).slice(-2);
+        document.getElementById('tanggal').value = now.getFullYear() + '-' + 
+            String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+            String(now.getDate()).padStart(2, '0');
         hitungTotal();
         updatePreview();
     };
