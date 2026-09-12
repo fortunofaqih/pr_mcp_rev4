@@ -26,496 +26,203 @@ $stmt->close();
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Print Fund Transfer BCA</title>
     <style>
-        /* Reset dan base */
-        * { 
-            box-sizing: border-box; 
+        * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
         }
+
         body {
-            font-family: 'Times New Roman', Times, serif;
-            padding: 0;
-            margin: 0;
+            font-family: 'Bookman Old Style', 'Times New Roman', Times, serif;
             background: white;
+            margin: 0;
+            padding: 0;
         }
-        
+
         .print-sheet {
-            width: 190mm;
-            height: 277mm;
+            width: 215mm;
+            height: 180mm;
             margin: 0 auto;
             padding: 0;
-            font-family: 'Times New Roman', Times, serif;
-            font-size: 10pt;
+            font-family: 'Bookman Old Style', 'Times New Roman', Times, serif;
+            font-size: 9pt;
+            font-weight: 600;
             color: #000;
-            line-height: 1.2;
+            line-height: 1.15;
             position: relative;
-            background: white;
+            overflow: hidden;
         }
-        
+
         .print-sheet .val {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            font-family: 'Times New Roman', Times, serif;
         }
 
-        /* === HEADER / TANGGAL === */
+        /* ===================== TANGGAL & JENIS ===================== */
         .p-tgl {
             position: absolute;
-            top: 18mm;
-            left: 14mm;
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-            letter-spacing: 1.5mm;
+            top: 20mm;
+            left: 37mm;
+            font-size: 8pt;
+            letter-spacing: 2.2mm;
+            word-spacing: 3.4mm;
         }
         .p-jenis {
             position: absolute;
-            top: 18mm;
-            left: 110mm;
+            top: 11mm;
+            left: 118mm;
             font-size: 9pt;
-            font-weight: bold;
-            font-family: 'Times New Roman', Times, serif;
         }
 
-        /* === SECTION A - PENERIMA (Kiri) === */
-        .p-rek-penerima { 
-            position: absolute; 
-            top: 42mm; 
-            left: 14mm; 
-            width: 75mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-            font-weight: bold;
-        }
-        .p-nama-penerima { 
-            position: absolute; 
-            top: 47mm; 
-            left: 14mm; 
-            width: 75mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-            font-weight: bold;
-        }
-        .p-alamat-penerima { 
-            position: absolute; 
-            top: 52mm; 
-            left: 14mm; 
-            width: 75mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-kota-penerima { 
-            position: absolute; 
-            top: 57mm; 
-            left: 14mm; 
-            width: 75mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-kode-negara-penerima { 
-            position: absolute; 
-            top: 62mm; 
-            left: 14mm; 
-            width: 30mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-tipe-a { 
-            position: absolute; 
-            top: 72mm; 
-            left: 14mm; 
-            font-size: 9pt;
-            font-family: 'Times New Roman', Times, serif;
-            font-weight: bold;
-        }
-        .p-status-a { 
-            position: absolute; 
-            top: 77mm; 
-            left: 14mm; 
-            font-size: 9pt;
-            font-family: 'Times New Roman', Times, serif;
-            font-weight: bold;
-        }
-        .p-kw-a { 
-            position: absolute; 
-            top: 82mm; 
-            left: 14mm; 
-            font-size: 9pt;
-            font-family: 'Times New Roman', Times, serif;
-            font-weight: bold;
-        }
+        /* ===================== BAGIAN A ===================== */
+        .p-rek-penerima        { position: absolute; top: 33mm; left: 45mm; width: 90mm; }
+        .p-nama-penerima       { position: absolute; top: 38mm; left: 45mm; width: 90mm; }
+        .p-alamat-penerima     { position: absolute; top: 43mm; left: 45mm; width: 90mm; }
+        .p-kota-penerima       { position: absolute; top: 48mm; left: 45mm; width: 90mm; }
+        .p-kode-negara-penerima{ position: absolute; top: 63mm; left: 85mm; width: 40mm; }
+        .p-tipe-a              { position: absolute; top: 68mm; left: 45mm; }
+        .p-status-a            { position: absolute; top: 72mm; left: 45mm; }
+        .p-kw-a                { position: absolute; top: 76mm; left: 45mm; }
 
-        /* === SECTION B - BANK PENERIMA (Kanan) === */
-        .p-nama-bank { 
-            position: absolute; 
-            top: 42mm; 
-            left: 105mm; 
-            width: 70mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-            font-weight: bold;
-        }
-        .p-alamat-bank { 
-            position: absolute; 
-            top: 47mm; 
-            left: 105mm; 
-            width: 70mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-kota-bank { 
-            position: absolute; 
-            top: 52mm; 
-            left: 105mm; 
-            width: 70mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-state-bank { 
-            position: absolute; 
-            top: 57mm; 
-            left: 105mm; 
-            width: 70mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-negara-bank { 
-            position: absolute; 
-            top: 62mm; 
-            left: 105mm; 
-            width: 50mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-kode-negara-bank { 
-            position: absolute; 
-            top: 67mm; 
-            left: 105mm; 
-            width: 40mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-swift { 
-            position: absolute; 
-            top: 72mm; 
-            left: 105mm; 
-            width: 70mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-            font-weight: bold;
-        }
+        /* ===================== BAGIAN B ===================== */
+        /* Semua digeser kanan 1cm, dan seluruh grup dinaikkan agar jarak antar baris tetap rapat */
+        .p-nama-bank           { position: absolute; top: 33mm; left: 141mm; width: 90mm; }
+        .p-alamat-bank         { position: absolute; top: 38mm; left: 141mm; width: 90mm; }
+        .p-kota-bank           { position: absolute; top: 43mm; left: 141mm; width: 90mm; }
+        .p-state-bank          { position: absolute; top: 48mm; left: 141mm; width: 90mm; }
+        .p-negara-bank         { position: absolute; top: 53mm; left: 141mm; width: 50mm; }
+        .p-kode-negara-bank    { position: absolute; top: 58mm; left: 141mm; width: 40mm; }
+        .p-swift               { position: absolute; top: 66mm; left: 141mm; width: 90mm; }
 
-        /* === SECTION C - PENGIRIM (Kiri Bawah) === */
-        .p-nama-pengirim { 
-            position: absolute; 
-            top: 95mm; 
-            left: 14mm; 
-            width: 75mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-            font-weight: bold;
-        }
-        .p-ktp { 
-            position: absolute; 
-            top: 100mm; 
-            left: 14mm; 
-            width: 50mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-alamat-pengirim { 
-            position: absolute; 
-            top: 105mm; 
-            left: 14mm; 
-            width: 75mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-kontak { 
-            position: absolute; 
-            top: 110mm; 
-            left: 14mm; 
-            width: 50mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-hp { 
-            position: absolute; 
-            top: 115mm; 
-            left: 14mm; 
-            width: 50mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-kota-pengirim { 
-            position: absolute; 
-            top: 120mm; 
-            left: 14mm; 
-            width: 50mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-rek-bca { 
-            position: absolute; 
-            top: 140mm; 
-            left: 14mm; 
-            width: 60mm; 
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-            font-weight: bold;
-        }
-        .p-tipe-c { 
-            position: absolute; 
-            top: 130mm; 
-            left: 14mm; 
-            font-size: 9pt;
-            font-family: 'Times New Roman', Times, serif;
-            font-weight: bold;
-        }
-        .p-status-c { 
-            position: absolute; 
-            top: 130mm; 
-            left: 65mm; 
-            font-size: 9pt;
-            font-family: 'Times New Roman', Times, serif;
-            font-weight: bold;
-        }
-        .p-kw-c { 
-            position: absolute; 
-            top: 135mm; 
-            left: 14mm; 
-            font-size: 9pt;
-            font-family: 'Times New Roman', Times, serif;
-            font-weight: bold;
-        }
+        /* ===================== BAGIAN C ===================== */
+        .p-nama-pengirim       { position: absolute; top: 78mm; left: 45mm; width: 90mm; }
+        .p-ktp                 { position: absolute; top: 83mm; left: 45mm; width: 60mm; }
+        .p-alamat-pengirim     { position: absolute; top: 88mm; left: 45mm; width: 90mm; }
+        .p-kontak              { position: absolute; top: 93mm; left: 45mm; width: 60mm; }
+        .p-hp                  { position: absolute; top: 98mm; left: 45mm; width: 60mm; }
+        .p-kota-pengirim       { position: absolute; top: 103mm; left: 45mm; width: 60mm; }
+        .p-rek-bca             { position: absolute; top: 108mm; left: 45mm; width: 70mm; }
+        .p-tipe-c              { position: absolute; top: 113mm; left: 45mm; }
+        .p-status-c            { position: absolute; top: 117mm; left: 75mm; }
+        .p-kw-c                { position: absolute; top: 121mm; left: 42mm; }
 
-        /* === SECTION D - DATA LAINNYA (Kanan Bawah) === */
-        .p-hub-keuangan { 
-            position: absolute; 
-            top: 95mm; 
-            left: 105mm; 
-            width: 70mm;
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-tujuan { 
-            position: absolute; 
-            top: 102mm; 
-            left: 105mm; 
-            width: 70mm;
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-berita { 
-            position: absolute; 
-            top: 109mm; 
-            left: 105mm; 
-            width: 70mm;
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-sumber-dana { 
-            position: absolute; 
-            top: 120mm; 
-            left: 105mm; 
-            width: 70mm;
-            font-size: 9pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
+        /* ===================== BAGIAN D ===================== */
+        .p-hub-keuangan        { position: absolute; top: 78mm; left: 141mm; }
+        .p-tujuan              { position: absolute; top: 83mm; left: 141mm; width: 90mm; }
+        .p-berita              { position: absolute; top: 88mm; left: 141mm; width: 90mm; }
+        .p-sumber-dana         { position: absolute; top: 94mm; left: 141mm; width: 90mm; }
 
-        /* === OPERATOR & VERIFIER === */
-        .p-biaya-kor { 
-            position: absolute; 
-            top: 148mm; 
-            left: 14mm; 
-            font-size: 9pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-operator { 
-            position: absolute; 
-            top: 148mm; 
-            left: 105mm; 
-            width: 35mm;
-            font-size: 9pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-verifier { 
-            position: absolute; 
-            top: 148mm; 
-            left: 145mm; 
-            width: 30mm;
-            font-size: 9pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
+        /* ===================== OPERATOR ===================== */
+        .p-biaya-kor           { position: absolute; top: 118mm; left: 32mm; }
+        .p-operator            { position: absolute; top: 118mm; left: 140mm; width: 30mm; }
+        .p-verifier            { position: absolute; top: 118mm; left: 175mm; width: 28mm; }
 
-        /* === JUMLAH / NOMINAL === */
-        .p-mata-uang { 
-            position: absolute; 
-            top: 205mm; 
-            left: 14mm; 
-            width: 20mm;
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-            font-weight: bold;
-        }
-        .p-jml-valas { 
-            position: absolute; 
-            top: 205mm; 
-            left: 35mm; 
-            width: 35mm;
-            text-align: right;
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-kurs { 
-            position: absolute; 
-            top: 205mm; 
-            left: 72mm; 
-            width: 28mm;
-            text-align: right;
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-jml-rupiah { 
-            position: absolute; 
-            top: 205mm; 
-            left: 100mm; 
-            width: 50mm;
-            text-align: right;
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-provisi { 
-            position: absolute; 
-            top: 210mm; 
-            left: 100mm; 
-            width: 50mm;
-            text-align: right;
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-biaya { 
-            position: absolute; 
-            top: 215mm; 
-            left: 100mm; 
-            width: 50mm;
-            text-align: right;
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .p-total { 
-            position: absolute; 
-            top: 220mm; 
-            left: 100mm; 
-            width: 50mm;
-            text-align: right;
-            font-size: 10pt;
-            font-family: 'Times New Roman', Times, serif;
-            font-weight: bold;
-        }
-        .p-terbilang { 
-            position: absolute; 
-            top: 228mm; 
-            left: 14mm; 
-            width: 170mm;
-            font-size: 9pt;
-            font-family: 'Times New Roman', Times, serif;
-            white-space: normal;
-            text-transform: uppercase;
-        }
+        /* ===================== JUMLAH ===================== */
+        .p-mata-uang           { position: absolute; top: 148mm; left: 42mm; width: 22mm; }
+        .p-jml-valas           { position: absolute; top: 148mm; left: 35mm; width: 40mm; text-align: right; }
+        .p-kurs                { position: absolute; top: 148mm; left: 65mm; width: 28mm; text-align: right; }
+        .p-jml-rupiah          { position: absolute; top: 148mm; left: 77mm; width: 45mm; text-align: right; }
+        .p-provisi             { position: absolute; top: 152mm; left: 77mm; width: 45mm; text-align: right; }
+        .p-biaya               { position: absolute; top: 157mm; left: 77mm; width: 45mm; text-align: right; }
+        .p-total               { position: absolute; top: 161mm; left: 77mm; width: 45mm; text-align: right; }
+        .p-terbilang           { position: absolute; top: 170mm; left: 20mm; width: 190mm; white-space: normal;}
 
+        /* ===================== PRINT SETTINGS ===================== */
         @media print {
             @page {
-                size: A4 portrait;
-                margin: 8mm 10mm;
+                size: 215mm 180mm portrait;
+                margin: 0;
             }
             html, body {
-                background: white !important;
-                padding: 0 !important;
                 margin: 0 !important;
-                width: 100% !important;
-                height: auto !important;
+                padding: 0 !important;
+                width: 215mm !important;
+                height: 180mm !important;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
             .print-sheet {
-                margin: 0 auto;
+                width: 215mm !important;
+                height: 180mm !important;
+                margin: 0 !important;
+                page-break-after: avoid;
+                transform: none !important;
             }
         }
     </style>
 </head>
 <body onload="window.print()">
     <div class="print-sheet">
-        <!-- TANGGAL -->
-        <div class="p-tgl" id="pTgl">
+
+        <div class="p-tgl val">
             <?= date('d', strtotime($data['tanggal'])) ?>  
             <?= date('m', strtotime($data['tanggal'])) ?>  
             <?= date('y', strtotime($data['tanggal'])) ?>
         </div>
-        <div class="p-jenis" id="pJenis"><?= htmlspecialchars($data['jenis_pengiriman']) ?></div>
+        <div class="p-jenis val"><?= htmlspecialchars($data['jenis_pengiriman']) ?></div>
 
-        <!-- SECTION A - PENERIMA -->
-        <div class="p-rek-penerima" id="pRekPenerima"><?= htmlspecialchars($data['rekening_penerima']) ?></div>
-        <div class="p-nama-penerima" id="pNamaPenerima"><?= htmlspecialchars($data['nama_penerima']) ?></div>
-        <div class="p-alamat-penerima" id="pAlamatPenerima"><?= htmlspecialchars($data['alamat_penerima']) ?></div>
-        <div class="p-kota-penerima" id="pKotaPenerima"><?= htmlspecialchars($data['kota_penerima']) ?></div>
-        <div class="p-kode-negara-penerima" id="pKodeNegaraPenerima"><?= htmlspecialchars($data['kode_negara_penerima']) ?></div>
-        <div class="p-tipe-a" id="pTipeA"><?= htmlspecialchars($data['tipe_nasabah']) ?></div>
-        <div class="p-status-a" id="pStatusA"><?= htmlspecialchars($data['status_nasabah']) ?></div>
-        <div class="p-kw-a" id="pKwA"><?= htmlspecialchars($data['kewarganegaraan_penerima']) ?></div>
+        <!-- A -->
+        <div class="p-rek-penerima val"><?= htmlspecialchars($data['rekening_penerima']) ?></div>
+        <div class="p-nama-penerima val"><?= htmlspecialchars($data['nama_penerima']) ?></div>
+        <div class="p-alamat-penerima val"><?= htmlspecialchars($data['alamat_penerima']) ?></div>
+        <div class="p-kota-penerima val"><?= htmlspecialchars($data['kota_penerima']) ?></div>
+        <div class="p-kode-negara-penerima val"><?= htmlspecialchars($data['kode_negara_penerima']) ?></div>
+        <div class="p-tipe-a val"><?= htmlspecialchars($data['tipe_nasabah']) ?></div>
+        <div class="p-status-a val"><?= htmlspecialchars($data['status_nasabah']) ?></div>
+        <div class="p-kw-a val"><?= htmlspecialchars($data['kewarganegaraan_penerima']) ?></div>
 
-        <!-- SECTION B - BANK -->
-        <div class="p-nama-bank" id="pNamaBank"><?= htmlspecialchars($data['nama_bank']) ?></div>
-        <div class="p-alamat-bank" id="pAlamatBank"><?= htmlspecialchars($data['alamat_bank']) ?></div>
-        <div class="p-kota-bank" id="pKotaBank"><?= htmlspecialchars($data['kota_bank']) ?></div>
-        <div class="p-state-bank" id="pStateBank"><?= htmlspecialchars($data['state_bank']) ?></div>
-        <div class="p-negara-bank" id="pNegaraBank"><?= htmlspecialchars($data['negara_bank']) ?></div>
-        <div class="p-kode-negara-bank" id="pKodeNegaraBank"><?= htmlspecialchars($data['kode_negara_bank']) ?></div>
-        <div class="p-swift" id="pSwift"><?= htmlspecialchars($data['swift_code']) ?></div>
+        <!-- B -->
+        <div class="p-nama-bank val"><?= htmlspecialchars($data['nama_bank']) ?></div>
+        <div class="p-alamat-bank val"><?= htmlspecialchars($data['alamat_bank']) ?></div>
+        <div class="p-kota-bank val"><?= htmlspecialchars($data['kota_bank']) ?></div>
+        <div class="p-state-bank val"><?= htmlspecialchars($data['state_bank']) ?></div>
+        <div class="p-negara-bank val"><?= htmlspecialchars($data['negara_bank']) ?></div>
+        <div class="p-kode-negara-bank val"><?= htmlspecialchars($data['kode_negara_bank']) ?></div>
+        <div class="p-swift val"><?= htmlspecialchars($data['swift_code']) ?></div>
 
-        <!-- SECTION C - PENGIRIM -->
-        <div class="p-nama-pengirim" id="pNamaPengirim"><?= htmlspecialchars($data['nama_pengirim']) ?></div>
-        <div class="p-ktp" id="pKtp"><?= htmlspecialchars($data['no_ktp']) ?></div>
-        <div class="p-alamat-pengirim" id="pAlamatPengirim"><?= htmlspecialchars($data['alamat_pengirim']) ?></div>
-        <div class="p-kontak" id="pKontak"><?= htmlspecialchars($data['kontak_person']) ?></div>
-        <div class="p-hp" id="pHp"><?= htmlspecialchars($data['no_hp']) ?></div>
-        <div class="p-kota-pengirim" id="pKotaPengirim"><?= htmlspecialchars($data['kota_pengirim']) ?></div>
-        <div class="p-rek-bca" id="pRekBca"><?= htmlspecialchars($data['rekening_bca']) ?></div>
-        <div class="p-tipe-c" id="pTipeC"><?= htmlspecialchars($data['tipe_nasabah_pengirim']) ?></div>
-        <div class="p-status-c" id="pStatusC"><?= htmlspecialchars($data['status_pengirim']) ?></div>
-        <div class="p-kw-c" id="pKwC"><?= htmlspecialchars($data['kewarganegaraan_pengirim']) ?></div>
+        <!-- C -->
+        <div class="p-nama-pengirim val"><?= htmlspecialchars($data['nama_pengirim']) ?></div>
+        <div class="p-ktp val"><?= htmlspecialchars($data['no_ktp']) ?></div>
+        <div class="p-alamat-pengirim val"><?= htmlspecialchars($data['alamat_pengirim']) ?></div>
+        <div class="p-kontak val"><?= htmlspecialchars($data['kontak_person']) ?></div>
+        <div class="p-hp val"><?= htmlspecialchars($data['no_hp']) ?></div>
+        <div class="p-kota-pengirim val"><?= htmlspecialchars($data['kota_pengirim']) ?></div>
+        <div class="p-rek-bca val"><?= htmlspecialchars($data['rekening_bca']) ?></div>
+        <div class="p-tipe-c val"><?= htmlspecialchars($data['tipe_nasabah_pengirim']) ?></div>
+        <div class="p-status-c val"><?= htmlspecialchars($data['status_pengirim']) ?></div>
+        <div class="p-kw-c val"><?= htmlspecialchars($data['kewarganegaraan_pengirim']) ?></div>
 
-        <!-- SECTION D - DATA LAIN -->
-        <div class="p-hub-keuangan" id="pHubKeuangan"><?= htmlspecialchars($data['hubungan_keuangan']) ?></div>
-        <div class="p-tujuan" id="pTujuan"><?= htmlspecialchars($data['tujuan_transaksi']) ?></div>
-        <div class="p-berita" id="pBerita"><?= htmlspecialchars($data['berita']) ?></div>
-        <div class="p-sumber-dana" id="pSumberDana">
+        <!-- D -->
+        <div class="p-hub-keuangan val"><?= htmlspecialchars($data['hubungan_keuangan']) ?></div>
+        <div class="p-tujuan val"><?= htmlspecialchars($data['tujuan_transaksi']) ?></div>
+        <div class="p-berita val"><?= htmlspecialchars($data['berita']) ?></div>
+        <div class="p-sumber-dana val">
             <?php
             $sumber = [];
-            if ($data['sd_tunai']) $sumber[] = 'Tunai Rp ' . number_format($data['sd_tunai_rp'], 0, ',', '.');
-            if ($data['sd_tabungan']) $sumber[] = 'Tabungan No.' . $data['sd_tabungan_no'] . ' Rp ' . number_format($data['sd_tabungan_rp'], 0, ',', '.');
-            if ($data['sd_cek']) $sumber[] = 'Cek No.' . $data['sd_cek_no'] . ' Rp ' . number_format($data['sd_cek_rp'], 0, ',', '.');
+            if (!empty($data['sd_tunai'])) $sumber[] = 'Tunai Rp ' . number_format($data['sd_tunai_rp'], 0, ',', '.');
+            if (!empty($data['sd_tabungan'])) $sumber[] = 'Tabungan No.' . $data['sd_tabungan_no'] . ' Rp ' . number_format($data['sd_tabungan_rp'], 0, ',', '.');
+            if (!empty($data['sd_cek'])) $sumber[] = 'Cek No.' . $data['sd_cek_no'] . ' Rp ' . number_format($data['sd_cek_rp'], 0, ',', '.');
             echo htmlspecialchars(implode(' | ', $sumber));
             ?>
         </div>
 
-        <!-- OPERATOR -->
-        <div class="p-biaya-kor" id="pBiayaKor"><?= htmlspecialchars($data['biaya_koresponden']) ?></div>
-        <div class="p-operator" id="pOperator"><?= htmlspecialchars($data['operator']) ?></div>
-        <div class="p-verifier" id="pVerifier"><?= htmlspecialchars($data['verifier']) ?></div>
+        <div class="p-biaya-kor val"><?= htmlspecialchars($data['biaya_koresponden']) ?></div>
+        <div class="p-operator val"><?= htmlspecialchars($data['operator']) ?></div>
+        <div class="p-verifier val"><?= htmlspecialchars($data['verifier']) ?></div>
 
-        <!-- NOMINAL -->
-        <div class="p-mata-uang" id="pMataUang"><?= htmlspecialchars($data['mata_uang']) ?></div>
-        <div class="p-jml-valas" id="pJmlValas"><?= number_format($data['jml_valas'], 2, ',', '.') ?></div>
-        <div class="p-kurs" id="pKurs"><?= number_format($data['kurs'], 2, ',', '.') ?></div>
-        <div class="p-jml-rupiah" id="pJmlRupiah">Rp <?= number_format($data['jml_rupiah'], 0, ',', '.') ?></div>
-        <div class="p-provisi" id="pProvisi">Rp <?= number_format($data['provisi'], 0, ',', '.') ?></div>
-        <div class="p-biaya" id="pBiaya">Rp <?= number_format($data['biaya'], 0, ',', '.') ?></div>
-        <div class="p-total" id="pTotal">Rp <?= number_format($data['jml_total'], 0, ',', '.') ?></div>
-        <div class="p-terbilang" id="pTerbilang"><?= htmlspecialchars($data['terbilang']) ?></div>
+        <!-- Jumlah -->
+        <div class="p-mata-uang val"><?= htmlspecialchars($data['mata_uang']) ?></div>
+        <div class="p-jml-valas val"><?= number_format($data['jml_valas'], 2, ',', '.') ?></div>
+        <div class="p-kurs val"><?= number_format($data['kurs'], 2, ',', '.') ?></div>
+        <div class="p-jml-rupiah val">Rp <?= number_format($data['jml_rupiah'], 0, ',', '.') ?></div>
+        <div class="p-provisi val">Rp <?= number_format($data['provisi'], 0, ',', '.') ?></div>
+        <div class="p-biaya val">Rp <?= number_format($data['biaya'], 0, ',', '.') ?></div>
+        <div class="p-total val">Rp <?= number_format($data['jml_total'], 0, ',', '.') ?></div>
+        <div class="p-terbilang val"><?= htmlspecialchars(strtoupper($data['terbilang'])) ?></div>
+
     </div>
 </body>
 </html>
