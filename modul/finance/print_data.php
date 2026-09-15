@@ -64,11 +64,11 @@ $stmt->close();
         /* ===================== TANGGAL & JENIS ===================== */
         .p-tgl {
             position: absolute;
-            top: 20mm;
-            left: 37mm;
+            top: 21mm;
+            left: 40mm;
             font-size: 8pt;
             letter-spacing: 2.2mm;
-            word-spacing: 3.4mm;
+            word-spacing: 3.2mm;
         }
         .p-jenis {
             position: absolute;
@@ -121,7 +121,7 @@ $stmt->close();
         .p-verifier            { position: absolute; top: 118mm; left: 175mm; width: 28mm; }
 
         /* ===================== JUMLAH ===================== */
-        .p-mata-uang           { position: absolute; top: 148mm; left: 42mm; width: 22mm; }
+        .p-mata-uang           { position: absolute; top: 148mm; left: 44mm; width: 22mm; }
         .p-jml-valas           { position: absolute; top: 148mm; left: 35mm; width: 40mm; text-align: right; }
         .p-kurs                { position: absolute; top: 148mm; left: 65mm; width: 28mm; text-align: right; }
         .p-jml-rupiah          { position: absolute; top: 148mm; left: 77mm; width: 45mm; text-align: right; }
@@ -217,10 +217,10 @@ $stmt->close();
         <div class="p-mata-uang val"><?= htmlspecialchars($data['mata_uang']) ?></div>
         <div class="p-jml-valas val"><?= number_format($data['jml_valas'], 2, ',', '.') ?></div>
         <div class="p-kurs val"><?= number_format($data['kurs'], 2, ',', '.') ?></div>
-        <div class="p-jml-rupiah val">Rp <?= number_format($data['jml_rupiah'], 0, ',', '.') ?></div>
-        <div class="p-provisi val">Rp <?= number_format($data['provisi'], 0, ',', '.') ?></div>
-        <div class="p-biaya val">Rp <?= number_format($data['biaya'], 0, ',', '.') ?></div>
-        <div class="p-total val">Rp <?= number_format($data['jml_total'], 0, ',', '.') ?></div>
+        <div class="p-jml-rupiah val"> <?= number_format($data['jml_rupiah'], 0, ',', '.') ?></div>
+        <div class="p-provisi val"> <?= number_format($data['provisi'], 0, ',', '.') ?></div>
+        <div class="p-biaya val"> <?= number_format($data['biaya'], 0, ',', '.') ?></div>
+        <div class="p-total val"> <?= number_format($data['jml_total'], 0, ',', '.') ?></div>
         <div class="p-terbilang val"><?= htmlspecialchars(strtoupper($data['terbilang'])) ?></div>
 
     </div>
