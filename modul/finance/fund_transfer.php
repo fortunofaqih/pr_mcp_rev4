@@ -807,35 +807,51 @@ require_once __DIR__ . '/../../auth/check_session.php';
         return new Intl.NumberFormat('id-ID').format(Math.round(n));
     }
 
-    function hitungTotal() {
-        let valasRaw = document.getElementById('jmlValas').value;
-        let mataUang = document.getElementById('mataUang').value;
+   function hitungTotal() {
+    let valasRaw = document.getElementById('jmlValas').value;
+    let mataUang = document.getElementById('mataUang').value;
+    let kursRaw = document.getElementById('kurs').value;
+    let biayaRaw = document.getElementById('biaya').value;
 
-        // Ambil nilai manual dari input
-        let valas = parseFloat(valasRaw);
+    // Ambil nilai manual dari input
+    let valas = parseFloat(valasRaw);
+    let kurs = parseFloat(kursRaw);
+    let biaya = parseFloat(biayaRaw);
 
-        // Jika valas kosong, tampilkan blank
-        if (valasRaw === '' || isNaN(valas)) {
-            document.getElementById('terbilangDisplay').textContent = '—';
-            document.getElementById('previewTerbilang').textContent = '—';
-            document.getElementById('terbilang').value = '';
-            return;
-        }
-
-        valas = isNaN(valas) ? 0 : valas;
-
-        // ===== TERBILANG BERDASARKAN JUMLAH VALAS =====
-        let t = '';
-        if (mataUang === 'USD') {
-            t = terbilangEnglish(Math.round(valas));
-        } else {
-            t = terbilang(Math.round(valas));
-        }
-        
-        document.getElementById('terbilangDisplay').textContent = t;
-        document.getElementById('terbilang').value = t;
-        document.getElementById('previewTerbilang').textContent = t;
+    // ===== HITUNG JUMLAH RUPIAH = VALAS x KURS =====
+    let jmlRupiah = 0;
+    if (!isNaN(valas) && !isNaN(kurs) && valas > 0 && kurs > 0) {
+        jmlRupiah = valas * kurs;
     }
+    document.getElementById('jmlRupiah').value = jmlRupiah > 0 ? formatRupiah(jmlRupiah) : '';
+
+    // ===== HITUNG TOTAL = JUMLAH RUPIAH + BIAYA =====
+    if (isNaN(biaya)) biaya = 0;
+    let total = jmlRupiah + biaya;
+    document.getElementById('jmlTotal').value = total > 0 ? formatRupiah(total) : '';
+
+    // Jika valas kosong, tampilkan blank untuk terbilang
+    if (valasRaw === '' || isNaN(valas)) {
+        document.getElementById('terbilangDisplay').textContent = '—';
+        document.getElementById('previewTerbilang').textContent = '—';
+        document.getElementById('terbilang').value = '';
+        return;
+    }
+
+    valas = isNaN(valas) ? 0 : valas;
+
+    // ===== TERBILANG BERDASARKAN JUMLAH VALAS =====
+    let t = '';
+    if (mataUang === 'USD') {
+        t = terbilangEnglish(Math.round(valas));
+    } else {
+        t = terbilang(Math.round(valas));
+    }
+    
+    document.getElementById('terbilangDisplay').textContent = t;
+    document.getElementById('terbilang').value = t;
+    document.getElementById('previewTerbilang').textContent = t;
+}
 
     function updatePreview() {
         document.getElementById('previewRek').textContent = document.getElementById('rekPenerima').value || '-';
@@ -951,16 +967,16 @@ require_once __DIR__ . '/../../auth/check_session.php';
         if (confirm('Reset semua data?')) location.reload();
     }
 
-    document.querySelectorAll('#formCard input, #formCard select').forEach(function(el) {
-        el.addEventListener('input', function() {
-            updatePreview();
-            if (['jmlValas','mataUang'].indexOf(this.id) >= 0) hitungTotal();
+        document.querySelectorAll('#formCard input, #formCard select').forEach(function(el) {
+            el.addEventListener('input', function() {
+                updatePreview();
+                if (['jmlValas','mataUang','kurs','biaya'].indexOf(this.id) >= 0) hitungTotal();
+            });
+            el.addEventListener('change', function() {
+                updatePreview();
+                if (['jmlValas','mataUang','kurs','biaya'].indexOf(this.id) >= 0) hitungTotal();
+            });
         });
-        el.addEventListener('change', function() {
-            updatePreview();
-            if (['jmlValas','mataUang'].indexOf(this.id) >= 0) hitungTotal();
-        });
-    });
 
     document.querySelectorAll('.text-uppercase').forEach(function(el) {
         el.addEventListener('input', function() { this.value = this.value.toUpperCase(); });
