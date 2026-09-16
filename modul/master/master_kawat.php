@@ -791,6 +791,7 @@ body {
 
                     <div class="l">
                         Stok Kawat Baru
+                        (Belum Dipakai)
                     </div>
 
                     <div class="small-muted">
@@ -812,6 +813,7 @@ body {
 
                     <div class="l">
                         Stok Kawat Bekas
+                        (Sudah Dipakai)
                     </div>
 
                     <div class="small-muted">
@@ -838,7 +840,8 @@ body {
                     </div>
 
                     <div class="l">
-                        Total Fisik Kawat
+                        Total Semua Kawat
+                        (Baru + Bekas)
                     </div>
 
                     <div class="small-muted">

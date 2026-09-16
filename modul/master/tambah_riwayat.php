@@ -49,6 +49,26 @@ function getIdSatuan(mysqli $db, string $namaSatuan): ?int
     return $row ? (int)$row['id_satuan'] : null;
 }
 
+/**
+ * Cek apakah id_kawat merujuk ke ukuran khusus SUSULAN (0.00 mm).
+ */
+function isKawatSusulan(mysqli $db, int $idKawat): bool
+{
+    $stmt = $db->prepare("
+        SELECT ukuran
+        FROM master_kawat
+        WHERE id_kawat = ?
+        LIMIT 1
+    ");
+    $stmt->bind_param("i", $idKawat);
+    $stmt->execute();
+
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    return $row && (float)$row['ukuran'] === 0.0;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tanggal   = $_POST['tanggal'] ?? date('Y-m-d');
     $idKawat   = (int)($_POST['id_kawat'] ?? 0);
@@ -57,6 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $satuan    = strtoupper(trim($_POST['satuan_input'] ?? 'KG'));
     $noRef     = trim($_POST['no_referensi'] ?? '');
     $ket       = trim($_POST['keterangan'] ?? '');
+    $ukuranManual = trim($_POST['ukuran_manual'] ?? '');
 
     // Mapping transaksi operasional.
     $map = [
@@ -122,6 +143,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $jenisDb = $map[$jenis]['jenis_db'];
     $kondisi = $map[$jenis]['kondisi'];
     $arah    = $map[$jenis]['arah'];
+
+    // =====================================================
+    // DETEKSI KAWAT SUSULAN (ukuran 0.00 mm)
+    // =====================================================
+    $isSusulan = isKawatSusulan($koneksi, $idKawat);
+
+    if ($isSusulan) {
+        // Gabungkan keterangan manual ke keterangan utama.
+        $ket = trim(
+            '[KAWAT SUSULAN / CAMPURAN] ' .
+            ($ukuranManual !== '' ? $ukuranManual . ' | ' : '') .
+            ($ket !== '' ? $ket : 'Kawat susulan campuran berbagai ukuran')
+        );
+
+        // Auto-generate no_referensi jika kosong.
+        if ($noRef === '') {
+            $noRef = 'SUSULAN-' . date('Ymd', strtotime($tanggal));
+        }
+
+        // Batasi panjang keterangan agar tidak overflow (kolom varchar 255).
+        if (mb_strlen($ket) > 250) {
+            $ket = mb_substr($ket, 0, 247) . '...';
+        }
+
+        if (mb_strlen($noRef) > 100) {
+            $noRef = mb_substr($noRef, 0, 100);
+        }
+    }
 
     // Validasi saldo jika transaksi keluar.
     if ($arah === 'OUT') {
@@ -200,7 +249,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['success'] =
             "Mutasi kawat berhasil disimpan. " .
             number_format($qtyAsal, 2) . " {$satuan} = " .
-            number_format($qtyKg, 2) . " KG.";
+            number_format($qtyKg, 2) . " KG." .
+            ($isSusulan ? ' (Kawat Susulan / Campuran)' : '');
 
         header("Location: master_kawat.php");
         exit;
@@ -213,7 +263,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// Data kawat + saldo BARU/BEKAS.
+// Data kawat + saldo BARU/BEKAS (hanya transaksi AKTIF).
 $kawat = $koneksi->query("
     SELECT
         k.id_kawat,
@@ -245,6 +295,7 @@ $kawat = $koneksi->query("
 
     LEFT JOIN transaksi_kawat t
         ON t.id_kawat = k.id_kawat
+       AND t.status_transaksi = 'AKTIF'
 
     GROUP BY
         k.id_kawat,
@@ -408,6 +459,31 @@ body {
     color: #f39c12;
 }
 
+/* ===== Box Kawat Susulan ===== */
+.susulan-box {
+    background: #fff8e6;
+    border: 1px solid #ffe08a;
+    border-left: 5px solid #f39c12;
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+
+.susulan-box .title {
+    font-weight: 700;
+    color: #b87400;
+    font-size: 13px;
+}
+
+.susulan-box .desc {
+    font-size: 12px;
+    color: #6c757d;
+}
+
+select option[data-susulan="1"] {
+    font-weight: 700;
+    color: #b87400;
+}
+
 @media(max-width:768px) {
     .wrap {
         margin: 12px auto;
@@ -468,6 +544,7 @@ body {
             <strong>KAWAT</strong>
             akan masuk otomatis dari tabel pembelian.
         </div>
+
         <div class="alert alert-info">
             <i class="fas fa-circle-info me-2"></i>
             Adjustment stok hanya digunakan untuk koreksi hasil stok fisik. <strong>Jangan</strong> digunakan untuk mengganti transaksi normal.
@@ -517,12 +594,21 @@ body {
 
                         <?php while ($r = $kawat->fetch_assoc()): ?>
 
+                            <?php
+                            $isSusulan = ((float)$r['ukuran'] === 0.0);
+
+                            $label = $isSusulan
+                                ? 'SUSULAN / CAMPURAN (input manual)'
+                                : number_format((float)$r['ukuran'], 2) . ' mm';
+                            ?>
+
                             <option
                                 value="<?= (int)$r['id_kawat'] ?>"
                                 data-baru="<?= h($r['stok_baru']) ?>"
                                 data-bekas="<?= h($r['stok_bekas']) ?>"
+                                data-susulan="<?= $isSusulan ? '1' : '0' ?>"
                             >
-                                <?= number_format((float)$r['ukuran'], 2) ?> mm
+                                <?= $isSusulan ? '⚠️ ' : '' ?><?= h($label) ?>
                             </option>
 
                         <?php endwhile; ?>
@@ -541,6 +627,53 @@ body {
                             Pilih ukuran kawat untuk melihat saldo stok.
                         </div>
 
+                    </div>
+
+                </div>
+
+
+                <!-- Info Kawat Susulan (muncul kondisional) -->
+                <div class="col-12" id="wrapInfoSusulan" style="display:none;">
+
+                    <div class="susulan-box">
+
+                        <div class="title">
+                            <i class="fas fa-triangle-exclamation me-1"></i>
+                            Mode KAWAT SUSULAN / CAMPURAN
+                        </div>
+
+                        <div class="desc mt-1">
+                            Ukuran ini adalah penampung untuk kawat bekas <strong>campuran berbagai ukuran</strong>.
+                            Isi keterangan ukuran di bawah agar histori jelas.
+                            Gunakan jenis transaksi <strong>Adjustment Masuk - Kawat Bekas</strong> untuk memasukkan,
+                            dan <strong>Rombeng</strong> untuk mengeluarkan saat dijual/dibuang.
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Input manual ukuran (khusus SUSULAN) -->
+                <div class="col-12" id="wrapUkuranManual" style="display:none;">
+
+                    <label class="form-label">
+                        Keterangan Ukuran (manual)
+                    </label>
+
+                    <input
+                        type="text"
+                        class="form-control"
+                        name="ukuran_manual"
+                        id="ukuranManual"
+                        placeholder="Contoh: campuran 0.50 - 1.20 mm, 1 karung gudang"
+                        maxlength="100"
+                    >
+
+                    <div class="hint mt-1">
+                        <i class="fas fa-circle-info me-1"></i>
+                        Keterangan ini akan disimpan bersama transaksi.
+                        No. Referensi otomatis diisi <code>SUSULAN-YYYYMMDD</code> jika dikosongkan.
                     </div>
 
                 </div>
@@ -776,8 +909,14 @@ body {
                     <input
                         class="form-control"
                         name="no_referensi"
+                        id="noReferensi"
                         placeholder="Contoh: BON-001 / ROMBENG-001"
                     >
+
+                    <div class="hint mt-1" id="hintReferensi" style="display:none;">
+                        <i class="fas fa-circle-info me-1"></i>
+                        Biarkan kosong untuk otomatis <code>SUSULAN-YYYYMMDD</code>.
+                    </div>
 
                 </div>
 
@@ -833,13 +972,19 @@ body {
 
 <script>
 
-const idKawat       = document.getElementById('idKawat');
-const saldoInfo     = document.getElementById('saldoInfo');
-const jenisMutasi   = document.getElementById('jenisMutasi');
-const qtyAsal       = document.getElementById('qtyAsal');
-const satuanInput   = document.getElementById('satuanInput');
-const hasilKonversi = document.getElementById('hasilKonversi');
+const idKawat        = document.getElementById('idKawat');
+const saldoInfo      = document.getElementById('saldoInfo');
+const jenisMutasi    = document.getElementById('jenisMutasi');
+const qtyAsal        = document.getElementById('qtyAsal');
+const satuanInput    = document.getElementById('satuanInput');
+const hasilKonversi  = document.getElementById('hasilKonversi');
 const detailKonversi = document.getElementById('detailKonversi');
+
+const wrapInfoSusulan    = document.getElementById('wrapInfoSusulan');
+const wrapUkuranManual   = document.getElementById('wrapUkuranManual');
+const ukuranManual       = document.getElementById('ukuranManual');
+const hintReferensi      = document.getElementById('hintReferensi');
+const noReferensi        = document.getElementById('noReferensi');
 
 
 function formatNumber(value, decimal = 2) {
@@ -875,6 +1020,7 @@ function updateSaldo() {
     const baru  = parseFloat(option.dataset.baru || 0);
     const bekas = parseFloat(option.dataset.bekas || 0);
     const total = baru + bekas;
+    const isSusulan = option.dataset.susulan === '1';
 
 
     saldoInfo.innerHTML = `
@@ -932,8 +1078,36 @@ function updateSaldo() {
             </div>
 
         </div>
+
+        ${isSusulan ? `
+            <div class="small text-warning mt-2">
+                <i class="fas fa-triangle-exclamation me-1"></i>
+                Mode SUSULAN/CAMPURAN aktif. Transaksi ini tidak mengikat ke ukuran fisik tunggal.
+            </div>
+        ` : ''}
     `;
 
+}
+
+
+function updateSusulanUI() {
+
+    const option = idKawat.options[idKawat.selectedIndex];
+    const isSusulan = option && option.dataset.susulan === '1';
+
+    if (isSusulan) {
+        wrapInfoSusulan.style.display = 'block';
+        wrapUkuranManual.style.display = 'block';
+        hintReferensi.style.display = 'block';
+    } else {
+        wrapInfoSusulan.style.display = 'none';
+        wrapUkuranManual.style.display = 'none';
+        hintReferensi.style.display = 'none';
+
+        if (ukuranManual) {
+            ukuranManual.value = '';
+        }
+    }
 }
 
 
@@ -1043,10 +1217,10 @@ function setUnit(unit) {
 }
 
 
-idKawat.addEventListener(
-    'change',
-    updateSaldo
-);
+idKawat.addEventListener('change', function () {
+    updateSaldo();
+    updateSusulanUI();
+});
 
 jenisMutasi.addEventListener(
     'change',
@@ -1064,7 +1238,7 @@ satuanInput.addEventListener(
 );
 
 
-// Default
+// Default saat load
 updateConversion();
 
 </script>
