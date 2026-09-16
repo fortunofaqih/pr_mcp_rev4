@@ -29,8 +29,6 @@ if ($_SESSION['status'] != "login") {
         .badge-dipoles { background-color: #17a2b8; color: white; }
         .badge-dipopok { background-color: #6f42c1; color: white; }
         .badge-dibubut { background-color: #fd7e14; color: white; }
-        .badge-dibubut { background-color: #fd7e14; color: white; }
-        .badge-dibubut { background-color: #fd7e14; color: white; }
         .badge-spei { background-color: #20c997; color: white; }
         .badge-stell { background-color: #e83e8c; color: white; }
         .badge-gulung-dinamo { background-color: #6c757d; color: white; }
@@ -52,13 +50,6 @@ if ($_SESSION['status'] != "login") {
         .modal-header-success .btn-close {
             filter: brightness(0) invert(1);
         }
-        .modal-header-warning {
-            background-color: #ffc107;
-            color: #000;
-        }
-        .modal-header-warning .btn-close {
-            filter: brightness(0);
-        }
     </style>
 </head>
 <body>
@@ -76,8 +67,6 @@ if ($_SESSION['status'] != "login") {
 </nav>
 
 <div class="container-fluid px-3 px-sm-4">
-   
-
     <div class="card">
         <div class="card-body">
             <div class="table-responsive">
@@ -96,16 +85,45 @@ if ($_SESSION['status'] != "login") {
                     </thead>
                     <tbody>
                         <?php
+                        // Ambil HANYA 1 record terbaru per mesin
                         $query = mysqli_query($koneksi, "
                             SELECT km.*, mm.id_mesin, mm.name 
                             FROM kondisi_mesin km
                             JOIN master_mesin mm ON km.id_mesin = mm.id
+                            INNER JOIN (
+                                SELECT id_mesin, MAX(id_kondisi_mesin) AS max_id
+                                FROM kondisi_mesin
+                                GROUP BY id_mesin
+                            ) latest ON km.id_kondisi_mesin = latest.max_id
                             ORDER BY km.start_date DESC
                         ");
                         while ($d = mysqli_fetch_array($query)) {
+                            // ====== LOGIKA STATUS GABUNGAN ======
                             $aktif = is_null($d['end_date']);
-                            $status_text = $aktif ? 'AKTIF' : 'SELESAI';
-                            $status_class = $aktif ? 'bg-warning text-dark' : 'bg-success text-white';
+                            $kondisi_upper = strtoupper($d['kondisi_mesin']);
+                            $kondisi_baik = ($kondisi_upper === 'BAIK');
+                            
+                            if (!$aktif && $kondisi_baik) {
+                                // Sudah selesai + kondisi BAIK
+                                $status_text = 'SELESAI SERVICE & BAIK';
+                                $status_class = 'bg-success text-white';
+                            } elseif ($aktif && $kondisi_baik) {
+                                // Aktif tapi kondisi BAIK (kasus khusus)
+                                $status_text = 'BAIK';
+                                $status_class = 'bg-success text-white';
+                            } elseif ($aktif) {
+                                // Masih dalam service
+                                $status_text = 'AKTIF';
+                                $status_class = 'bg-warning text-dark';
+                            } else {
+                                // Selesai tapi kondisi bukan BAIK
+                                $status_text = 'SELESAI';
+                                $status_class = 'bg-success text-white';
+                            }
+                            
+                            // Tombol "Selesaikan" hanya muncul jika AKTIF dan kondisi BUKAN BAIK
+                            $perlu_selesai = $aktif && !$kondisi_baik;
+                            // ===================================
                             
                             // Mapping kondisi ke badge
                             $badge_map = [
@@ -116,14 +134,16 @@ if ($_SESSION['status'] != "login") {
                                 'DI POPOK' => '<span class="badge badge-dipopok"><i class="fas fa-baby me-1"></i>DI POPOK</span>',
                                 'DI BUBUT' => '<span class="badge badge-dibubut"><i class="fas fa-cog me-1"></i>DI BUBUT</span>',
                                 'SPEI' => '<span class="badge badge-spei"><i class="fas fa-gear me-1"></i>SPEI</span>',
-                                'STELL' => '<span class="badge badge-stell"><i class="fas fa-circle me-1"></i>STELL</span>',
+                                'STELL' => '<span class="badge badge-dibongkar"><i class="fas fa-circle me-1"></i>STELL</span>',
                                 'DI COR' => '<span class="badge badge-dibongkar"><i class="fas fa-wrench me-1"></i>DI COR</span>',
-                                'DI SELEP' => '<span class="badge badge-dibongkar"><i class="fas fa-wrench me-1"></i>DI SELEP</span>',
+                                'SELEP' => '<span class="badge badge-dibongkar"><i class="fas fa-wrench me-1"></i>SELEP</span>',
                                 'DI GANTI' => '<span class="badge badge-dibongkar"><i class="fas fa-wrench me-1"></i>DI GANTI</span>',
                                 'GULUNG DINAMO' => '<span class="badge badge-gulung-dinamo"><i class="fas fa-bolt me-1"></i>GULUNG DINAMO</span>'
                             ];
                             
-                            $badge_kondisi = isset($badge_map[$d['kondisi_mesin']]) ? $badge_map[$d['kondisi_mesin']] : '<span class="badge bg-secondary">' . htmlspecialchars($d['kondisi_mesin']) . '</span>';
+                            $badge_kondisi = isset($badge_map[$kondisi_upper]) 
+                                ? $badge_map[$kondisi_upper] 
+                                : '<span class="badge bg-secondary">' . htmlspecialchars($d['kondisi_mesin']) . '</span>';
                         ?>
                         <tr>
                             <td class="fw-bold text-primary"><?= htmlspecialchars($d['id_mesin']) ?></td>
@@ -140,7 +160,7 @@ if ($_SESSION['status'] != "login") {
                                             title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <?php if ($aktif) { ?>
+                                    <?php if ($perlu_selesai) { ?>
                                     <button class="btn btn-sm btn-outline-success"
                                             onclick="openSelesaiModal(<?= (int)$d['id_kondisi_mesin'] ?>, '<?= htmlspecialchars($d['name'], ENT_QUOTES) ?>')"
                                             title="Selesaikan Service">
@@ -198,7 +218,7 @@ if ($_SESSION['status'] != "login") {
                             <option value="SPEI">SPEI</option>
                             <option value="STELL">STELL</option>
                             <option value="DI COR">DI COR</option>
-                            <option value="DI SELEP">DI SELEP</option>
+                            <option value="SELEP">SELEP</option>
                             <option value="DI GANTI">DI GANTI</option>
                             <option value="GULUNG DINAMO">GULUNG DINAMO</option>
                         </select>
@@ -261,7 +281,7 @@ if ($_SESSION['status'] != "login") {
                             <option value="STELL">STELL</option>
                             <option value="GULUNG DINAMO">GULUNG DINAMO</option>
                             <option value="DI COR">DI COR</option>
-                            <option value="DI SELEP">DI SELEP</option>
+                            <option value="SELEP">SELEP</option>
                             <option value="DI GANTI">DI GANTI</option>
                         </select>
                         <small class="text-muted">Pilih kondisi setelah service selesai</small>
@@ -291,7 +311,6 @@ $(document).ready(function () {
         order: [[4, 'desc']]
     });
     
-    // Set default date untuk modal selesai
     $('#end_date_selesai').val(new Date().toISOString().split('T')[0]);
 });
 
@@ -305,9 +324,6 @@ function resetFormTambah() {
 }
 
 function editKondisi(id) {
-    console.log('Edit clicked for ID:', id); // Debug
-    
-    // Tampilkan loading
     $('#modalTambahKondisi').modal('show');
     document.getElementById('modalTambahTitle').innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Memuat data...';
     
@@ -316,15 +332,10 @@ function editKondisi(id) {
         type: 'POST',
         data: { id: id },
         dataType: 'json',
-        timeout: 10000, // Timeout 10 detik
+        timeout: 10000,
         success: function(response) {
-            console.log('Response:', response); // Debug
-            
             if (response.status === 'success') {
                 const data = response.data;
-                console.log('Data received:', data); // Debug
-                
-                // Isi form dengan data
                 document.getElementById('id_edit_kondisi').value = data.id_kondisi_mesin;
                 document.getElementById('id_mesin_kondisi').value = data.id_mesin;
                 document.getElementById('id_mesin_kondisi').disabled = true;
@@ -332,8 +343,6 @@ function editKondisi(id) {
                 document.getElementById('keterangan_service_mesin').value = data.keterangan_service_mesin || '';
                 document.getElementById('start_date_kondisi').value = data.start_date;
                 document.getElementById('end_date_kondisi').value = data.end_date || '';
-                
-                // Update judul modal
                 document.getElementById('modalTambahTitle').innerHTML = '<i class="fas fa-edit me-2"></i> Edit Kondisi Mesin';
             } else {
                 alert('Gagal mengambil data kondisi: ' + response.message);
@@ -342,8 +351,6 @@ function editKondisi(id) {
         },
         error: function(xhr, status, error) {
             console.error('AJAX Error:', error);
-            console.error('Status:', status);
-            console.error('Response Text:', xhr.responseText);
             alert('Error saat mengambil data kondisi! Silahkan cek console untuk detail.');
             $('#modalTambahKondisi').modal('hide');
         }
@@ -361,17 +368,13 @@ function openSelesaiModal(id, nama_mesin) {
 $('#formSelesaiKondisi').on('submit', function (e) {
     e.preventDefault();
     
-    const id = document.getElementById('id_kondisi_selesai').value;
     const end_date = document.getElementById('end_date_selesai').value;
-    const kondisi = document.getElementById('kondisi_selesai').value;
-    
     if (!end_date) {
         alert('Tanggal selesai wajib diisi!');
         return;
     }
     
     const formData = new FormData(this);
-    
     const submitBtn = $(this).find('button[type="submit"]');
     const originalText = submitBtn.html();
     submitBtn.html('<i class="fas fa-spinner fa-spin"></i> Menyimpan...');
@@ -409,10 +412,7 @@ $('#formKondisi').on('submit', function (e) {
     
     const id_edit = document.getElementById('id_edit_kondisi').value;
     const id_mesin = document.getElementById('id_mesin_kondisi').value;
-    const kondisi = document.getElementById('kondisi_mesin').value;
     const start_date = document.getElementById('start_date_kondisi').value;
-    
-    console.log('Form submitted:', { id_edit, id_mesin, kondisi, start_date }); // Debug
     
     if (!id_mesin || !start_date) {
         alert('Pilih mesin dan tanggal mulai wajib diisi!');
@@ -421,8 +421,6 @@ $('#formKondisi').on('submit', function (e) {
     
     const formData = new FormData(this);
     const action = id_edit === '0' ? 'ajax_simpan_kondisi_mesin.php' : 'ajax_update_kondisi_mesin.php';
-    
-    console.log('Sending to:', action); // Debug
     
     const submitBtn = $(this).find('button[type="submit"]');
     const originalText = submitBtn.html();
@@ -438,7 +436,6 @@ $('#formKondisi').on('submit', function (e) {
         dataType: 'json',
         timeout: 10000,
         success: function(response) {
-            console.log('Save response:', response); // Debug
             if (response.status === 'success') {
                 alert(response.message);
                 $('#modalTambahKondisi').modal('hide');
@@ -451,8 +448,6 @@ $('#formKondisi').on('submit', function (e) {
         },
         error: function(xhr, status, error) {
             console.error('AJAX Error:', error);
-            console.error('Status:', status);
-            console.error('Response Text:', xhr.responseText);
             alert('Gagal menyimpan data kondisi! Error: ' + error);
             submitBtn.html(originalText);
             submitBtn.prop('disabled', false);

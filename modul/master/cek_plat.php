@@ -1,6 +1,6 @@
 <?php
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 if (isset($_POST['plat_nomor'])) {
     $plat_nomor = mysqli_real_escape_string($koneksi, $_POST['plat_nomor']);
