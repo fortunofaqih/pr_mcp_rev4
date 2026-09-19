@@ -34,14 +34,13 @@ ini_set('display_errors', '0');
 error_reporting(E_ALL);
 ob_start();
 
+header('Content-Type: application/json');
 require_once __DIR__ . '/../../config/koneksi.php';
 require_once __DIR__ . '/../../auth/check_session.php';
 
 // Bersihkan buffer dari output apa pun yang mungkin sudah tercetak
 // (misalnya notice dari file yang di-require di atas)
 ob_clean();
-
-header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     ob_end_clean();

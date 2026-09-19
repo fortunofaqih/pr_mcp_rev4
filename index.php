@@ -296,6 +296,12 @@ if ($is_finance) {
                             <?php endif; ?>
                         </a>
                     </li>
+                     <li class="nav-item">
+                        <a href="modul/pimpinan/list_approval_pimpinan.php" class="nav-link">
+                            <i class="fas fa-list me-2"></i> List Approval PR
+                          
+                        </a>
+                    </li>
 
                     <!-- Update Status BAN (IT juga bisa lihat ini) -->
                     <li class="nav-item">

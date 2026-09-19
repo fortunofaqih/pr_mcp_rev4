@@ -899,8 +899,9 @@ require_once __DIR__ . '/../../auth/check_session.php';
         .then(data => {
             if (data.success) {
                 // Setelah berhasil simpan, lanjutkan cetak
-                preparePrint();
+                
                 alert('Data berhasil disimpan! ID: ' + data.id);
+                preparePrint();
             } else {
                 alert('Gagal menyimpan data: ' + data.message);
             }
