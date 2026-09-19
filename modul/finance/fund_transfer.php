@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../auth/check_session.php';
     <title>Fund Transfer BCA - Input Form</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -874,42 +875,99 @@ require_once __DIR__ . '/../../auth/check_session.php';
         return [dd, mm, yy].join('  ');
     }
 
-    function saveAndPrint() {
-        // Format tanggal
-        formatTanggal();
+function saveAndPrint() {
+    formatTanggal();
+    
+    var formData = new FormData(document.getElementById('formTransfer'));
+    
+    var jmlRupiahValue = document.getElementById('jmlRupiah').value.replace(/\./g, '');
+    var jmlTotalValue  = document.getElementById('jmlTotal').value.replace(/\./g, '');
+    var terbilangValue = document.getElementById('terbilang').value;
+    
+    formData.append('jml_rupiah', jmlRupiahValue || '0');
+    formData.append('jml_total',  jmlTotalValue  || '0');
+    formData.append('terbilang',  terbilangValue || '');
+    
+    // Loading state
+    var btnSave = document.querySelector('button[onclick="saveAndPrint()"]');
+    var originalText = btnSave.innerHTML;
+    btnSave.disabled = true;
+    btnSave.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>MENYIMPAN...';
+    
+    fetch('proses_simpan.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(async function(response) {
+        var rawText = await response.text();
+        try {
+            return JSON.parse(rawText);
+        } catch (e) {
+            console.error('Response bukan JSON:', rawText);
+            throw new Error(
+                'Server tidak mengembalikan JSON. ' +
+                'HTTP Status: ' + response.status + '. ' +
+                'Cuplikan: ' + rawText.substring(0, 300)
+            );
+        }
+    })
+    .then(function(data) {
+        btnSave.disabled = false;
+        btnSave.innerHTML = originalText;
         
-        // Kumpulkan semua data dari form
-        var formData = new FormData(document.getElementById('formTransfer'));
-        
-        // Ambil nilai perhitungan
-        var jmlRupiahValue = document.getElementById('jmlRupiah').value.replace(/\./g, '');
-        var jmlTotalValue = document.getElementById('jmlTotal').value.replace(/\./g, '');
-        var terbilangValue = document.getElementById('terbilang').value;
-        
-        formData.append('jml_rupiah', jmlRupiahValue || '0');
-        formData.append('jml_total', jmlTotalValue || '0');
-        formData.append('terbilang', terbilangValue || '');
-        
-        // Kirim ke server untuk simpan
-        fetch('proses_simpan.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Setelah berhasil simpan, lanjutkan cetak
-                
-                alert('Data berhasil disimpan! ID: ' + data.id);
-                preparePrint();
-            } else {
-                alert('Gagal menyimpan data: ' + data.message);
-            }
-        })
-        .catch(error => {
-            alert('Error: ' + error);
-        });
-    }
+        if (data.success) {
+            // ✅ SIMPAN BERHASIL → tampilkan modal, JANGAN langsung cetak
+            showSuccessModal(data.id);
+        } else {
+            alert('Gagal menyimpan data: ' + data.message);
+        }
+    })
+    .catch(function(error) {
+        btnSave.disabled = false;
+        btnSave.innerHTML = originalText;
+        alert('Error: ' + error.message);
+        console.error(error);
+    });
+}
+
+/**
+ * Tampilkan modal sukses dengan nomor transaksi
+ */
+function showSuccessModal(id) {
+    document.getElementById('modalIdTransaksi').textContent = '#' + String(id).padStart(4, '0');
+    var modal = new bootstrap.Modal(document.getElementById('successModal'));
+    modal.show();
+}
+
+/**
+ * Dipanggil dari tombol "Cetak Sekarang" di modal
+ */
+function doPrintFromModal() {
+    // Tutup modal dulu
+    var modalEl = document.getElementById('successModal');
+    var modalInstance = bootstrap.Modal.getInstance(modalEl);
+    if (modalInstance) modalInstance.hide();
+    
+    // Tunggu modal benar-benar tertutup baru print
+    modalEl.addEventListener('hidden.bs.modal', function handler() {
+        modalEl.removeEventListener('hidden.bs.modal', handler);
+        preparePrint();
+    }, { once: true });
+}
+
+/**
+ * Tutup modal & reset form untuk input transaksi baru
+ */
+function closeModalAndReset() {
+    var modalEl = document.getElementById('successModal');
+    var modalInstance = bootstrap.Modal.getInstance(modalEl);
+    if (modalInstance) modalInstance.hide();
+    
+    modalEl.addEventListener('hidden.bs.modal', function handler() {
+        modalEl.removeEventListener('hidden.bs.modal', handler);
+        location.reload();
+    }, { once: true });
+}
 
     /*
      * preparePrint() HANYA mengisi field teks/angka/tanggal.
@@ -995,6 +1053,75 @@ require_once __DIR__ . '/../../auth/check_session.php';
         updatePreview();
     };
 </script>
+<!-- ================= MODAL SUKSES ================= -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            
+            <!-- Header hijau dengan ikon centang -->
+            <div class="modal-body text-center p-0">
+                <div style="background: linear-gradient(135deg, #198754 0%, #20c997 100%); padding: 32px 20px 24px;">
+                    <div style="
+                        width: 90px; height: 90px; border-radius: 50%;
+                        background: rgba(255,255,255,0.25);
+                        margin: 0 auto 16px;
+                        display: flex; align-items: center; justify-content: center;
+                        animation: popIn 0.5s ease-out;
+                    ">
+                        <i class="fas fa-check-circle" style="font-size: 52px; color: #fff;"></i>
+                    </div>
+                    <h4 class="text-white fw-bold mb-1" style="font-size: 20px;">
+                        Data Berhasil Disimpan!
+                    </h4>
+                    <p class="text-white mb-0" style="opacity: 0.9; font-size: 13px;">
+                        Fund Transfer BCA telah tersimpan di sistem
+                    </p>
+                </div>
 
+                <!-- Info ID -->
+                <div style="padding: 20px 28px 8px;">
+                    <div style="
+                        background: #f0f9f4; border: 2px dashed #198754;
+                        border-radius: 10px; padding: 12px 18px;
+                        display: inline-block; margin-bottom: 8px;
+                    ">
+                        <div style="font-size: 11px; color: #666; letter-spacing: 1px;">
+                            NOMOR TRANSAKSI
+                        </div>
+                        <div style="font-size: 24px; font-weight: 800; color: #198754;" id="modalIdTransaksi">
+                            #000
+                        </div>
+                    </div>
+                    <p class="text-muted mb-3 mt-2" style="font-size: 12.5px;">
+                        Silakan pilih tindakan selanjutnya:
+                    </p>
+                </div>
+
+                <!-- Tombol Aksi -->
+                <div style="padding: 0 24px 24px; display: flex; flex-direction: column; gap: 8px;">
+                    
+                    <a href="list_data.php" class="btn btn-primary fw-bold py-2"
+                       style="border-radius: 8px; font-size: 13.5px;">
+                        <i class="fas fa-list me-2"></i>LIHAT DATA TERSIMPAN UNTUK CETAK
+                    </a>
+                    <button type="button" class="btn btn-outline-secondary py-2"
+                            style="border-radius: 8px; font-size: 13px;"
+                            onclick="closeModalAndReset()">
+                        <i class="fas fa-plus me-2"></i>INPUT TRANSAKSI BARU
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Animasi pop-in -->
+<style>
+    @keyframes popIn {
+        0%   { transform: scale(0.3); opacity: 0; }
+        60%  { transform: scale(1.15); opacity: 1; }
+        100% { transform: scale(1); }
+    }
+</style>
 </body>
 </html>
