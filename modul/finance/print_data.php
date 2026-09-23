@@ -21,6 +21,15 @@ if ($result->num_rows === 0) {
 
 $data = $result->fetch_assoc();
 $stmt->close();
+
+/**
+ * Format angka dengan gaya internasional (US):
+ * ribuan pakai koma, desimal pakai titik.
+ * Contoh: 77200.00 -> 77,200.00
+ */
+function fmt_usd($angka, $desimal = 2) {
+    return number_format((float)$angka, $desimal, '.', ',');
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -61,15 +70,26 @@ $stmt->close();
             text-overflow: ellipsis;
         }
 
-        /* ===================== TANGGAL & JENIS ===================== */
+
+                /* ===================== TANGGAL & JENIS ===================== */
         .p-tgl {
             position: absolute;
             top: 21mm;
-            left: 40mm;
+            left: 35mm;
             font-size: 8pt;
             letter-spacing: 2.2mm;
             word-spacing: 3.2mm;
         }
+        /* Geser 'd' dan 'm' tanpa menggeser 'y' */
+        .p-tgl .tgl-d {
+            position: relative;
+            left: 4mm;
+        }
+        .p-tgl .tgl-m {
+            position: relative;
+            left: 2mm;
+        }
+
         .p-jenis {
             position: absolute;
             top: 11mm;
@@ -77,6 +97,7 @@ $stmt->close();
             font-size: 9pt;
         }
 
+    
         /* ===================== BAGIAN A ===================== */
         .p-rek-penerima        { position: absolute; top: 33mm; left: 45mm; width: 90mm; }
         .p-nama-penerima       { position: absolute; top: 38mm; left: 45mm; width: 90mm; }
@@ -88,7 +109,6 @@ $stmt->close();
         .p-kw-a                { position: absolute; top: 76mm; left: 45mm; }
 
         /* ===================== BAGIAN B ===================== */
-        /* Semua digeser kanan 1cm, dan seluruh grup dinaikkan agar jarak antar baris tetap rapat */
         .p-nama-bank           { position: absolute; top: 33mm; left: 141mm; width: 90mm; }
         .p-alamat-bank         { position: absolute; top: 38mm; left: 141mm; width: 90mm; }
         .p-kota-bank           { position: absolute; top: 43mm; left: 141mm; width: 90mm; }
@@ -97,12 +117,20 @@ $stmt->close();
         .p-kode-negara-bank    { position: absolute; top: 58mm; left: 141mm; width: 40mm; }
         .p-swift               { position: absolute; top: 66mm; left: 141mm; width: 90mm; }
 
+        /* Negara bank: biarkan wrap ke bawah jika tidak cukup */
+        .p-negara-bank.wrap {
+            white-space: normal;
+            overflow: visible;
+            text-overflow: clip;
+            line-height: 1.1;
+        }
+
         /* ===================== BAGIAN C ===================== */
-        .p-nama-pengirim       { position: absolute; top: 78mm; left: 45mm; width: 90mm; }
+        .p-nama-pengirim       { position: absolute; top: 79mm; left: 45mm; width: 90mm; }
         .p-ktp                 { position: absolute; top: 83mm; left: 45mm; width: 60mm; }
         .p-alamat-pengirim     { position: absolute; top: 88mm; left: 45mm; width: 90mm; }
         .p-kontak              { position: absolute; top: 93mm; left: 45mm; width: 60mm; }
-        .p-hp                  { position: absolute; top: 98mm; left: 45mm; width: 60mm; }
+        .p-hp                  { position: absolute; top: 97mm; left: 45mm; width: 60mm; }
         .p-kota-pengirim       { position: absolute; top: 103mm; left: 45mm; width: 60mm; }
         .p-rek-bca             { position: absolute; top: 108mm; left: 45mm; width: 70mm; }
         .p-tipe-c              { position: absolute; top: 113mm; left: 45mm; }
@@ -158,9 +186,9 @@ $stmt->close();
     <div class="print-sheet">
 
         <div class="p-tgl val">
-            <?= date('d', strtotime($data['tanggal'])) ?>  
-            <?= date('m', strtotime($data['tanggal'])) ?>  
-            <?= date('y', strtotime($data['tanggal'])) ?>
+            <span class="tgl-d"><?= date('d', strtotime($data['tanggal'])) ?></span>
+            <span class="tgl-m"><?= date('m', strtotime($data['tanggal'])) ?></span>
+            <span><?= date('y', strtotime($data['tanggal'])) ?></span>
         </div>
         <div class="p-jenis val"><?= htmlspecialchars($data['jenis_pengiriman']) ?></div>
 
@@ -179,7 +207,7 @@ $stmt->close();
         <div class="p-alamat-bank val"><?= htmlspecialchars($data['alamat_bank']) ?></div>
         <div class="p-kota-bank val"><?= htmlspecialchars($data['kota_bank']) ?></div>
         <div class="p-state-bank val"><?= htmlspecialchars($data['state_bank']) ?></div>
-        <div class="p-negara-bank val"><?= htmlspecialchars($data['negara_bank']) ?></div>
+        <div class="p-negara-bank val wrap"><?= htmlspecialchars($data['negara_bank']) ?></div>
         <div class="p-kode-negara-bank val"><?= htmlspecialchars($data['kode_negara_bank']) ?></div>
         <div class="p-swift val"><?= htmlspecialchars($data['swift_code']) ?></div>
 
@@ -215,7 +243,7 @@ $stmt->close();
 
         <!-- Jumlah -->
         <div class="p-mata-uang val"><?= htmlspecialchars($data['mata_uang']) ?></div>
-        <div class="p-jml-valas val"><?= number_format($data['jml_valas'], 2, ',', '.') ?></div>
+        <div class="p-jml-valas val"><?= fmt_usd($data['jml_valas'], 2) ?></div>
         <div class="p-kurs val"><?= number_format($data['kurs'], 2, ',', '.') ?></div>
         <div class="p-jml-rupiah val"> <?= number_format($data['jml_rupiah'], 0, ',', '.') ?></div>
         <div class="p-provisi val"> <?= number_format($data['provisi'], 0, ',', '.') ?></div>

@@ -2,6 +2,10 @@
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
 require_once __DIR__ . '/../../auth/check_session.php';
+// Helper tahan null
+function h($v) {
+    return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -96,7 +100,7 @@ require_once __DIR__ . '/../../auth/check_session.php';
                     <tr>
                         <th>No</th>
                         <th>Tanggal</th>
-                        <th>Jenis Kirim</th>
+                        
                         <th>Rek. Penerima</th>
                         <th>Nama Penerima</th>
                         <th>Bank</th>
@@ -132,19 +136,22 @@ require_once __DIR__ . '/../../auth/check_session.php';
                             <tr>
                                 <td><?= $no++ ?></td>
                                 <td><?= date('d/m/Y', strtotime($row['tanggal'])) ?></td>
-                                <td><?= htmlspecialchars($row['jenis_pengiriman']) ?></td>
-                                <td><?= htmlspecialchars($row['rekening_penerima']) ?></td>
-                                <td><strong><?= htmlspecialchars($row['nama_penerima']) ?></strong></td>
-                                <td><?= htmlspecialchars($row['nama_bank']) ?></td>
-                                <td><?= htmlspecialchars($row['nama_pengirim']) ?></td>
-                                <td><span class="badge bg-info"><?= htmlspecialchars($row['mata_uang']) ?></span></td>
-                                <td class="text-end fw-bold">Rp <?= number_format($row['jml_total'], 0, ',', '.') ?></td>
-                                <td>
+                               
+                                <td><?= h($row['rekening_penerima']) ?></td>
+                                <td><strong><?= h($row['nama_penerima']) ?></strong></td>
+                                <td><?= h($row['nama_bank']) ?></td>
+                                <td><?= h($row['nama_pengirim']) ?></td>
+                                <td><span class="badge bg-info"><?= h($row['mata_uang']) ?></span></td>
+                                <td class="text-end fw-bold">Rp <?= number_format((float)($row['jml_total'] ?? 0), 0, ',', '.') ?></td>
+                              <td>
                                     <a href="view_data.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-view" target="_blank">
                                         <i class="fas fa-eye"></i>
                                     </a>
                                     <a href="print_data.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-print" target="_blank">
                                         <i class="fas fa-print"></i>
+                                    </a>
+                                    <a href="edit_fund_transfer.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-warning">
+                                        <i class="fas fa-edit"></i>
                                     </a>
                                     <button onclick="deleteData(<?= $row['id'] ?>)" class="btn btn-sm btn-danger">
                                         <i class="fas fa-trash"></i>
