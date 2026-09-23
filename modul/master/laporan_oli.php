@@ -1,4 +1,5 @@
 <?php
+// laporan oli
 session_start();
 
 require_once __DIR__ . '/../../config/koneksi.php';
@@ -74,6 +75,12 @@ if ($idOliFilter > 0) {
     $stmt->close();
 }
 
+// =========================================================
+// Tentukan rentang tanggal periode
+// =========================================================
+$tglAwal  = sprintf('%04d-%02d-01', $tahun, $bulan);
+$tglAkhir = date('Y-m-t', strtotime($tglAwal)); // tanggal terakhir bulan
+
 header("Content-Type: application/vnd.ms-excel; charset=utf-8");
 
 header(
@@ -84,6 +91,9 @@ header(
 header("Pragma: no-cache");
 header("Expires: 0");
 
+// =========================================================
+// Query transaksi periode terpilih
+// =========================================================
 $sql = "
     SELECT
         r.*,
@@ -140,6 +150,8 @@ while ($row = $result->fetch_assoc()) {
     $rows[] = $row;
 }
 
+$stmt->close();
+
 $rowspan = [];
 
 foreach ($rows as $row) {
@@ -154,6 +166,125 @@ foreach ($rows as $row) {
 }
 
 $shown = [];
+
+// =========================================================
+// Query SALDO AWAL
+// Akumulasi MASUK - KELUAR untuk transaksi AKTIF
+// dengan tanggal SEBELUM tanggal awal periode
+// =========================================================
+$sqlAwal = "
+    SELECT
+        r.id_oli,
+        o.nama_oli,
+        COALESCE(SUM(
+            CASE
+                WHEN r.jenis_transaksi = 'MASUK'  THEN  r.jumlah
+                WHEN r.jenis_transaksi = 'KELUAR' THEN -r.jumlah
+                ELSE 0
+            END
+        ), 0) AS saldo_awal
+    FROM riwayat_oli r
+    JOIN master_oli o ON o.id_oli = r.id_oli
+    WHERE
+        r.status_transaksi = 'AKTIF'
+        AND r.tanggal < ?
+";
+
+if ($idOliFilter > 0) {
+    $sqlAwal .= " AND r.id_oli = ? ";
+}
+
+$sqlAwal .= " GROUP BY r.id_oli, o.nama_oli ";
+
+$stmtAwal = $koneksi->prepare($sqlAwal);
+
+if ($idOliFilter > 0) {
+    $stmtAwal->bind_param("si", $tglAwal, $idOliFilter);
+} else {
+    $stmtAwal->bind_param("s", $tglAwal);
+}
+
+$stmtAwal->execute();
+$resAwal = $stmtAwal->get_result();
+
+$saldoAwalMap = [];
+
+while ($row = $resAwal->fetch_assoc()) {
+    $saldoAwalMap[(int)$row['id_oli']] = [
+        'nama_oli'   => $row['nama_oli'],
+        'saldo_awal' => (float)$row['saldo_awal'],
+    ];
+}
+
+$stmtAwal->close();
+
+// =========================================================
+// Bangun ringkasan per oli (dari transaksi periode + saldo awal)
+// =========================================================
+$ringkasan = [];
+
+// Inisialisasi dari saldo awal
+foreach ($saldoAwalMap as $idOli => $info) {
+    $ringkasan[$idOli] = [
+        'nama_oli'    => $info['nama_oli'],
+        'saldo_awal'  => $info['saldo_awal'],
+        'total_masuk' => 0.0,
+        'total_keluar'=> 0.0,
+        'saldo_akhir' => 0.0,
+    ];
+}
+
+// Tambahkan transaksi periode
+foreach ($rows as $r) {
+
+    $id = (int)$r['id_oli'];
+
+    if (!isset($ringkasan[$id])) {
+        $ringkasan[$id] = [
+            'nama_oli'    => $r['nama_oli'],
+            'saldo_awal'  => 0.0,
+            'total_masuk' => 0.0,
+            'total_keluar'=> 0.0,
+            'saldo_akhir' => 0.0,
+        ];
+    }
+
+    if ($r['jenis_transaksi'] === 'MASUK') {
+        $ringkasan[$id]['total_masuk'] += (float)$r['jumlah'];
+    } elseif ($r['jenis_transaksi'] === 'KELUAR') {
+        $ringkasan[$id]['total_keluar'] += (float)$r['jumlah'];
+    }
+}
+
+// Hitung saldo akhir
+foreach ($ringkasan as $id => $info) {
+    $ringkasan[$id]['saldo_akhir'] =
+        $info['saldo_awal']
+        + $info['total_masuk']
+        - $info['total_keluar'];
+}
+
+// Urutkan ringkasan berdasarkan nama oli
+uasort($ringkasan, function ($a, $b) {
+    return strcmp($a['nama_oli'], $b['nama_oli']);
+});
+
+// Total keseluruhan (untuk baris TOTAL)
+$grand = [
+    'saldo_awal'   => 0.0,
+    'total_masuk'  => 0.0,
+    'total_keluar' => 0.0,
+    'saldo_akhir'  => 0.0,
+];
+
+foreach ($ringkasan as $info) {
+    $grand['saldo_awal']   += $info['saldo_awal'];
+    $grand['total_masuk']  += $info['total_masuk'];
+    $grand['total_keluar'] += $info['total_keluar'];
+    $grand['saldo_akhir']  += $info['saldo_akhir'];
+}
+
+$tampilkanTotal = count($ringkasan) > 1;
 
 function h($v)
 {
@@ -225,6 +356,29 @@ body {
     font-weight: bold;
 }
 
+/* Ringkasan saldo */
+.ringkasan {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.ringkasan th {
+    background: #f0c48a;
+    border: 1px solid #000;
+    padding: 5px;
+}
+
+.ringkasan td {
+    border: 1px solid #000;
+    padding: 5px;
+}
+
+.ringkasan .total-row td {
+    background: #fde9c9;
+    font-weight: bold;
+}
+
 </style>
 
 </head>
@@ -250,7 +404,70 @@ body {
 
 <br>
 
+<!-- ===================================================== -->
+<!-- RINGKASAN SALDO AWAL / MASUK / KELUAR / AKHIR          -->
+<!-- ===================================================== -->
+<table class="ringkasan">
 
+<thead>
+
+<tr>
+    <th>Jenis Oli</th>
+    <th>Saldo Awal (Liter)</th>
+    <th>Total Masuk (Liter)</th>
+    <th>Total Keluar (Liter)</th>
+    <th>Saldo Akhir (Liter)</th>
+</tr>
+
+</thead>
+
+<tbody>
+
+<?php if (count($ringkasan)): ?>
+
+    <?php foreach ($ringkasan as $info): ?>
+
+    <tr>
+        <td><?= h($info['nama_oli']) ?></td>
+        <td class="right"><?= number_format($info['saldo_awal'], 2) ?></td>
+        <td class="right"><?= number_format($info['total_masuk'], 2) ?></td>
+        <td class="right"><?= number_format($info['total_keluar'], 2) ?></td>
+        <td class="right bold"><?= number_format($info['saldo_akhir'], 2) ?></td>
+    </tr>
+
+    <?php endforeach; ?>
+
+    <?php if ($tampilkanTotal): ?>
+
+    <tr class="total-row">
+        <td class="center">TOTAL</td>
+        <td class="right"><?= number_format($grand['saldo_awal'], 2) ?></td>
+        <td class="right"><?= number_format($grand['total_masuk'], 2) ?></td>
+        <td class="right"><?= number_format($grand['total_keluar'], 2) ?></td>
+        <td class="right"><?= number_format($grand['saldo_akhir'], 2) ?></td>
+    </tr>
+
+    <?php endif; ?>
+
+<?php else: ?>
+
+    <tr>
+        <td colspan="5" class="center">
+            Tidak ada data saldo.
+        </td>
+    </tr>
+
+<?php endif; ?>
+
+</tbody>
+
+</table>
+
+<br>
+
+<!-- ===================================================== -->
+<!-- DETAIL TRANSAKSI                                       -->
+<!-- ===================================================== -->
 <table class="t">
 
 <thead>

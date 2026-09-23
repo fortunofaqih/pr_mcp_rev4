@@ -17,8 +17,17 @@ $user = $_SESSION['username'] ?? 'system';
 oli_sync_master_barang($koneksi, $user);
 oli_sync_pembelian($koneksi, $user);
 
-// Ambil atau buat ID Solar
-$idSolar = oli_get_or_create_master($koneksi, 'SOLAR INDUSTRI', $user);
+// Ambil ID Solar
+$idSolar = oli_get_id_by_name($koneksi, 'SOLAR INDUSTRI');
+
+// Jika belum ada, insert manual
+if (!$idSolar) {
+    $stmt = $koneksi->prepare("INSERT INTO master_oli (nama_oli, created_by) VALUES ('SOLAR INDUSTRI', ?)");
+    $stmt->bind_param("s", $user);
+    $stmt->execute();
+    $idSolar = $koneksi->insert_id;
+    $stmt->close();
+}
 
 $bulan =
     isset($_GET['bulan'])
