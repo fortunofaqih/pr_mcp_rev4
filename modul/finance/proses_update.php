@@ -21,84 +21,106 @@ if ($id <= 0) {
     exit;
 }
 
-// ===== Helper: ambil array checkbox dari POST, simpan sebagai JSON =====
-function checkboxJson($key) {
-    if (!isset($_POST[$key])) return '[]';   // <-- ubah null jadi '[]'
+/* =========================================================
+ * HELPER
+ * ========================================================= */
+
+/**
+ * Ambil value dari POST sebagai string.
+ * Kalau field-nya array (checkbox), gabung dengan koma.
+ * Konsisten dengan proses_simpan.php → tidak ada JSON, tidak ada '[]'.
+ *
+ * Catatan: karena checkbox/radio akan dicentang manual oleh user
+ * di kertas, field-field ini biasanya tetap kosong di form edit.
+ * Kalau user tidak mengubah apapun, nilainya tetap '' (string kosong).
+ */
+function ambilSebagaiString($key, $default = '') {
+    if (!isset($_POST[$key])) return $default;
     $val = $_POST[$key];
     if (is_array($val)) {
-        return json_encode(array_values($val), JSON_UNESCAPED_UNICODE);
+        // Buang nilai kosong, lalu gabung koma
+        $val = array_filter(array_map('strval', $val), function ($v) {
+            return $v !== '';
+        });
+        return implode(', ', $val);
     }
-    return json_encode([$val], JSON_UNESCAPED_UNICODE);
+    return (string) $val;
 }
 
-function postVal($key, $default = '') {      // <-- ubah default null jadi ''
+function postVal($key, $default = '') {
     return isset($_POST[$key]) ? trim((string)$_POST[$key]) : $default;
 }
 
-// ===== Ambil data dari form =====
-$tanggal            = postVal('tanggal');
-$jenis_pengiriman   = checkboxJson('jenis_pengiriman');
-$rekening_penerima  = postVal('rekening_penerima');
-$nama_penerima      = postVal('nama_penerima');
-$alamat_penerima    = postVal('alamat_penerima');
-$kota_penerima      = postVal('kota_penerima');
-$state_penerima     = postVal('state_penerima');
-$negara_penerima    = postVal('negara_penerima');
-$kode_negara_penerima = postVal('kode_negara_penerima');
-$tipe_nasabah       = checkboxJson('tipe_nasabah');
-$status_nasabah     = checkboxJson('status_nasabah');
-$kewarganegaraan_penerima = checkboxJson('kewarganegaraan_penerima');
+/* =========================================================
+ * AMBIL DATA DARI FORM
+ * ========================================================= */
 
-$nama_bank          = postVal('nama_bank');
-$alamat_bank        = postVal('alamat_bank');
-$kota_bank          = postVal('kota_bank');
-$state_bank         = postVal('state_bank');
-$negara_bank        = postVal('negara_bank');
-$kode_negara_bank   = postVal('kode_negara_bank');
-$swift_code         = postVal('swift_code');
+$tanggal                   = postVal('tanggal');
+$jenis_pengiriman          = ambilSebagaiString('jenis_pengiriman');
 
-$nama_pengirim      = postVal('nama_pengirim');
-$no_ktp             = postVal('no_ktp');
-$alamat_pengirim    = postVal('alamat_pengirim');
-$kontak_person      = postVal('kontak_person');
-$no_hp              = postVal('no_hp');
-$no_telp            = postVal('no_telp');
-$email_pengirim     = postVal('email_pengirim');
-$kota_pengirim      = postVal('kota_pengirim');
-$tipe_nasabah_pengirim = checkboxJson('tipe_nasabah_pengirim');
-$status_pengirim    = checkboxJson('status_pengirim');
-$kewarganegaraan_pengirim = checkboxJson('kewarganegaraan_pengirim');
-$rekening_bca       = postVal('rekening_bca');
+$rekening_penerima         = postVal('rekening_penerima');
+$nama_penerima             = postVal('nama_penerima');
+$alamat_penerima           = postVal('alamat_penerima');
+$kota_penerima             = postVal('kota_penerima');
+$state_penerima            = postVal('state_penerima');
+$negara_penerima           = postVal('negara_penerima');
+$kode_negara_penerima      = postVal('kode_negara_penerima');
+$tipe_nasabah              = ambilSebagaiString('tipe_nasabah');
+$status_nasabah            = ambilSebagaiString('status_nasabah');
+$kewarganegaraan_penerima  = ambilSebagaiString('kewarganegaraan_penerima');
 
-$hubungan_keuangan  = postVal('hubungan_keuangan');
-$tujuan_transaksi   = postVal('tujuan_transaksi');
-$berita             = postVal('berita');
+$nama_bank                 = postVal('nama_bank');
+$alamat_bank               = postVal('alamat_bank');
+$kota_bank                 = postVal('kota_bank');
+$state_bank                = postVal('state_bank');
+$negara_bank               = postVal('negara_bank');
+$kode_negara_bank          = postVal('kode_negara_bank');
+$swift_code                = postVal('swift_code');
 
-$sd_tunai           = isset($_POST['sd_tunai']) ? 1 : 0;
-$sd_tunai_rp        = postVal('sd_tunai_rp', 0);
-$sd_tabungan        = isset($_POST['sd_tabungan']) ? 1 : 0;
-$sd_tabungan_no     = postVal('sd_tabungan_no');
-$sd_tabungan_rp     = postVal('sd_tabungan_rp', 0);
-$sd_cek             = isset($_POST['sd_cek']) ? 1 : 0;
-$sd_cek_no          = postVal('sd_cek_no');
-$sd_cek_rp          = postVal('sd_cek_rp', 0);
+$nama_pengirim             = postVal('nama_pengirim');
+$no_ktp                    = postVal('no_ktp');
+$alamat_pengirim           = postVal('alamat_pengirim');
+$kontak_person             = postVal('kontak_person');
+$no_hp                     = postVal('no_hp');
+$no_telp                   = postVal('no_telp');
+$email_pengirim            = postVal('email_pengirim');
+$kota_pengirim             = postVal('kota_pengirim');
+$tipe_nasabah_pengirim     = ambilSebagaiString('tipe_nasabah_pengirim');
+$status_pengirim           = ambilSebagaiString('status_pengirim');
+$kewarganegaraan_pengirim  = ambilSebagaiString('kewarganegaraan_pengirim');
+$rekening_bca              = postVal('rekening_bca');
 
-$mata_uang          = postVal('mata_uang', 'IDR');
-$jml_valas          = (float) postVal('jml_valas', 0);
-$kurs               = (float) postVal('kurs', 0);
-$jml_rupiah         = (float) postVal('jml_rupiah', 0);
-$provisi            = (float) postVal('provisi', 0);
-$biaya              = (float) postVal('biaya', 0);
-$jml_total          = (float) postVal('jml_total', 0);
-$terbilang          = postVal('terbilang');
+$hubungan_keuangan         = postVal('hubungan_keuangan');
+$tujuan_transaksi          = postVal('tujuan_transaksi');
+$berita                    = postVal('berita');
 
-$biaya_koresponden  = postVal('biaya_koresponden');
-$today_value        = isset($_POST['today_value']) ? 1 : 0;
-$instruksi_khusus   = postVal('instruksi_khusus');
-$operator           = postVal('operator');
-$verifier           = postVal('verifier');
+$sd_tunai                  = isset($_POST['sd_tunai'])     ? 1 : 0;
+$sd_tunai_rp               = postVal('sd_tunai_rp', 0);
+$sd_tabungan               = isset($_POST['sd_tabungan'])  ? 1 : 0;
+$sd_tabungan_no            = postVal('sd_tabungan_no');
+$sd_tabungan_rp            = postVal('sd_tabungan_rp', 0);
+$sd_cek                    = isset($_POST['sd_cek'])       ? 1 : 0;
+$sd_cek_no                 = postVal('sd_cek_no');
+$sd_cek_rp                 = postVal('sd_cek_rp', 0);
 
-// ===== Pastikan data ada =====
+$mata_uang                 = postVal('mata_uang', 'IDR');
+$jml_valas                 = (float) postVal('jml_valas', 0);
+$kurs                      = (float) postVal('kurs', 0);
+$jml_rupiah                = (float) postVal('jml_rupiah', 0);
+$provisi                   = (float) postVal('provisi', 0);
+$biaya                     = (float) postVal('biaya', 0);
+$jml_total                 = (float) postVal('jml_total', 0);
+$terbilang                 = postVal('terbilang');
+
+$biaya_koresponden         = postVal('biaya_koresponden');
+$today_value               = isset($_POST['today_value']) ? 1 : 0;
+$instruksi_khusus          = postVal('instruksi_khusus');
+$operator                  = postVal('operator');
+$verifier                  = postVal('verifier');
+
+/* =========================================================
+ * PASTIKAN DATA ADA
+ * ========================================================= */
 $checkStmt = $koneksi->prepare("SELECT id FROM fund_transfer_bca WHERE id = ?");
 $checkStmt->bind_param('i', $id);
 $checkStmt->execute();
@@ -110,7 +132,9 @@ if ($checkRes->num_rows === 0) {
 }
 $checkStmt->close();
 
-// ===== Query UPDATE =====
+/* =========================================================
+ * QUERY UPDATE
+ * ========================================================= */
 $sql = "
     UPDATE fund_transfer_bca SET
         tanggal = ?,
