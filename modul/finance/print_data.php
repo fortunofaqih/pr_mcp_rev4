@@ -98,24 +98,48 @@ function fmt_usd($angka, $desimal = 2) {
         }
 
     
-        /* ===================== BAGIAN A ===================== */
-        .p-rek-penerima        { position: absolute; top: 33mm; left: 45mm; width: 90mm; }
-        .p-nama-penerima       { position: absolute; top: 38mm; left: 45mm; width: 90mm; }
-        .p-alamat-penerima     { position: absolute; top: 43mm; left: 45mm; width: 90mm; }
-        .p-kota-penerima       { position: absolute; top: 48mm; left: 45mm; width: 90mm; }
-        .p-kode-negara-penerima{ position: absolute; top: 63mm; left: 85mm; width: 40mm; }
-        .p-tipe-a              { position: absolute; top: 68mm; left: 45mm; }
-        .p-status-a            { position: absolute; top: 72mm; left: 45mm; }
-        .p-kw-a                { position: absolute; top: 76mm; left: 45mm; }
+       /* ===================== BAGIAN A ===================== */
+.p-rek-penerima        { position: absolute; top: 33mm; left: 45mm; width: 90mm; }
+.p-nama-penerima       { position: absolute; top: 38mm; left: 45mm; width: 60mm; }
+.print-sheet .p-alamat-penerima {
+    position: absolute;
+    top: 43mm;
+    left: 45mm;
+    width: 60mm;
+    font-size: 8pt;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.1;
+    word-wrap: break-word;
+    word-break: break-word;
+}
+.p-kota-penerima       { position: absolute; top: 48mm; left: 45mm; width: 90mm; }
+.p-kode-negara-penerima{ position: absolute; top: 63mm; left: 85mm; width: 40mm; }
+.p-tipe-a              { position: absolute; top: 68mm; left: 45mm; }
+.p-status-a            { position: absolute; top: 72mm; left: 45mm; }
+.p-kw-a                { position: absolute; top: 76mm; left: 45mm; }
 
-        /* ===================== BAGIAN B ===================== */
-        .p-nama-bank           { position: absolute; top: 33mm; left: 141mm; width: 90mm; }
-        .p-alamat-bank         { position: absolute; top: 38mm; left: 141mm; width: 90mm; }
-        .p-kota-bank           { position: absolute; top: 43mm; left: 141mm; width: 90mm; }
-        .p-state-bank          { position: absolute; top: 48mm; left: 141mm; width: 90mm; }
-        .p-negara-bank         { position: absolute; top: 53mm; left: 141mm; width: 50mm; }
-        .p-kode-negara-bank    { position: absolute; top: 58mm; left: 141mm; width: 40mm; }
-        .p-swift               { position: absolute; top: 66mm; left: 141mm; width: 90mm; }
+/* ===================== BAGIAN B ===================== */
+.p-nama-bank           { position: absolute; top: 33mm; left: 141mm; width: 90mm; }
+.print-sheet .p-alamat-bank {
+    position: absolute;
+    top: 38mm;
+    left: 141mm;
+    width: 60mm;
+    font-size: 8pt;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.1;
+    word-wrap: break-word;
+    word-break: break-word;
+}
+.p-kota-bank           { position: absolute; top: 43mm; left: 141mm; width: 90mm; }
+.p-state-bank          { position: absolute; top: 48mm; left: 141mm; width: 90mm; }
+.p-negara-bank         { position: absolute; top: 53mm; left: 141mm; width: 50mm; }
+.p-kode-negara-bank    { position: absolute; top: 58mm; left: 141mm; width: 40mm; }
+.p-swift               { position: absolute; top: 66mm; left: 141mm; width: 90mm; }
 
         /* Negara bank: biarkan wrap ke bawah jika tidak cukup */
         .p-negara-bank.wrap {
