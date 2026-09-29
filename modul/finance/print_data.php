@@ -100,10 +100,22 @@ function fmt_usd($angka, $desimal = 2) {
     
        /* ===================== BAGIAN A ===================== */
 .p-rek-penerima        { position: absolute; top: 33mm; left: 45mm; width: 90mm; }
-.p-nama-penerima       { position: absolute; top: 38mm; left: 45mm; width: 60mm; }
+.print-sheet .p-nama-penerima {
+    position: absolute;
+    top: 37.5mm;
+    left: 45mm;
+    width: 60mm;
+    font-size: 8pt;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.1;
+    word-wrap: break-word;
+    word-break: break-word;
+}
 .print-sheet .p-alamat-penerima {
     position: absolute;
-    top: 43mm;
+    top: 43.5mm;
     left: 45mm;
     width: 60mm;
     font-size: 8pt;
@@ -116,7 +128,7 @@ function fmt_usd($angka, $desimal = 2) {
 }
 .p-kota-penerima       { position: absolute; top: 48mm; left: 45mm; width: 90mm; }
 .p-kode-negara-penerima{ position: absolute; top: 63mm; left: 85mm; width: 40mm; }
-.p-tipe-a              { position: absolute; top: 68mm; left: 45mm; }
+.p-negara-penerima { position: absolute; top: 68mm; left: 45mm; width: 60mm; }
 .p-status-a            { position: absolute; top: 72mm; left: 45mm; }
 .p-kw-a                { position: absolute; top: 76mm; left: 45mm; }
 
@@ -141,13 +153,14 @@ function fmt_usd($angka, $desimal = 2) {
 .p-kode-negara-bank    { position: absolute; top: 58mm; left: 141mm; width: 40mm; }
 .p-swift               { position: absolute; top: 66mm; left: 141mm; width: 90mm; }
 
-        /* Negara bank: biarkan wrap ke bawah jika tidak cukup */
-        .p-negara-bank.wrap {
-            white-space: normal;
-            overflow: visible;
-            text-overflow: clip;
-            line-height: 1.1;
-        }
+.print-sheet .p-negara-bank.wrap {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.1;
+    word-wrap: break-word;
+    word-break: break-word;
+}
 
         /* ===================== BAGIAN C ===================== */
         .p-nama-pengirim       { position: absolute; top: 79mm; left: 45mm; width: 90mm; }
@@ -222,7 +235,7 @@ function fmt_usd($angka, $desimal = 2) {
         <div class="p-alamat-penerima val"><?= htmlspecialchars($data['alamat_penerima']) ?></div>
         <div class="p-kota-penerima val"><?= htmlspecialchars($data['kota_penerima']) ?></div>
         <div class="p-kode-negara-penerima val"><?= htmlspecialchars($data['kode_negara_penerima']) ?></div>
-        <div class="p-tipe-a val"><?= htmlspecialchars($data['tipe_nasabah']) ?></div>
+        <div class="p-negara-penerima val"><?= htmlspecialchars(trim($data['negara_penerima'] ?? '')) ?></div>
         <div class="p-status-a val"><?= htmlspecialchars($data['status_nasabah']) ?></div>
         <div class="p-kw-a val"><?= htmlspecialchars($data['kewarganegaraan_penerima']) ?></div>
 
