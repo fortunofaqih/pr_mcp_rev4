@@ -44,6 +44,17 @@ while ($r = mysqli_fetch_assoc($res_mobil)) {
     $list_mobil[] = $r;
 }
 
+// 4b. AMBIL MASTER BARANG AKTIF untuk dropdown nama barang (Select2)
+$sql_barang = "SELECT id_barang, nama_barang, merk, satuan 
+               FROM master_barang 
+               WHERE status_aktif = 'AKTIF' 
+               ORDER BY nama_barang ASC";
+$res_barang = mysqli_query($koneksi, $sql_barang);
+$list_barang = [];
+while ($r = mysqli_fetch_assoc($res_barang)) {
+    $list_barang[] = $r;
+}
+
 // 5. BANGUN SQL FILTER
 $filter_sql = " WHERE 1=1 ";
 if ($abjad_filter != '' && $abjad_filter != 'ALL') {
@@ -98,6 +109,9 @@ if ($filter_petugas > 0) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Flatpickr Date Picker -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <!-- Select2 -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
     <style>
         :root { --mcp-blue: #0000FF; }
         body { background-color: #f8f9fa; font-family: 'Inter', sans-serif; font-size: 0.82rem; }
@@ -116,10 +130,26 @@ if ($filter_petugas > 0) {
 
         /* Info mobil terpilih di modal */
         #info_mobil_terpilih { font-size: 10px; color: #555; min-height: 14px; }
+        /* Info barang terpilih di modal */
+        #info_barang_terpilih { font-size: 10px; color: #555; min-height: 14px; }
 
         /* Styling Flatpickr */
         .flatpickr-input { font-family: 'Inter', sans-serif; }
         .flatpickr-calendar { box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important; }
+
+        /* Styling Select2 agar cocok dengan ukuran form-sm Bootstrap */
+        .select2-container--bootstrap-5 .select2-selection--single {
+            min-height: calc(1.5em + 0.5rem + 2px);
+            padding: 0.25rem 0.5rem;
+            font-size: 0.82rem;
+        }
+        .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+            line-height: 1.5;
+            padding-left: 0;
+        }
+        .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
+            height: 100%;
+        }
 
         /* CSS untuk Cetak */
         @media print {
@@ -397,8 +427,25 @@ if ($filter_petugas > 0) {
                             <input type="date" name="tgl_beli_barang" id="edit_tgl" class="form-control form-control-sm border-primary" required>
                         </div>
                         <div class="col-md-8">
-                            <label class="small fw-bold">NAMA BARANG</label>
-                            <input type="text" name="nama_barang" id="edit_barang" class="form-control form-control-sm fw-bold text-uppercase" readonly>
+                            <label class="small fw-bold">
+                                NAMA BARANG <span class="text-danger">*</span>
+                                <small class="text-muted fw-normal">(ketik untuk mencari)</small>
+                            </label>
+                            <select name="nama_barang" id="edit_barang" 
+                                    class="form-select form-select-sm fw-bold text-uppercase" required>
+                                <option value="">— Cari / Pilih Barang —</option>
+                                <?php foreach ($list_barang as $b): ?>
+                                    <option value="<?= htmlspecialchars($b['nama_barang']) ?>"
+                                            data-merk="<?= htmlspecialchars($b['merk'] ?? '') ?>"
+                                            data-satuan="<?= htmlspecialchars($b['satuan'] ?? '') ?>">
+                                        <?= htmlspecialchars($b['nama_barang']) ?>
+                                        <?php if (!empty($b['merk']) && strtoupper(trim($b['merk'])) !== strtoupper(trim($b['nama_barang']))): ?>
+                                            — <?= htmlspecialchars($b['merk']) ?>
+                                        <?php endif; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div id="info_barang_terpilih" class="mt-1"></div>
                         </div>
                     </div>
 
@@ -552,6 +599,8 @@ foreach ($data_tampil as $row) {
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <!-- Flatpickr JS -->
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<!-- Select2 JS -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 // ── Setup Flatpickr Date Pickers ────────────────────────
 // FIX: Gunakan format manual YYYY-MM-DD tanpa .toISOString() untuk menghindari timezone conversion
@@ -610,6 +659,17 @@ function updateInfoMobil(opt) {
     }
 }
 
+// ── Helper: tampilkan info barang terpilih (merk + satuan) ──
+function updateInfoBarang(opt) {
+    var info = $('#info_barang_terpilih');
+    var merk   = opt.data('merk')   || '';
+    var satuan = opt.data('satuan') || '';
+    var parts  = [];
+    if (satuan) parts.push('<i class="fas fa-box me-1"></i>Satuan: <b>' + satuan + '</b>');
+    if (merk)   parts.push('<i class="fas fa-tag me-1"></i>Merk Master: <b>' + merk + '</b>');
+    info.html(parts.length ? parts.join(' &nbsp;|&nbsp; ') : '');
+}
+
 function aksiRetur(id, barang, qty, supplier) {
     let msg = `RETUR BARANG?\n--------------------------\nBarang : ${barang}\nQty    : ${qty}\nToko   : ${supplier}\n--------------------------\nMasukkan alasan retur:`;
     let alasan = prompt(msg);
@@ -625,13 +685,43 @@ $(document).ready(function() {
         $(this).toggleClass('select-petugas-aktif', $(this).val() > 0);
     });
 
+    // ── Init Select2 untuk NAMA BARANG ───────────────────
+    $('#edit_barang').select2({
+        theme: 'bootstrap-5',
+        dropdownParent: $('#modalEditBeli'),  // PENTING: agar dropdown muncul di dalam modal
+        placeholder: '— Cari / Pilih Barang —',
+        allowClear: true,
+        width: '100%',
+        language: {
+            noResults: function() { return "Barang tidak ditemukan"; },
+            searching: function() { return "Mencari..."; }
+        }
+    });
+
+    // Auto-fill merk & info saat barang dipilih
+    $('#edit_barang').on('change', function() {
+        var opt = $(this).find('option:selected');
+        var merk   = opt.data('merk')   || '';
+        var satuan = opt.data('satuan') || '';
+
+        if (merk) $('#edit_merk').val(merk);
+        updateInfoBarang(opt);
+    });
+
   // ── Buka modal edit ──────────────────────────────────────
 	$(document).on('click', '.btn-edit', function() {
 		var d = $(this).data();
 
 		$('#edit_id').val(d.id);
 		$('#edit_tgl').val(d.tgl);
-		$('#edit_barang').val(d.barang);
+
+		// — Bagian Nama Barang (Select2) —
+		// Jika nama barang TIDAK ada di master (data lama/manual), tambahkan opsi sementara
+		if ($('#edit_barang option[value="' + d.barang + '"]').length === 0) {
+			$('#edit_barang').append(new Option(d.barang, d.barang, true, true));
+		}
+		$('#edit_barang').val(d.barang).trigger('change');
+
 		$('#edit_merk').val(d.merk);
 		$('#edit_supplier').val(d.supplier);
 		$('#edit_qty').val(d.qty);
@@ -641,7 +731,6 @@ $(document).ready(function() {
 		$('#edit_ket').val(d.ket);
 
 		// --- TAMBAHAN UNTUK PETUGAS PEMBELIAN ---
-		
 		$('#edit_id_user_beli').val(d.idUserBeli).trigger('change'); 
 
 		// — Bagian Plat Nomor (Versi Perbaikan) —
@@ -679,6 +768,13 @@ $(document).ready(function() {
             $('#edit_driver').val(opt.data('driver'));
         }
         updateInfoMobil(opt);
+    });
+
+    // — Reset Select2 & info saat modal ditutup —
+    $('#modalEditBeli').on('hidden.bs.modal', function() {
+        $('#edit_barang').val(null).trigger('change');
+        $('#info_barang_terpilih').html('');
+        $('#info_mobil_terpilih').html('');
     });
 
        // — Hitung Otomatis di Modal Edit —

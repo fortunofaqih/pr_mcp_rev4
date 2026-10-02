@@ -15,25 +15,31 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // Ambil input
-$username      = mysqli_real_escape_string($koneksi, $_POST['username']);
-$password      = $_POST['password'];
-$login_sebagai = mysqli_real_escape_string($koneksi, $_POST['login_sebagai']);
+$username      = $_POST['username'] ?? '';
+$password      = $_POST['password'] ?? '';
+$login_sebagai = $_POST['login_sebagai'] ?? '';
 
-// Validasi: pastikan nilai login_sebagai adalah role yang valid
+// Validasi role yang valid
 $role_valid = ['administrator', 'manager', 'admin_gudang', 'bagian_pembelian', 'pemesan_pr_besar', 'bagian_produksi', 'finance', 'it'];
 if (!in_array($login_sebagai, $role_valid)) {
     header("location:../login.php?pesan=gagal");
     exit();
 }
 
-// Query user
-$query = mysqli_query($koneksi,
-    "SELECT * FROM users WHERE username='$username' LIMIT 1"
-);
+// Gunakan Prepared Statement untuk mencegah SQL Injection & penanganan error
+$stmt = mysqli_prepare($koneksi, "SELECT * FROM users WHERE username = ? LIMIT 1");
 
-if (mysqli_num_rows($query) === 1) {
+if (!$stmt) {
+    die("Query Error: " . mysqli_error($koneksi));
+}
 
-    $data = mysqli_fetch_assoc($query);
+mysqli_stmt_bind_param($stmt, "s", $username);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result();
+
+if ($result && mysqli_num_rows($result) === 1) {
+
+    $data = mysqli_fetch_assoc($result);
 
     // Verifikasi password
     if (password_verify($password, $data['password'])) {
@@ -44,50 +50,35 @@ if (mysqli_num_rows($query) === 1) {
             exit();
         }
 
-        // ============================================================
-        // VALIDASI ROLE: Apakah user boleh login dengan role yang dipilih?
-        //
-        // Aturan:
-        // - Role asli user harus cocok DENGAN yang dipilih, KECUALI:
-        // - Jika user punya akses_gudang='Y', dia boleh pilih 'admin_gudang'
-        //   meski role aslinya bukan admin_gudang
-        // ============================================================
+        // VALIDASI ROLE
         $role_asli    = $data['role'];
         $akses_gudang = $data['akses_gudang']; // 'Y' atau 'N'
-
-        $boleh_login = false;
+        $boleh_login  = false;
 
         if ($login_sebagai === $role_asli) {
-            // Kasus normal: role yang dipilih = role asli akun
             $boleh_login = true;
-
         } elseif ($login_sebagai === 'admin_gudang' && $akses_gudang === 'Y') {
-            // Kasus khusus: user punya akses gudang tambahan
             $boleh_login = true;
-
         } elseif ($role_asli === 'administrator') {
-            // Administrator bisa masuk sebagai role apapun
             $boleh_login = true;
         }
-      
 
         if (!$boleh_login) {
             header("location:../login.php?pesan=akses_ditolak");
             exit();
         }
 
-        // ============================================================
-        // ANTI LOGIN GANDA: Generate session token unik
-        // ============================================================
+        // ANTI LOGIN GANDA: Update Session Token
         $session_token = bin2hex(random_bytes(32));
+        $stmt_update   = mysqli_prepare($koneksi, "UPDATE users SET session_token = ? WHERE id_user = ?");
+        
+        if ($stmt_update) {
+            mysqli_stmt_bind_param($stmt_update, "si", $session_token, $data['id_user']);
+            mysqli_stmt_execute($stmt_update);
+            mysqli_stmt_close($stmt_update);
+        }
 
-        mysqli_query($koneksi,
-            "UPDATE users SET session_token='$session_token' WHERE id_user='{$data['id_user']}'"
-        );
-
-        // ============================================================
         // SET SESSION
-        // ============================================================
         $_SESSION['id_user']       = $data['id_user'];
         $_SESSION['username']      = $data['username'];
         $_SESSION['nama']          = $data['nama_lengkap'];
@@ -98,22 +89,14 @@ if (mysqli_num_rows($query) === 1) {
         $_SESSION['status']        = 'login';
         $_SESSION['session_token'] = $session_token;
 
-        // ============================================================
-        // REDIRECT berdasarkan role yang DIPILIH
-        // ============================================================
+        // REDIRECT berdasarkan role
         if ($login_sebagai === 'administrator') {
             header("location:../modul/master/users.php");
-
-        } elseif ($login_sebagai === 'pemesan_pr_besar') {
-            header("location:../index.php");
-
         } elseif ($login_sebagai === 'finance') {
             header("location:../modul/finance/index.php");
-
         } elseif ($login_sebagai === 'it') {
             header("location:../modul/it_asset/index.php");
-
-        }else {
+        } else {
             header("location:../index.php");
         }
         exit();

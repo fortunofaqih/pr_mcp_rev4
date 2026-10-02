@@ -15,10 +15,28 @@ $tgl_beli_barang = mysqli_real_escape_string($koneksi, $_POST['tgl_beli_barang']
 $plat_raw   = $_POST['plat_nomor'] ?? '';
 $plat_nomor = strtoupper(mysqli_real_escape_string($koneksi, $plat_raw));
 
-$id_user_beli = (int)$_POST['id_user_beli']; 
+$id_user_beli = (int)($_POST['id_user_beli'] ?? 0); 
 $keterangan   = strtoupper(mysqli_real_escape_string($koneksi, $_POST['keterangan'] ?? ''));
 $merk_beli    = strtoupper(mysqli_real_escape_string($koneksi, $_POST['merk_beli'] ?? ''));
 $supplier     = strtoupper(mysqli_real_escape_string($koneksi, $_POST['supplier'] ?? ''));
+
+// ── VALIDASI DASAR (Celah #1) ─────────────────────────
+if ($id_pembelian <= 0) {
+    header("location:data_pembelian.php?pesan=edit_gagal&error=" . urlencode("ID pembelian tidak valid."));
+    exit;
+}
+if ($id_user_beli <= 0) {
+    header("location:data_pembelian.php?pesan=edit_gagal&error=" . urlencode("Petugas pembelian wajib dipilih."));
+    exit;
+}
+if (empty($nama_barang)) {
+    header("location:data_pembelian.php?pesan=edit_gagal&error=" . urlencode("Nama barang tidak boleh kosong."));
+    exit;
+}
+if ($qty_baru <= 0) {
+    header("location:data_pembelian.php?pesan=edit_gagal&error=" . urlencode("Qty harus lebih dari 0."));
+    exit;
+}
 
 // 2. Ambil Data Lama (Penting untuk netralisasi stok)
 $sql_old = "SELECT qty, alokasi_stok, nama_barang_beli, id_request_detail 
@@ -41,21 +59,28 @@ mysqli_begin_transaction($koneksi);
 
 try {
     // --- STEP A: NETRALISASI STOK LAMA ---
-   
-	if ($alokasi_lama == 'MASUK STOK') {
-		$q_m_old = mysqli_query($koneksi, "SELECT id_barang FROM master_barang WHERE nama_barang = '$nama_barang_lama' LIMIT 1");
-		if ($row_m_old = mysqli_fetch_assoc($q_m_old)) {
-			$id_b_old = $row_m_old['id_barang'];
+    if ($alokasi_lama == 'MASUK STOK') {
+        $q_m_old = mysqli_query($koneksi, "SELECT id_barang FROM master_barang WHERE nama_barang = '$nama_barang_lama' LIMIT 1");
+        if ($row_m_old = mysqli_fetch_assoc($q_m_old)) {
+            $id_b_old = $row_m_old['id_barang'];
         
-        // 1. Kembalikan angka stok di master
-			mysqli_query($koneksi, "UPDATE master_barang SET stok_akhir = stok_akhir - $qty_lama WHERE id_barang = $id_b_old");
+            // 1. Kembalikan angka stok di master
+            mysqli_query($koneksi, "UPDATE master_barang SET stok_akhir = stok_akhir - $qty_lama WHERE id_barang = $id_b_old");
         
-        // 2. PERBAIKAN: Hapus log lama dengan kriteria yang lebih luas (mencakup ID: xxx atau ID-BELI: xxx)
-        // Kita gunakan wildcard %ID%id_pembelian% agar semua format kena
-			$sql_del_log = "DELETE FROM tr_stok_log WHERE id_barang = '$id_b_old' AND keterangan LIKE '%ID% $id_pembelian%'"; 
-			mysqli_query($koneksi, $sql_del_log);
-		}
-	}
+            // 2. PERBAIKAN (Celah #2): Hapus log lama dengan pattern yang presisi
+            $sql_del_log = "DELETE FROM tr_stok_log 
+                            WHERE id_barang = '$id_b_old' 
+                            AND (
+                                keterangan LIKE '%ID: $id_pembelian |%'
+                                OR keterangan LIKE '%ID: $id_pembelian|%'
+                                OR keterangan LIKE '%ID-BELI: $id_pembelian |%'
+                                OR keterangan LIKE '%ID-BELI: $id_pembelian|%'
+                                OR keterangan LIKE '%ID: $id_pembelian'
+                                OR keterangan LIKE '%ID-BELI: $id_pembelian'
+                            )"; 
+            mysqli_query($koneksi, $sql_del_log);
+        }
+    }
 
     // --- Cari id_mobil berdasarkan plat_nomor terbaru ---
     $q_cari_id = mysqli_query($koneksi, "SELECT id_mobil FROM master_mobil WHERE plat_nomor = '$plat_nomor' LIMIT 1");
@@ -95,7 +120,7 @@ try {
                                 subtotal_estimasi = $subtotal,
                                 tipe_request = '$tipe_request',
                                 status_item = 'TERBELI',
-								keterangan   = '$keterangan',
+                                keterangan   = '$keterangan',
                                 is_dibeli = 1
                             WHERE id_detail = $id_req_detail";
         
@@ -105,21 +130,20 @@ try {
     }
 
     // --- STEP D: REKAYASA ULANG STOK BARU ---
-    // Jika alokasi baru adalah MASUK STOK, maka tambahkan ke master_barang terbaru
-	if ($alokasi_stok == 'MASUK STOK') {
-		$q_m_new = mysqli_query($koneksi, "SELECT id_barang FROM master_barang WHERE nama_barang = '$nama_barang' LIMIT 1");
-		if ($row_m_new = mysqli_fetch_assoc($q_m_new)) {
-			$id_b_new = $row_m_new['id_barang'];
+    if ($alokasi_stok == 'MASUK STOK') {
+        $q_m_new = mysqli_query($koneksi, "SELECT id_barang FROM master_barang WHERE nama_barang = '$nama_barang' LIMIT 1");
+        if ($row_m_new = mysqli_fetch_assoc($q_m_new)) {
+            $id_b_new = $row_m_new['id_barang'];
         
-			mysqli_query($koneksi, "UPDATE master_barang SET stok_akhir = stok_akhir + $qty_baru WHERE id_barang = $id_b_new");
+            mysqli_query($koneksi, "UPDATE master_barang SET stok_akhir = stok_akhir + $qty_baru WHERE id_barang = $id_b_new");
         
-        // Gunakan format keterangan yang konsisten agar mudah dihapus di kemudian hari
-        $ket_log_baru = "MASUK DARI PEMBELIAN (EDIT) | ID-BELI: $id_pembelian";
-        $sql_ins_log = "INSERT INTO tr_stok_log (id_barang, tgl_log, qty, tipe_transaksi, keterangan) 
-                        VALUES ($id_b_new, '$tgl_beli_barang " . date('H:i:s') . "', $qty_baru, 'MASUK', '$ket_log_baru')";
-			mysqli_query($koneksi, $sql_ins_log);
-		}
-	}
+            // Gunakan format keterangan yang konsisten agar mudah dihapus di kemudian hari
+            $ket_log_baru = "MASUK DARI PEMBELIAN (EDIT) | ID-BELI: $id_pembelian";
+            $sql_ins_log = "INSERT INTO tr_stok_log (id_barang, tgl_log, qty, tipe_transaksi, keterangan) 
+                            VALUES ($id_b_new, '$tgl_beli_barang " . date('H:i:s') . "', $qty_baru, 'MASUK', '$ket_log_baru')";
+            mysqli_query($koneksi, $sql_ins_log);
+        }
+    }
 
     // Jika semua OK, simpan permanen
     mysqli_commit($koneksi);
