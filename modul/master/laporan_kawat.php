@@ -25,9 +25,6 @@ $pakaiRentang = ($startDate !== '' && $endDate !== '');
 
 if ($pakaiRentang) {
 
-    /* ---------- Mode Rentang Tanggal ---------- */
-
-    // Validasi format sederhana
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $startDate) ||
         !preg_match('/^\d{4}-\d{2}-\d{2}$/', $endDate)) {
 
@@ -37,7 +34,6 @@ if ($pakaiRentang) {
 
 if ($pakaiRentang) {
 
-    // Pastikan start <= end
     if ($startDate > $endDate) {
         $tmp       = $startDate;
         $startDate = $endDate;
@@ -53,8 +49,6 @@ if ($pakaiRentang) {
                      . date('Ymd', strtotime($endDate));
 
 } else {
-
-    /* ---------- Mode Bulan (backward compatible) ---------- */
 
     $bulan = isset($_GET['bulan'])
         ? max(1, min(12, (int)$_GET['bulan']))
@@ -134,6 +128,7 @@ header("Expires: 0");
 /* =========================================================
    QUERY DETAIL MUTASI
    Hanya transaksi AKTIF
+   (tetap mengikuti filter periode)
    ========================================================= */
 
 $sqlDetail = "
@@ -201,10 +196,6 @@ $stmtDetail->bind_param($typesDetail, ...$paramsDetail);
 $stmtDetail->execute();
 $resultDetail = $stmtDetail->get_result();
 
-/* =========================================================
-   BUFFER DETAIL UNTUK ROWSPAN PER UKURAN
-   ========================================================= */
-
 $detailRows = [];
 
 while ($row = $resultDetail->fetch_assoc()) {
@@ -227,6 +218,8 @@ $ukuranSudahTampil = [];
 
 /* =========================================================
    QUERY REKAP PER UKURAN
+   — LINTAS BULAN (tidak terpengaruh filter periode)
+   — Stok Bekas = Total Return Bekas − Total Rombeng
    ========================================================= */
 
 $sqlRekap = "
@@ -234,104 +227,60 @@ $sqlRekap = "
         k.id_kawat,
         k.ukuran,
 
-        COALESCE(
-            SUM(
-                CASE
-                    WHEN " . ($pakaiRentang
-                        ? "t.tanggal BETWEEN ? AND ?"
-                        : "MONTH(t.tanggal) = ? AND YEAR(t.tanggal) = ?") . "
-                     AND t.status_transaksi = 'AKTIF'
-                     AND t.jenis_mutasi = 'PEMBELIAN'
-                    THEN t.qty_kg
-                    ELSE 0
-                END
-            ),
-            0
-        ) AS pembelian,
+        COALESCE(SUM(CASE
+            WHEN t.status_transaksi = 'AKTIF'
+             AND t.jenis_mutasi = 'PEMBELIAN'
+            THEN t.qty_kg ELSE 0 END), 0) AS total_beli,
 
-        COALESCE(
-            SUM(
-                CASE
-                    WHEN " . ($pakaiRentang
-                        ? "t.tanggal BETWEEN ? AND ?"
-                        : "MONTH(t.tanggal) = ? AND YEAR(t.tanggal) = ?") . "
-                     AND t.status_transaksi = 'AKTIF'
-                     AND t.jenis_mutasi = 'RETURN_BEKAS'
-                    THEN t.qty_kg
-                    ELSE 0
-                END
-            ),
-            0
-        ) AS return_bekas,
+        COALESCE(SUM(CASE
+            WHEN t.status_transaksi = 'AKTIF'
+             AND t.jenis_mutasi = 'RETURN_BEKAS'
+            THEN t.qty_kg ELSE 0 END), 0) AS total_bekas,
 
-        COALESCE(
-            SUM(
-                CASE
-                    WHEN " . ($pakaiRentang
-                        ? "t.tanggal BETWEEN ? AND ?"
-                        : "MONTH(t.tanggal) = ? AND YEAR(t.tanggal) = ?") . "
-                     AND t.status_transaksi = 'AKTIF'
-                     AND t.jenis_mutasi = 'ROMBENG'
-                    THEN t.qty_kg
-                    ELSE 0
-                END
-            ),
-            0
-        ) AS rombeng,
-
-        COALESCE(
-            SUM(
-                CASE
-                    WHEN t.status_transaksi = 'AKTIF'
-                     AND t.kondisi = 'BARU'
-                     AND t.arah = 'IN'
-                    THEN t.qty_kg
-
-                    WHEN t.status_transaksi = 'AKTIF'
-                     AND t.kondisi = 'BARU'
-                     AND t.arah = 'OUT'
-                    THEN -t.qty_kg
-
-                    ELSE 0
-                END
-            ),
-            0
-        ) AS stok_baru_akhir,
-
-        COALESCE(
-            SUM(
-                CASE
-                    WHEN t.status_transaksi = 'AKTIF'
-                     AND t.kondisi = 'BEKAS'
-                     AND t.arah = 'IN'
-                    THEN t.qty_kg
-
-                    WHEN t.status_transaksi = 'AKTIF'
-                     AND t.kondisi = 'BEKAS'
-                     AND t.arah = 'OUT'
-                    THEN -t.qty_kg
-
-                    ELSE 0
-                END
-            ),
-            0
-        ) AS stok_bekas_akhir,
+        COALESCE(SUM(CASE
+            WHEN t.status_transaksi = 'AKTIF'
+             AND t.jenis_mutasi = 'ROMBENG'
+            THEN t.qty_kg ELSE 0 END), 0) AS total_rombeng,
 
         (
-            SELECT MAX(t2.tanggal)
+            SELECT t2.tanggal
             FROM transaksi_kawat t2
             WHERE t2.id_kawat = k.id_kawat
               AND t2.status_transaksi = 'AKTIF'
               AND t2.jenis_mutasi = 'PEMBELIAN'
+            ORDER BY t2.tanggal DESC, t2.id_transaksi DESC
+            LIMIT 1
         ) AS tgl_beli_terakhir,
 
         (
-            SELECT MAX(t3.tanggal)
+            SELECT t2.qty_kg
+            FROM transaksi_kawat t2
+            WHERE t2.id_kawat = k.id_kawat
+              AND t2.status_transaksi = 'AKTIF'
+              AND t2.jenis_mutasi = 'PEMBELIAN'
+            ORDER BY t2.tanggal DESC, t2.id_transaksi DESC
+            LIMIT 1
+        ) AS qty_beli_terakhir,
+
+        (
+            SELECT t3.tanggal
             FROM transaksi_kawat t3
             WHERE t3.id_kawat = k.id_kawat
               AND t3.status_transaksi = 'AKTIF'
               AND t3.jenis_mutasi = 'RETURN_BEKAS'
-        ) AS tgl_bekas_terakhir
+            ORDER BY t3.tanggal DESC, t3.id_transaksi DESC
+            LIMIT 1
+        ) AS tgl_bekas_terakhir,
+
+        (
+            SELECT t3.qty_kg
+            FROM transaksi_kawat t3
+            WHERE t3.id_kawat = k.id_kawat
+              AND t3.status_transaksi = 'AKTIF'
+              AND t3.jenis_mutasi = 'RETURN_BEKAS'
+            ORDER BY t3.tanggal DESC, t3.id_transaksi DESC
+            LIMIT 1
+        ) AS qty_bekas_terakhir
 
     FROM master_kawat k
 
@@ -352,57 +301,22 @@ $sqlRekap .= "
         k.ukuran ASC
 ";
 
-/* ---------------------------------------------------------
-   Susun parameter rekap secara dinamis (urutan sesuai '?')
-   --------------------------------------------------------- */
-
 $paramsRekap = [];
 $typesRekap  = '';
 
-// Blok 1: Pembelian
-if ($pakaiRentang) {
-    $paramsRekap[] = $startDate;
-    $paramsRekap[] = $endDate;
-    $typesRekap   .= 'ss';
-} else {
-    $paramsRekap[] = $bulan;
-    $paramsRekap[] = $tahun;
-    $typesRekap   .= 'ii';
-}
-
-// Blok 2: Return Bekas
-if ($pakaiRentang) {
-    $paramsRekap[] = $startDate;
-    $paramsRekap[] = $endDate;
-    $typesRekap   .= 'ss';
-} else {
-    $paramsRekap[] = $bulan;
-    $paramsRekap[] = $tahun;
-    $typesRekap   .= 'ii';
-}
-
-// Blok 3: Rombeng
-if ($pakaiRentang) {
-    $paramsRekap[] = $startDate;
-    $paramsRekap[] = $endDate;
-    $typesRekap   .= 'ss';
-} else {
-    $paramsRekap[] = $bulan;
-    $paramsRekap[] = $tahun;
-    $typesRekap   .= 'ii';
-}
-
-// Filter ukuran (opsional)
 if ($idKawatFilter > 0) {
     $paramsRekap[] = $idKawatFilter;
     $typesRekap   .= 'i';
 }
 
 $stmtRekap = $koneksi->prepare($sqlRekap);
-$stmtRekap->bind_param($typesRekap, ...$paramsRekap);
+
+if ($paramsRekap) {
+    $stmtRekap->bind_param($typesRekap, ...$paramsRekap);
+}
+
 $stmtRekap->execute();
 $resultRekap = $stmtRekap->get_result();
-
 /* =========================================================
    HELPERS
    ========================================================= */
@@ -426,6 +340,25 @@ function labelJenis($j)
         'ADJUSTMENT_MASUK'  => 'Adjustment Masuk',
         'ADJUSTMENT_KELUAR' => 'Adjustment Keluar'
     ][$j] ?? $j;
+}
+
+/**
+ * Format kolom "tanggal = qty KG".
+ * Contoh: 02/10/2026 = 1.00 KG
+ * Kalau tanggal kosong / qty 0 → tampil 0 KG.
+ */
+function formatTanggalQty($tanggal, $qtyKg)
+{
+    $qty = (float)$qtyKg;
+
+    if (!$tanggal || $qty <= 0) {
+        return '0 KG';
+    }
+
+    return date('d/m/Y', strtotime($tanggal))
+         . ' = '
+         . number_format($qty, 2, '.', '')
+         . ' KG';
 }
 ?>
 <html>
@@ -479,40 +412,16 @@ body {
     vertical-align: middle;
 }
 
-.text-center {
-    text-align: center;
-}
+.text-center { text-align: center; }
+.text-right  { text-align: right; }
+.text-left   { text-align: left; }
+.bold        { font-weight: bold; }
 
-.text-right {
-    text-align: right;
-}
+.in  { color: #008000; font-weight: bold; }
+.out { color: #c00000; font-weight: bold; }
 
-.text-left {
-    text-align: left;
-}
-
-.bold {
-    font-weight: bold;
-}
-
-.in {
-    color: #008000;
-    font-weight: bold;
-}
-
-.out {
-    color: #c00000;
-    font-weight: bold;
-}
-
-
-.bg-even {
-    background: #f9f9f9;
-}
-
-.bg-odd {
-    background: #ffffff;
-}
+.bg-even { background: #f9f9f9; }
+.bg-odd  { background: #ffffff; }
 
 .info-table {
     border-collapse: collapse;
@@ -547,7 +456,8 @@ body {
 </div>
 
 <div class="sub-note">
-    Kolom tanggal menampilkan transaksi terakhir lintas bulan
+    Rekap Per Ukuran menampilkan kondisi keseluruhan saat ini (lintas bulan).
+    Detail Mutasi mengikuti periode filter.
 </div>
 
 <br>
@@ -558,7 +468,7 @@ body {
      ===================================================== -->
 
 <div class="bold">
-    REKAP PER UKURAN
+    REKAP PER UKURAN (KONDISI SAAT INI)
 </div>
 
 <table class="table-data">
@@ -569,8 +479,8 @@ body {
 
     <th>No</th>
     <th>Ukuran</th>
-    <th>Pembelian</th>
-    <th>Kembali Bekas</th>
+    <th>Total Beli</th>
+    <th>Total Bekas</th>
     <th>Rombeng</th>
     <th>Tgl Beli Terakhir</th>
     <th>Tgl Bekas Kembali Terakhir</th>
@@ -588,15 +498,22 @@ $noRekap = 1;
 
 while ($r = $resultRekap->fetch_assoc()):
 
-    $stokBekas = (float)$r['stok_bekas_akhir'];
+    $totalBeli    = (float)$r['total_beli'];
+    $totalBekas   = (float)$r['total_bekas'];
+    $totalRombeng = (float)$r['total_rombeng'];
 
-    $tglBeli = $r['tgl_beli_terakhir']
-        ? date('d/m/Y', strtotime($r['tgl_beli_terakhir']))
-        : '-';
+    // Stok bekas = total kembali bekas − total rombeng
+    $stokBekas = $totalBekas - $totalRombeng;
 
-    $tglBekas = $r['tgl_bekas_terakhir']
-        ? date('d/m/Y', strtotime($r['tgl_bekas_terakhir']))
-        : '-';
+    $tglBeliTampil = formatTanggalQty(
+        $r['tgl_beli_terakhir'],
+        $r['qty_beli_terakhir']
+    );
+
+    $tglBekasTampil = formatTanggalQty(
+        $r['tgl_bekas_terakhir'],
+        $r['qty_bekas_terakhir']
+    );
 ?>
 
 <tr>
@@ -610,27 +527,27 @@ while ($r = $resultRekap->fetch_assoc()):
     </td>
 
     <td class="text-right">
-        <?= number_format((float)$r['pembelian'], 2) ?>
+        <?= number_format($totalBeli, 2, '.', '') ?>
     </td>
 
     <td class="text-right">
-        <?= number_format((float)$r['return_bekas'], 2) ?>
+        <?= number_format($totalBekas, 2, '.', '') ?>
     </td>
 
     <td class="text-right">
-        <?= number_format((float)$r['rombeng'], 2) ?>
+        <?= number_format($totalRombeng, 2, '.', '') ?>
     </td>
 
     <td class="text-center">
-        <?= h($tglBeli) ?>
+        <?= h($tglBeliTampil) ?>
     </td>
 
     <td class="text-center">
-        <?= h($tglBekas) ?>
+        <?= h($tglBekasTampil) ?>
     </td>
 
-    <td class="text-right">
-        <?= number_format($stokBekas, 2) ?>
+    <td class="text-right bold">
+        <?= number_format($stokBekas, 2, '.', '') ?>
     </td>
 
 </tr>
@@ -651,6 +568,10 @@ while ($r = $resultRekap->fetch_assoc()):
 
 <div class="bold">
     DETAIL MUTASI
+</div>
+
+<div class="sub-note" style="text-align:left;margin-bottom:4px;">
+    Menampilkan transaksi dalam periode <?= h($periodeLabel) ?> saja.
 </div>
 
 <table class="table-data">
@@ -681,7 +602,8 @@ while ($r = $resultRekap->fetch_assoc()):
 
 <?php
 
-$noDetail = 1;
+$noDetail = 0;
+$lastIdKawat = null;
 
 if (count($detailRows) > 0):
 
@@ -692,6 +614,14 @@ if (count($detailRows) > 0):
 
         if ($tampilkanUkuran) {
             $ukuranSudahTampil[$idKawat] = true;
+        }
+
+        // Reset nomor setiap ganti ukuran
+        if ($lastIdKawat !== $idKawat) {
+            $noDetail = 1;
+            $lastIdKawat = $idKawat;
+        } else {
+            $noDetail++;
         }
 
         $rowClass =
@@ -734,7 +664,7 @@ if (count($detailRows) > 0):
     <td class="text-right in">
 
         <?= $r['arah'] === 'IN'
-            ? number_format((float)$r['qty_kg'], 2)
+            ? number_format((float)$r['qty_kg'], 2, '.', '')
             : '-'
         ?>
 
@@ -743,14 +673,14 @@ if (count($detailRows) > 0):
     <td class="text-right out">
 
         <?= $r['arah'] === 'OUT'
-            ? number_format((float)$r['qty_kg'], 2)
+            ? number_format((float)$r['qty_kg'], 2, '.', '')
             : '-'
         ?>
 
     </td>
 
     <td class="text-right">
-        <?= number_format((float)$r['qty_asal'], 4) ?>
+        <?= number_format((float)$r['qty_asal'], 4, '.', '') ?>
     </td>
 
     <td class="text-center">
@@ -772,8 +702,6 @@ if (count($detailRows) > 0):
 </tr>
 
 <?php
-
-        $noDetail++;
 
     endforeach;
 
