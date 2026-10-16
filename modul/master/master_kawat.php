@@ -702,12 +702,17 @@ body {
                     Input Mutasi
                 </a>
 
-                <a
-                    class="btn btn-success btn-sm"
-                    href="laporan_kawat.php?bulan=<?= date('m') ?>&tahun=<?= date('Y') ?>"
-                >
+               <a class="btn btn-success btn-sm"
+                href="laporan_kawat.php?start_date=<?= h($startDate) ?>&end_date=<?= h($endDate) ?>">
                     <i class="fas fa-file-excel me-1"></i>
                     Excel
+                </a>
+
+                <a class="btn btn-danger btn-sm"
+                href="cetak_laporan_kawat.php?start_date=<?= h($startDate) ?>&end_date=<?= h($endDate) ?>"
+                target="_blank">
+                    <i class="fas fa-print me-1"></i>
+                    Cetak PDF
                 </a>
 
                 <a
@@ -779,9 +784,11 @@ body {
 
 
         <!-- KPI -->
+             
+               <!-- KPI -->
         <div class="row g-3 mb-4">
 
-            <div class="col-md-3">
+            <div class="col-md-4">
 
                 <div class="stat">
 
@@ -803,7 +810,7 @@ body {
             </div>
 
 
-            <div class="col-md-3">
+            <div class="col-md-4">
 
                 <div class="stat">
 
@@ -825,46 +832,45 @@ body {
             </div>
 
 
-            <div class="col-md-3">
+            <div class="col-md-4">
 
                 <div class="stat">
 
                     <?php
-                    $totalFisik =
-                        (float)($tot['stok_baru'] ?? 0) +
-                        (float)($tot['stok_bekas'] ?? 0);
+                    $stokBaru   = (float)($tot['stok_baru'] ?? 0);
+                    $stokBekas  = (float)($tot['stok_bekas'] ?? 0);
+                    $selisih    = $stokBaru - $stokBekas;
+
+                    if ($selisih > 0.000001) {
+                        $warnaSelisih = 'text-success';
+                        $tandaSelisih = '+';
+                    } elseif ($selisih < -0.000001) {
+                        $warnaSelisih = 'text-danger';
+                        $tandaSelisih = '-';
+                    } else {
+                        $warnaSelisih = 'text-secondary';
+                        $tandaSelisih = '';
+                    }
                     ?>
 
-                    <div class="n">
-                        <?= number_format($totalFisik, 2) ?> KG
+                    <div class="n <?= $warnaSelisih ?>">
+                        <?= $tandaSelisih ?>
+                        <?= number_format(abs($selisih), 2) ?> KG
                     </div>
 
                     <div class="l">
-                        Total Semua Kawat
-                        (Baru + Bekas)
+                        Selisih Baru vs Bekas
                     </div>
 
                     <div class="small-muted">
-                        <?= number_format($totalFisik * 10, 2) ?> ONS
+                        <?php if ($selisih > 0.000001): ?>
+                            Kawat baru lebih banyak
+                        <?php elseif ($selisih < -0.000001): ?>
+                            Kawat bekas lebih banyak
+                        <?php else: ?>
+                            Stok baru & bekas seimbang
+                        <?php endif; ?>
                     </div>
-
-                </div>
-
-            </div>
-
-
-            <div class="col-md-3">
-
-                <div class="stat">
-
-                    <div class="n">
-                        <?= number_format((int)($tot['transaksi_aktif'] ?? 0)) ?>
-                    </div>
-
-                    <div class="l">
-                        Transaksi Aktif
-                    </div>
-
 
                 </div>
 

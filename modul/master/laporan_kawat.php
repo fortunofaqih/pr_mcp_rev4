@@ -15,35 +15,77 @@ kawat_sync_master_barang($koneksi, $user);
 kawat_sync_pembelian($koneksi, $user);
 
 /* =========================================================
-   FILTER
+   FILTER — MODE BULAN atau MODE RENTANG TANGGAL
    ========================================================= */
 
-$bulan = isset($_GET['bulan'])
-    ? max(1, min(12, (int)$_GET['bulan']))
-    : (int)date('m');
+$startDate = isset($_GET['start_date']) ? trim($_GET['start_date']) : '';
+$endDate   = isset($_GET['end_date'])   ? trim($_GET['end_date'])   : '';
 
-$tahun = isset($_GET['tahun'])
-    ? (int)$_GET['tahun']
-    : (int)date('Y');
+$pakaiRentang = ($startDate !== '' && $endDate !== '');
+
+if ($pakaiRentang) {
+
+    /* ---------- Mode Rentang Tanggal ---------- */
+
+    // Validasi format sederhana
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $startDate) ||
+        !preg_match('/^\d{4}-\d{2}-\d{2}$/', $endDate)) {
+
+        $pakaiRentang = false;
+    }
+}
+
+if ($pakaiRentang) {
+
+    // Pastikan start <= end
+    if ($startDate > $endDate) {
+        $tmp       = $startDate;
+        $startDate = $endDate;
+        $endDate   = $tmp;
+    }
+
+    $periodeLabel = date('d/m/Y', strtotime($startDate))
+                  . ' s/d '
+                  . date('d/m/Y', strtotime($endDate));
+
+    $namaFilePeriode = date('Ymd', strtotime($startDate))
+                     . '_'
+                     . date('Ymd', strtotime($endDate));
+
+} else {
+
+    /* ---------- Mode Bulan (backward compatible) ---------- */
+
+    $bulan = isset($_GET['bulan'])
+        ? max(1, min(12, (int)$_GET['bulan']))
+        : (int)date('m');
+
+    $tahun = isset($_GET['tahun'])
+        ? (int)$_GET['tahun']
+        : (int)date('Y');
+
+    $namaBulan = [
+        1  => 'Januari',
+        2  => 'Februari',
+        3  => 'Maret',
+        4  => 'April',
+        5  => 'Mei',
+        6  => 'Juni',
+        7  => 'Juli',
+        8  => 'Agustus',
+        9  => 'September',
+        10 => 'Oktober',
+        11 => 'November',
+        12 => 'Desember'
+    ][$bulan];
+
+    $periodeLabel = $namaBulan . ' ' . $tahun;
+    $namaFilePeriode = $namaBulan . '_' . $tahun;
+}
 
 $idKawatFilter = isset($_GET['id_kawat'])
     ? (int)$_GET['id_kawat']
     : 0;
-
-$namaBulan = [
-    1  => 'Januari',
-    2  => 'Februari',
-    3  => 'Maret',
-    4  => 'April',
-    5  => 'Mei',
-    6  => 'Juni',
-    7  => 'Juli',
-    8  => 'Agustus',
-    9  => 'September',
-    10 => 'Oktober',
-    11 => 'November',
-    12 => 'Desember'
-][$bulan];
 
 /* =========================================================
    NAMA UKURAN FILTER
@@ -84,7 +126,7 @@ $namaFileUkuran = $idKawatFilter > 0
 header("Content-Type: application/vnd.ms-excel; charset=utf-8");
 header(
     "Content-Disposition: attachment; " .
-    "filename=Laporan_Mutasi_Kawat_{$namaBulan}_{$tahun}{$namaFileUkuran}.xls"
+    "filename=Laporan_Mutasi_Kawat_{$namaFilePeriode}{$namaFileUkuran}.xls"
 );
 header("Pragma: no-cache");
 header("Expires: 0");
@@ -120,13 +162,31 @@ $sqlDetail = "
         ON s.id_satuan = t.id_satuan_asal
 
     WHERE
-        MONTH(t.tanggal) = ?
-        AND YEAR(t.tanggal) = ?
-        AND t.status_transaksi = 'AKTIF'
+        t.status_transaksi = 'AKTIF'
 ";
+
+$paramsDetail = [];
+$typesDetail  = '';
+
+if ($pakaiRentang) {
+
+    $sqlDetail .= " AND t.tanggal BETWEEN ? AND ? ";
+    $paramsDetail[] = $startDate;
+    $paramsDetail[] = $endDate;
+    $typesDetail   .= 'ss';
+
+} else {
+
+    $sqlDetail .= " AND MONTH(t.tanggal) = ? AND YEAR(t.tanggal) = ? ";
+    $paramsDetail[] = $bulan;
+    $paramsDetail[] = $tahun;
+    $typesDetail   .= 'ii';
+}
 
 if ($idKawatFilter > 0) {
     $sqlDetail .= " AND t.id_kawat = ? ";
+    $paramsDetail[] = $idKawatFilter;
+    $typesDetail   .= 'i';
 }
 
 $sqlDetail .= "
@@ -137,22 +197,7 @@ $sqlDetail .= "
 ";
 
 $stmtDetail = $koneksi->prepare($sqlDetail);
-
-if ($idKawatFilter > 0) {
-    $stmtDetail->bind_param(
-        "iii",
-        $bulan,
-        $tahun,
-        $idKawatFilter
-    );
-} else {
-    $stmtDetail->bind_param(
-        "ii",
-        $bulan,
-        $tahun
-    );
-}
-
+$stmtDetail->bind_param($typesDetail, ...$paramsDetail);
 $stmtDetail->execute();
 $resultDetail = $stmtDetail->get_result();
 
@@ -166,10 +211,6 @@ while ($row = $resultDetail->fetch_assoc()) {
     $detailRows[] = $row;
 }
 
-/*
- * Hitung jumlah baris per id_kawat.
- * Nilai ini dipakai untuk rowspan kolom Ukuran.
- */
 $rowspanUkuran = [];
 
 foreach ($detailRows as $row) {
@@ -196,8 +237,9 @@ $sqlRekap = "
         COALESCE(
             SUM(
                 CASE
-                    WHEN MONTH(t.tanggal) = ?
-                     AND YEAR(t.tanggal) = ?
+                    WHEN " . ($pakaiRentang
+                        ? "t.tanggal BETWEEN ? AND ?"
+                        : "MONTH(t.tanggal) = ? AND YEAR(t.tanggal) = ?") . "
                      AND t.status_transaksi = 'AKTIF'
                      AND t.jenis_mutasi = 'PEMBELIAN'
                     THEN t.qty_kg
@@ -210,22 +252,9 @@ $sqlRekap = "
         COALESCE(
             SUM(
                 CASE
-                    WHEN MONTH(t.tanggal) = ?
-                     AND YEAR(t.tanggal) = ?
-                     AND t.status_transaksi = 'AKTIF'
-                     AND t.jenis_mutasi = 'PEMAKAIAN'
-                    THEN t.qty_kg
-                    ELSE 0
-                END
-            ),
-            0
-        ) AS pemakaian,
-
-        COALESCE(
-            SUM(
-                CASE
-                    WHEN MONTH(t.tanggal) = ?
-                     AND YEAR(t.tanggal) = ?
+                    WHEN " . ($pakaiRentang
+                        ? "t.tanggal BETWEEN ? AND ?"
+                        : "MONTH(t.tanggal) = ? AND YEAR(t.tanggal) = ?") . "
                      AND t.status_transaksi = 'AKTIF'
                      AND t.jenis_mutasi = 'RETURN_BEKAS'
                     THEN t.qty_kg
@@ -238,8 +267,9 @@ $sqlRekap = "
         COALESCE(
             SUM(
                 CASE
-                    WHEN MONTH(t.tanggal) = ?
-                     AND YEAR(t.tanggal) = ?
+                    WHEN " . ($pakaiRentang
+                        ? "t.tanggal BETWEEN ? AND ?"
+                        : "MONTH(t.tanggal) = ? AND YEAR(t.tanggal) = ?") . "
                      AND t.status_transaksi = 'AKTIF'
                      AND t.jenis_mutasi = 'ROMBENG'
                     THEN t.qty_kg
@@ -285,7 +315,23 @@ $sqlRekap = "
                 END
             ),
             0
-        ) AS stok_bekas_akhir
+        ) AS stok_bekas_akhir,
+
+        (
+            SELECT MAX(t2.tanggal)
+            FROM transaksi_kawat t2
+            WHERE t2.id_kawat = k.id_kawat
+              AND t2.status_transaksi = 'AKTIF'
+              AND t2.jenis_mutasi = 'PEMBELIAN'
+        ) AS tgl_beli_terakhir,
+
+        (
+            SELECT MAX(t3.tanggal)
+            FROM transaksi_kawat t3
+            WHERE t3.id_kawat = k.id_kawat
+              AND t3.status_transaksi = 'AKTIF'
+              AND t3.jenis_mutasi = 'RETURN_BEKAS'
+        ) AS tgl_bekas_terakhir
 
     FROM master_kawat k
 
@@ -306,39 +352,54 @@ $sqlRekap .= "
         k.ukuran ASC
 ";
 
-$stmtRekap = $koneksi->prepare($sqlRekap);
+/* ---------------------------------------------------------
+   Susun parameter rekap secara dinamis (urutan sesuai '?')
+   --------------------------------------------------------- */
 
-if ($idKawatFilter > 0) {
+$paramsRekap = [];
+$typesRekap  = '';
 
-    $stmtRekap->bind_param(
-        "iiiiiiiii",
-        $bulan,
-        $tahun,
-        $bulan,
-        $tahun,
-        $bulan,
-        $tahun,
-        $bulan,
-        $tahun,
-        $idKawatFilter
-    );
-
+// Blok 1: Pembelian
+if ($pakaiRentang) {
+    $paramsRekap[] = $startDate;
+    $paramsRekap[] = $endDate;
+    $typesRekap   .= 'ss';
 } else {
-
-    $stmtRekap->bind_param(
-        "iiiiiiii",
-        $bulan,
-        $tahun,
-        $bulan,
-        $tahun,
-        $bulan,
-        $tahun,
-        $bulan,
-        $tahun
-    );
-
+    $paramsRekap[] = $bulan;
+    $paramsRekap[] = $tahun;
+    $typesRekap   .= 'ii';
 }
 
+// Blok 2: Return Bekas
+if ($pakaiRentang) {
+    $paramsRekap[] = $startDate;
+    $paramsRekap[] = $endDate;
+    $typesRekap   .= 'ss';
+} else {
+    $paramsRekap[] = $bulan;
+    $paramsRekap[] = $tahun;
+    $typesRekap   .= 'ii';
+}
+
+// Blok 3: Rombeng
+if ($pakaiRentang) {
+    $paramsRekap[] = $startDate;
+    $paramsRekap[] = $endDate;
+    $typesRekap   .= 'ss';
+} else {
+    $paramsRekap[] = $bulan;
+    $paramsRekap[] = $tahun;
+    $typesRekap   .= 'ii';
+}
+
+// Filter ukuran (opsional)
+if ($idKawatFilter > 0) {
+    $paramsRekap[] = $idKawatFilter;
+    $typesRekap   .= 'i';
+}
+
+$stmtRekap = $koneksi->prepare($sqlRekap);
+$stmtRekap->bind_param($typesRekap, ...$paramsRekap);
 $stmtRekap->execute();
 $resultRekap = $stmtRekap->get_result();
 
@@ -389,6 +450,13 @@ body {
 .sub {
     text-align: center;
     font-size: 12px;
+}
+
+.sub-note {
+    text-align: center;
+    font-size: 10px;
+    color: #555;
+    font-style: italic;
 }
 
 .table-data {
@@ -471,11 +539,15 @@ body {
 </div>
 
 <div class="sub">
-    Periode <?= h($namaBulan) ?> <?= (int)$tahun ?>
+    Periode <?= h($periodeLabel) ?>
 </div>
 
 <div class="sub">
     Ukuran: <?= h($ukuranFilterText) ?>
+</div>
+
+<div class="sub-note">
+    Kolom tanggal menampilkan transaksi terakhir lintas bulan
 </div>
 
 <br>
@@ -500,9 +572,9 @@ body {
     <th>Pembelian</th>
     <th>Kembali Bekas</th>
     <th>Rombeng</th>
-    <th>Dipakai</th>
+    <th>Tgl Beli Terakhir</th>
+    <th>Tgl Bekas Kembali Terakhir</th>
     <th>Stok Bekas Saat Ini</th>
-    <th>Total Keseluruhan</th>
 
 </tr>
 
@@ -516,9 +588,15 @@ $noRekap = 1;
 
 while ($r = $resultRekap->fetch_assoc()):
 
-    $stokBaru  = (float)$r['stok_baru_akhir'];
     $stokBekas = (float)$r['stok_bekas_akhir'];
-    $total     = $stokBaru + $stokBekas;
+
+    $tglBeli = $r['tgl_beli_terakhir']
+        ? date('d/m/Y', strtotime($r['tgl_beli_terakhir']))
+        : '-';
+
+    $tglBekas = $r['tgl_bekas_terakhir']
+        ? date('d/m/Y', strtotime($r['tgl_bekas_terakhir']))
+        : '-';
 ?>
 
 <tr>
@@ -543,16 +621,16 @@ while ($r = $resultRekap->fetch_assoc()):
         <?= number_format((float)$r['rombeng'], 2) ?>
     </td>
 
-    <td class="text-right">
-        <?= number_format($stokBaru, 2) ?>
+    <td class="text-center">
+        <?= h($tglBeli) ?>
+    </td>
+
+    <td class="text-center">
+        <?= h($tglBekas) ?>
     </td>
 
     <td class="text-right">
         <?= number_format($stokBekas, 2) ?>
-    </td>
-
-    <td class="text-right bold">
-        <?= number_format($total, 2) ?>
     </td>
 
 </tr>
