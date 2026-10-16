@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
-require_once __DIR__ . '/../../auth/check_session.php';
+//require_once __DIR__ . '/../../auth/check_session.php';
 // Helper tahan null
 function h($v) {
     return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');

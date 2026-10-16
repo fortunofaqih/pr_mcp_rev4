@@ -451,46 +451,56 @@ body {
             </div>
 
 
-            <div class="d-flex gap-2">
+           <div class="d-flex gap-2">
 
-                <a
-                    href="master_oli_list.php"
-                    class="btn btn-light btn-sm"
-                >
-                    Rekap Stok
-                </a>
+    <a
+        href="master_oli_list.php"
+        class="btn btn-light btn-sm"
+    >
+        Rekap Stok
+    </a>
 
-                <a
-                    href="tambah_riwayat_oli.php"
-                    class="btn btn-warning btn-sm"
-                >
-                    Input Mutasi
-                </a>
+    <a
+        href="tambah_riwayat_oli.php"
+        class="btn btn-warning btn-sm"
+    >
+        Input Mutasi
+    </a>
+       <a
+        href="laporan_oli_pdf.php?start_date=<?= h($startDate) ?>&end_date=<?= h($endDate) ?>&id_oli=<?= (int)$idOliFilter ?>&jenis=<?= h($jenisFilter) ?>"
+        target="_blank"
+        class="btn btn-danger btn-sm"
+    >
+        <i class="fas fa-file-pdf me-1"></i>
+        Cetak PDF
+    </a>
 
-                <a
-                    href="laporan_oli.php?bulan=<?= date('m') ?>&tahun=<?= date('Y') ?>"
-                    class="btn btn-success btn-sm"
-                >
-                    OLI Excel
-                </a>
-				
+    <a
+        href="laporan_oli.php?start_date=<?= h($startDate) ?>&end_date=<?= h($endDate) ?>&id_oli=<?= (int)$idOliFilter ?>&jenis=<?= h($jenisFilter) ?>"
+        class="btn btn-success btn-sm"
+    >
+        <i class="fas fa-file-excel me-1"></i>
+        Export Laporan Excel
+    </a>
 
-				<a
-					href="laporan_solar.php?bulan=<?= date('m') ?>&tahun=<?= date('Y') ?>"
-					class="btn btn-info btn-sm"
-				>
-					<i class="fas fa-gas-pump me-1"></i>
-					Solar Excel
-				</a>
+    <button
+        type="button"
+        class="btn btn-info btn-sm"
+        hidden
+        title="Fitur Solar Excel sementara dinonaktifkan"
+    >
+        <i class="fas fa-gas-pump me-1"></i>
+        Solar Excel
+    </button>
 
-                <a
-                    href="../../index.php"
-                    class="btn btn-outline-light btn-sm"
-                >
-                    Home
-                </a>
+    <a
+        href="../../index.php"
+        class="btn btn-outline-light btn-sm"
+    >
+        Home
+    </a>
 
-            </div>
+</div>
 
         </div>
 

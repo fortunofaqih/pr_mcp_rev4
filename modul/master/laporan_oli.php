@@ -16,35 +16,45 @@ $user = $_SESSION['username'] ?? 'system';
 oli_sync_master_barang($koneksi, $user);
 oli_sync_pembelian($koneksi, $user);
 
-$bulan =
-    isset($_GET['bulan'])
+/* =========================================================
+   FILTER
+   ========================================================= */
+
+$startDate = $_GET['start_date'] ?? '';
+$endDate   = $_GET['end_date']   ?? '';
+
+$bulan = isset($_GET['bulan'])
     ? max(1, min(12, (int)$_GET['bulan']))
     : (int)date('m');
 
-$tahun =
-    isset($_GET['tahun'])
+$tahun = isset($_GET['tahun'])
     ? (int)$_GET['tahun']
     : (int)date('Y');
 
-$idOliFilter =
-    isset($_GET['id_oli'])
+if ($startDate === '' || $endDate === '') {
+    $startDate = sprintf('%04d-%02d-01', $tahun, $bulan);
+    $endDate   = date('Y-m-t', strtotime($startDate));
+}
+
+if ($startDate > $endDate) {
+    [$startDate, $endDate] = [$endDate, $startDate];
+}
+
+$idOliFilter = isset($_GET['id_oli'])
     ? (int)$_GET['id_oli']
     : 0;
 
-$namaBulan = [
-    1=>'Januari',
-    2=>'Februari',
-    3=>'Maret',
-    4=>'April',
-    5=>'Mei',
-    6=>'Juni',
-    7=>'Juli',
-    8=>'Agustus',
-    9=>'September',
-    10=>'Oktober',
-    11=>'November',
-    12=>'Desember'
-][$bulan];
+$jenisFilter = isset($_GET['jenis'])
+    ? trim($_GET['jenis'])
+    : '';
+
+/* =========================================================
+   LABEL PERIODE & FILTER
+   ========================================================= */
+
+$periodeText = date('d/m/Y', strtotime($startDate))
+    . ' s/d '
+    . date('d/m/Y', strtotime($endDate));
 
 $filterText = 'Semua Oli';
 
@@ -54,19 +64,13 @@ if ($idOliFilter > 0) {
         SELECT nama_oli
         FROM master_oli
         WHERE id_oli = ?
+        LIMIT 1
     ");
 
-    $stmt->bind_param(
-        "i",
-        $idOliFilter
-    );
-
+    $stmt->bind_param("i", $idOliFilter);
     $stmt->execute();
 
-    $row =
-        $stmt
-            ->get_result()
-            ->fetch_assoc();
+    $row = $stmt->get_result()->fetch_assoc();
 
     if ($row) {
         $filterText = $row['nama_oli'];
@@ -75,25 +79,92 @@ if ($idOliFilter > 0) {
     $stmt->close();
 }
 
-// =========================================================
-// Tentukan rentang tanggal periode
-// =========================================================
-$tglAwal  = sprintf('%04d-%02d-01', $tahun, $bulan);
-$tglAkhir = date('Y-m-t', strtotime($tglAwal)); // tanggal terakhir bulan
+/* =========================================================
+   SALDO AKHIR PER OLI
+   ========================================================= */
+
+$saldoAkhirList = [];
+
+$sqlSaldo = "
+    SELECT
+        o.id_oli,
+        o.nama_oli,
+        COALESCE(SUM(
+            CASE
+                WHEN r.jenis_transaksi = 'MASUK'  THEN  r.jumlah
+                WHEN r.jenis_transaksi = 'KELUAR' THEN -r.jumlah
+                ELSE 0
+            END
+        ), 0) AS saldo_akhir
+    FROM master_oli o
+
+    LEFT JOIN riwayat_oli r
+        ON r.id_oli = o.id_oli
+       AND r.status_transaksi = 'AKTIF'
+       AND r.tanggal <= ?
+
+    GROUP BY
+        o.id_oli,
+        o.nama_oli
+
+    ORDER BY
+        o.nama_oli ASC
+";
+
+$stmtSaldo = $koneksi->prepare($sqlSaldo);
+$stmtSaldo->bind_param("s", $endDate);
+$stmtSaldo->execute();
+
+$resSaldo = $stmtSaldo->get_result();
+
+while ($row = $resSaldo->fetch_assoc()) {
+    $saldoAkhirList[] = $row;
+}
+
+$stmtSaldo->close();
+
+/* =========================================================
+   DOWNLOAD EXCEL
+   ========================================================= */
+
+$namaFile =
+    'Laporan_Oli_'
+    . date('Ymd', strtotime($startDate))
+    . '_'
+    . date('Ymd', strtotime($endDate))
+    . '.xls';
 
 header("Content-Type: application/vnd.ms-excel; charset=utf-8");
-
-header(
-    "Content-Disposition: attachment; " .
-    "filename=Laporan_Stok_Oli_{$namaBulan}_{$tahun}.xls"
-);
-
+header("Content-Disposition: attachment; filename={$namaFile}");
 header("Pragma: no-cache");
 header("Expires: 0");
 
-// =========================================================
-// Query transaksi periode terpilih
-// =========================================================
+/* =========================================================
+   QUERY TRANSAKSI SESUAI FILTER
+   ========================================================= */
+
+$where = [
+    "r.tanggal BETWEEN ? AND ?",
+    "r.status_transaksi = 'AKTIF'"
+];
+
+$params = [$startDate, $endDate];
+$types  = 'ss';
+
+if ($idOliFilter > 0) {
+    $where[]  = "r.id_oli = ?";
+    $params[] = $idOliFilter;
+    $types   .= 'i';
+}
+
+if ($jenisFilter !== '') {
+    $where[]  = "r.jenis_mutasi = ?";
+    $params[] = $jenisFilter;
+    $types   .= 's';
+}
+
+$whereSql = 'WHERE ' . implode(' AND ', $where);
+
 $sql = "
     SELECT
         r.*,
@@ -103,17 +174,8 @@ $sql = "
     JOIN master_oli o
         ON o.id_oli = r.id_oli
 
-    WHERE
-        MONTH(r.tanggal) = ?
-        AND YEAR(r.tanggal) = ?
-        AND r.status_transaksi = 'AKTIF'
-";
+    $whereSql
 
-if ($idOliFilter > 0) {
-    $sql .= " AND r.id_oli = ? ";
-}
-
-$sql .= "
     ORDER BY
         o.nama_oli ASC,
         r.tanggal ASC,
@@ -121,25 +183,7 @@ $sql .= "
 ";
 
 $stmt = $koneksi->prepare($sql);
-
-if ($idOliFilter > 0) {
-
-    $stmt->bind_param(
-        "iii",
-        $bulan,
-        $tahun,
-        $idOliFilter
-    );
-
-} else {
-
-    $stmt->bind_param(
-        "ii",
-        $bulan,
-        $tahun
-    );
-}
-
+$stmt->bind_param($types, ...$params);
 $stmt->execute();
 
 $result = $stmt->get_result();
@@ -152,139 +196,27 @@ while ($row = $result->fetch_assoc()) {
 
 $stmt->close();
 
-$rowspan = [];
+/* =========================================================
+   HITUNG ROWSPAN PER OLI (untuk kolom "Jenis Oli")
+   ========================================================= */
 
-foreach ($rows as $row) {
+$rowspanOli = [];
 
-    $id = (int)$row['id_oli'];
-
-    if (!isset($rowspan[$id])) {
-        $rowspan[$id] = 0;
-    }
-
-    $rowspan[$id]++;
-}
-
-$shown = [];
-
-// =========================================================
-// Query SALDO AWAL
-// Akumulasi MASUK - KELUAR untuk transaksi AKTIF
-// dengan tanggal SEBELUM tanggal awal periode
-// =========================================================
-$sqlAwal = "
-    SELECT
-        r.id_oli,
-        o.nama_oli,
-        COALESCE(SUM(
-            CASE
-                WHEN r.jenis_transaksi = 'MASUK'  THEN  r.jumlah
-                WHEN r.jenis_transaksi = 'KELUAR' THEN -r.jumlah
-                ELSE 0
-            END
-        ), 0) AS saldo_awal
-    FROM riwayat_oli r
-    JOIN master_oli o ON o.id_oli = r.id_oli
-    WHERE
-        r.status_transaksi = 'AKTIF'
-        AND r.tanggal < ?
-";
-
-if ($idOliFilter > 0) {
-    $sqlAwal .= " AND r.id_oli = ? ";
-}
-
-$sqlAwal .= " GROUP BY r.id_oli, o.nama_oli ";
-
-$stmtAwal = $koneksi->prepare($sqlAwal);
-
-if ($idOliFilter > 0) {
-    $stmtAwal->bind_param("si", $tglAwal, $idOliFilter);
-} else {
-    $stmtAwal->bind_param("s", $tglAwal);
-}
-
-$stmtAwal->execute();
-$resAwal = $stmtAwal->get_result();
-
-$saldoAwalMap = [];
-
-while ($row = $resAwal->fetch_assoc()) {
-    $saldoAwalMap[(int)$row['id_oli']] = [
-        'nama_oli'   => $row['nama_oli'],
-        'saldo_awal' => (float)$row['saldo_awal'],
-    ];
-}
-
-$stmtAwal->close();
-
-// =========================================================
-// Bangun ringkasan per oli (dari transaksi periode + saldo awal)
-// =========================================================
-$ringkasan = [];
-
-// Inisialisasi dari saldo awal
-foreach ($saldoAwalMap as $idOli => $info) {
-    $ringkasan[$idOli] = [
-        'nama_oli'    => $info['nama_oli'],
-        'saldo_awal'  => $info['saldo_awal'],
-        'total_masuk' => 0.0,
-        'total_keluar'=> 0.0,
-        'saldo_akhir' => 0.0,
-    ];
-}
-
-// Tambahkan transaksi periode
 foreach ($rows as $r) {
-
     $id = (int)$r['id_oli'];
 
-    if (!isset($ringkasan[$id])) {
-        $ringkasan[$id] = [
-            'nama_oli'    => $r['nama_oli'],
-            'saldo_awal'  => 0.0,
-            'total_masuk' => 0.0,
-            'total_keluar'=> 0.0,
-            'saldo_akhir' => 0.0,
-        ];
+    if (!isset($rowspanOli[$id])) {
+        $rowspanOli[$id] = 0;
     }
 
-    if ($r['jenis_transaksi'] === 'MASUK') {
-        $ringkasan[$id]['total_masuk'] += (float)$r['jumlah'];
-    } elseif ($r['jenis_transaksi'] === 'KELUAR') {
-        $ringkasan[$id]['total_keluar'] += (float)$r['jumlah'];
-    }
+    $rowspanOli[$id]++;
 }
 
-// Hitung saldo akhir
-foreach ($ringkasan as $id => $info) {
-    $ringkasan[$id]['saldo_akhir'] =
-        $info['saldo_awal']
-        + $info['total_masuk']
-        - $info['total_keluar'];
-}
+$oliSudahTampil = [];
 
-// Urutkan ringkasan berdasarkan nama oli
-uasort($ringkasan, function ($a, $b) {
-    return strcmp($a['nama_oli'], $b['nama_oli']);
-});
-
-// Total keseluruhan (untuk baris TOTAL)
-$grand = [
-    'saldo_awal'   => 0.0,
-    'total_masuk'  => 0.0,
-    'total_keluar' => 0.0,
-    'saldo_akhir'  => 0.0,
-];
-
-foreach ($ringkasan as $info) {
-    $grand['saldo_awal']   += $info['saldo_awal'];
-    $grand['total_masuk']  += $info['total_masuk'];
-    $grand['total_keluar'] += $info['total_keluar'];
-    $grand['saldo_akhir']  += $info['saldo_akhir'];
-}
-
-$tampilkanTotal = count($ringkasan) > 1;
+/* =========================================================
+   HELPERS
+   ========================================================= */
 
 function h($v)
 {
@@ -327,6 +259,23 @@ body {
     text-align: center;
 }
 
+/* ---------- Info saldo (per kolom) ---------- */
+.saldo-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0 16px 0;
+}
+
+.saldo-table td {
+    border: 1px solid #8a4b08;
+    background: #fff8e8;
+    padding: 6px 8px;
+    font-weight: bold;
+    text-align: center;
+    font-size: 12px;
+}
+
+/* ---------- Tabel detail ---------- */
 .t {
     border-collapse: collapse;
     width: 100%;
@@ -337,11 +286,13 @@ body {
     color: white;
     border: 1px solid #000;
     padding: 6px;
+    text-align: center;
 }
 
 .t td {
     border: 1px solid #000;
     padding: 5px;
+    vertical-align: middle;
 }
 
 .center {
@@ -356,26 +307,13 @@ body {
     font-weight: bold;
 }
 
-/* Ringkasan saldo */
-.ringkasan {
-    border-collapse: collapse;
-    width: 100%;
-    margin-bottom: 10px;
+.in {
+    color: #008000;
+    font-weight: bold;
 }
 
-.ringkasan th {
-    background: #f0c48a;
-    border: 1px solid #000;
-    padding: 5px;
-}
-
-.ringkasan td {
-    border: 1px solid #000;
-    padding: 5px;
-}
-
-.ringkasan .total-row td {
-    background: #fde9c9;
+.out {
+    color: #c00000;
     font-weight: bold;
 }
 
@@ -395,94 +333,64 @@ body {
 </div>
 
 <div class="sub">
-    Periode <?= h($namaBulan) ?> <?= (int)$tahun ?>
+    Periode <?= h($periodeText) ?>
 </div>
 
 <div class="sub">
     Filter: <?= h($filterText) ?>
+    <?= $jenisFilter !== ''
+        ? ' | Jenis: ' . h(labelOliMutasi($jenisFilter))
+        : ''
+    ?>
 </div>
 
 <br>
 
-<!-- ===================================================== -->
-<!-- RINGKASAN SALDO AWAL / MASUK / KELUAR / AKHIR          -->
-<!-- ===================================================== -->
-<table class="ringkasan">
 
-<thead>
+<!-- ===================================================== -->
+<!-- INFO SALDO AKHIR — SATU OLI SATU KOLOM                 -->
+<!-- ===================================================== -->
+
+<?php if (count($saldoAkhirList)): ?>
+
+<table class="saldo-table">
 
 <tr>
-    <th>Jenis Oli</th>
-    <th>Saldo Awal (Liter)</th>
-    <th>Total Masuk (Liter)</th>
-    <th>Total Keluar (Liter)</th>
-    <th>Saldo Akhir (Liter)</th>
-</tr>
 
-</thead>
+    <?php foreach ($saldoAkhirList as $s): ?>
 
-<tbody>
-
-<?php if (count($ringkasan)): ?>
-
-    <?php foreach ($ringkasan as $info): ?>
-
-    <tr>
-        <td><?= h($info['nama_oli']) ?></td>
-        <td class="right"><?= number_format($info['saldo_awal'], 2) ?></td>
-        <td class="right"><?= number_format($info['total_masuk'], 2) ?></td>
-        <td class="right"><?= number_format($info['total_keluar'], 2) ?></td>
-        <td class="right bold"><?= number_format($info['saldo_akhir'], 2) ?></td>
-    </tr>
+        <td>
+            <?= h($s['nama_oli']) ?>
+            =
+            <?= number_format((float)$s['saldo_akhir'], 2) ?> L
+        </td>
 
     <?php endforeach; ?>
 
-    <?php if ($tampilkanTotal): ?>
-
-    <tr class="total-row">
-        <td class="center">TOTAL</td>
-        <td class="right"><?= number_format($grand['saldo_awal'], 2) ?></td>
-        <td class="right"><?= number_format($grand['total_masuk'], 2) ?></td>
-        <td class="right"><?= number_format($grand['total_keluar'], 2) ?></td>
-        <td class="right"><?= number_format($grand['saldo_akhir'], 2) ?></td>
-    </tr>
-
-    <?php endif; ?>
-
-<?php else: ?>
-
-    <tr>
-        <td colspan="5" class="center">
-            Tidak ada data saldo.
-        </td>
-    </tr>
-
-<?php endif; ?>
-
-</tbody>
+</tr>
 
 </table>
 
-<br>
+<?php endif; ?>
+
 
 <!-- ===================================================== -->
 <!-- DETAIL TRANSAKSI                                       -->
 <!-- ===================================================== -->
+
 <table class="t">
 
 <thead>
 
 <tr>
-    <th>No</th>
-    <th>Jenis Oli</th>
-    <th>Tanggal</th>
-    <th>Jenis</th>
-    <th>Masuk Liter</th>
-    <th>Keluar Liter</th>
-    <th>Tujuan</th>
-    <th>Referensi</th>
-    <th>Keterangan</th>
-    <th>User</th>
+    <th style="width:4%;">No</th>
+    <th style="width:9%;">Tanggal</th>
+    <th style="width:16%;">Jenis Oli</th>
+    <th style="width:14%;">Jenis</th>
+    <th style="width:10%;">Masuk (L)</th>
+    <th style="width:10%;">Keluar (L)</th>
+    <th style="width:17%;">Tujuan</th>
+    <th style="width:20%;">Keterangan</th>
 </tr>
 
 </thead>
@@ -492,20 +400,44 @@ body {
 
 <?php
 
-$no = 1;
+$no = 0;
+$lastIdOli = null;
 
 if (count($rows)):
 
     foreach ($rows as $r):
 
-        $id =
-            (int)$r['id_oli'];
+        $idOli = (int)$r['id_oli'];
 
-        $first =
-            !isset($shown[$id]);
+        $tampilkanOli = !isset($oliSudahTampil[$idOli]);
 
-        if ($first) {
-            $shown[$id] = true;
+        if ($tampilkanOli) {
+            $oliSudahTampil[$idOli] = true;
+        }
+
+        /*
+         * Reset nomor setiap kali ganti jenis oli.
+         */
+        if ($lastIdOli !== $idOli) {
+            $no = 1;
+            $lastIdOli = $idOli;
+        } else {
+            $no++;
+        }
+
+        $tujuan = '-';
+
+        if ($r['jenis_mutasi'] === 'PEMAKAIAN') {
+            $tujuan = trim(
+                ($r['tujuan_tipe'] ?: '')
+                . ' - '
+                . ($r['tujuan_nama'] ?: ''),
+                ' -'
+            );
+
+            if ($tujuan === '') {
+                $tujuan = '-';
+            }
         }
 
 ?>
@@ -513,37 +445,37 @@ if (count($rows)):
 <tr>
 
     <td class="center">
-        <?= $no++ ?>
+        <?= $no ?>
     </td>
 
-    <?php if ($first): ?>
+    <td class="center">
+        <?= date('d/m/Y', strtotime($r['tanggal'])) ?>
+    </td>
+
+    <?php if ($tampilkanOli): ?>
 
         <td
-            rowspan="<?= (int)$rowspan[$id] ?>"
-            class="bold"
-            style="vertical-align:top;"
+            class="bold center"
+            rowspan="<?= (int)$rowspanOli[$idOli] ?>"
+            style="vertical-align: middle;"
         >
             <?= h($r['nama_oli']) ?>
         </td>
 
     <?php endif; ?>
 
-    <td class="center">
-        <?= date('d/m/Y', strtotime($r['tanggal'])) ?>
-    </td>
-
     <td>
         <?= h(labelOliMutasi($r['jenis_mutasi'])) ?>
     </td>
 
-    <td class="right">
+    <td class="right in">
         <?= $r['jenis_transaksi'] === 'MASUK'
             ? number_format((float)$r['jumlah'], 2)
             : '-'
         ?>
     </td>
 
-    <td class="right">
+    <td class="right out">
         <?= $r['jenis_transaksi'] === 'KELUAR'
             ? number_format((float)$r['jumlah'], 2)
             : '-'
@@ -551,25 +483,11 @@ if (count($rows)):
     </td>
 
     <td>
-        <?php if ($r['jenis_mutasi'] === 'PEMAKAIAN'): ?>
-            <?= h($r['tujuan_tipe'] ?: '-') ?>
-            -
-            <?= h($r['tujuan_nama'] ?: '-') ?>
-        <?php else: ?>
-            -
-        <?php endif; ?>
-    </td>
-
-    <td>
-        <?= h($r['no_referensi'] ?: '-') ?>
+        <?= h($tujuan) ?>
     </td>
 
     <td>
         <?= h($r['keterangan'] ?: '-') ?>
-    </td>
-
-    <td>
-        <?= h($r['created_by'] ?: '-') ?>
     </td>
 
 </tr>
@@ -581,11 +499,8 @@ else:
 ?>
 
 <tr>
-    <td
-        colspan="10"
-        class="center"
-    >
-        Tidak ada transaksi.
+    <td colspan="8" class="center">
+        Tidak ada transaksi untuk filter yang dipilih.
     </td>
 </tr>
 

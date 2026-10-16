@@ -498,12 +498,11 @@ body {
     <th>No</th>
     <th>Ukuran</th>
     <th>Pembelian</th>
-    <th>Dipakai Pabrik</th>
     <th>Kembali Bekas</th>
     <th>Rombeng</th>
-    <th>Stok Baru Saat Ini</th>
+    <th>Dipakai</th>
     <th>Stok Bekas Saat Ini</th>
-    <th>Total Saat Ini</th>
+    <th>Total Keseluruhan</th>
 
 </tr>
 
@@ -534,10 +533,6 @@ while ($r = $resultRekap->fetch_assoc()):
 
     <td class="text-right">
         <?= number_format((float)$r['pembelian'], 2) ?>
-    </td>
-
-    <td class="text-right">
-        <?= number_format((float)$r['pemakaian'], 2) ?>
     </td>
 
     <td class="text-right">
