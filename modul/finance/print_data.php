@@ -56,7 +56,7 @@ function fmt_usd($angka, $desimal = 2) {
             margin: 0 auto;
             padding: 0;
             font-family: 'Bookman Old Style', 'Times New Roman', Times, serif;
-            font-size: 9pt;
+            font-size: 8pt;
             font-weight: 600;
             color: #000;
             line-height: 1.15;
@@ -133,7 +133,7 @@ function fmt_usd($angka, $desimal = 2) {
 .p-kw-a                { position: absolute; top: 76mm; left: 45mm; }
 
 /* ===================== BAGIAN B ===================== */
-.p-nama-bank           { position: absolute; top: 33mm; left: 141mm; width: 90mm; }
+.p-nama-bank           { position: absolute; top: 33mm; left: 141mm; width: 90mm;  font-size: 7pt;}
 .print-sheet .p-alamat-bank {
     position: absolute;
     top: 38mm;
