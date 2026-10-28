@@ -226,7 +226,25 @@ function h($str) { return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); }
             70%  { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
             100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
         }
-
+        .btn-pr {
+            background: #1e3a8a;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            transition: 0.2s;
+        }
+        .btn-pr:hover {
+            background: #2563eb;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(30,58,138,0.3);
+        }
         .btn-void {
             background: #ef4444;
             color: white;
@@ -307,7 +325,7 @@ function h($str) { return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); }
                 text-transform: uppercase;
             }
             .step-indicator { justify-content: flex-end; }
-            .btn-void, .btn-revert { width: 100%; padding: 10px; border-radius: 10px; margin-top: 8px; }
+            .btn-void, .btn-revert, .btn-pr { width: 100%; padding: 10px; border-radius: 10px; margin-top: 8px; }
         }
     </style>
 </head>
@@ -558,31 +576,39 @@ function h($str) { return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); }
                                     <?php endif; ?>
                                 </div>
                             </td>
-                            <td class="text-center px-4" data-label="Aksi">
-                                <div class="d-flex gap-2 justify-content-center flex-wrap">
-                                    <?php 
-                                    $boleh_revert = in_array($status_app, ['APPROVED 1', 'APPROVED 2', 'APPROVED']) 
-                                                    && empty($data['void_by']);
-                                    $boleh_void   = empty($data['void_by']);
-                                    
-                                    if ($boleh_revert): 
-                                    ?>
-                                    <button type="button"
-                                            class="btn-revert"
-                                            onclick="revertPR(<?= $data['id_request'] ?>, '<?= h($data['no_request']) ?>', '<?= $status_app ?>')">
-                                        <i class="fas fa-undo me-1"></i> REVERT
-                                    </button>
-                                    <?php endif; ?>
-                                    
-                                    <?php if ($boleh_void): ?>
-                                    <button type="button"
-                                            class="btn-void"
-                                            onclick="voidPR(<?= $data['id_request'] ?>, '<?= h($data['no_request']) ?>')">
-                                        <i class="fas fa-ban me-1"></i> VOID
-                                    </button>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
+                           <td class="text-center px-4" data-label="Aksi">
+                            <div class="d-flex gap-2 justify-content-center flex-wrap">
+                                <!-- Tombol PR (Lihat / Cetak) -->
+                                <a href="cetak_pr_besar.php?id=<?= (int)$data['id_request'] ?>"
+                                target="_blank"
+                                class="btn-pr"
+                                title="Lihat / Cetak PR">
+                                    <i class="fas fa-eye me-1"></i> PR
+                                </a>
+
+                                <?php 
+                                $boleh_revert = in_array($status_app, ['APPROVED 1', 'APPROVED 2', 'APPROVED']) 
+                                                && empty($data['void_by']);
+                                $boleh_void   = empty($data['void_by']);
+                                
+                                if ($boleh_revert): 
+                                ?>
+                                <button type="button"
+                                        class="btn-revert"
+                                        onclick="revertPR(<?= $data['id_request'] ?>, '<?= h($data['no_request']) ?>', '<?= $status_app ?>')">
+                                    <i class="fas fa-undo me-1"></i> REVERT
+                                </button>
+                                <?php endif; ?>
+                                
+                                <?php if ($boleh_void): ?>
+                                <button type="button"
+                                        class="btn-void"
+                                        onclick="voidPR(<?= $data['id_request'] ?>, '<?= h($data['no_request']) ?>')">
+                                    <i class="fas fa-ban me-1"></i> VOID
+                                </button>
+                                <?php endif; ?>
+                            </div>
+                        </td>
                         </tr>
                     <?php endforeach; else: ?>
                         <tr>
