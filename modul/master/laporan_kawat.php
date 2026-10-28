@@ -126,9 +126,28 @@ header("Pragma: no-cache");
 header("Expires: 0");
 
 /* =========================================================
-   QUERY DETAIL MUTASI
-   Hanya transaksi AKTIF
-   (tetap mengikuti filter periode)
+   HELPER QUERY DETAIL — dipakai untuk PEMBELIAN & BEKAS
+   ========================================================= */
+
+function buildFilterPeriodeDetail($pakaiRentang, $startDate, $endDate, $bulan, $tahun)
+{
+    if ($pakaiRentang) {
+        return [
+            " AND t.tanggal BETWEEN ? AND ? ",
+            [$startDate, $endDate],
+            'ss'
+        ];
+    }
+
+    return [
+        " AND MONTH(t.tanggal) = ? AND YEAR(t.tanggal) = ? ",
+        [$bulan, $tahun],
+        'ii'
+    ];
+}
+
+/* =========================================================
+   QUERY DETAIL MUTASI — PEMBELIAN
    ========================================================= */
 
 $sqlDetail = "
@@ -158,25 +177,16 @@ $sqlDetail = "
 
     WHERE
         t.status_transaksi = 'AKTIF'
+        AND t.jenis_mutasi = 'PEMBELIAN'
 ";
 
-$paramsDetail = [];
-$typesDetail  = '';
+list($filterSql, $filterParams, $filterTypes) =
+    buildFilterPeriodeDetail($pakaiRentang, $startDate, $endDate, $bulan, $tahun);
 
-if ($pakaiRentang) {
+$sqlDetail .= $filterSql;
 
-    $sqlDetail .= " AND t.tanggal BETWEEN ? AND ? ";
-    $paramsDetail[] = $startDate;
-    $paramsDetail[] = $endDate;
-    $typesDetail   .= 'ss';
-
-} else {
-
-    $sqlDetail .= " AND MONTH(t.tanggal) = ? AND YEAR(t.tanggal) = ? ";
-    $paramsDetail[] = $bulan;
-    $paramsDetail[] = $tahun;
-    $typesDetail   .= 'ii';
-}
+$paramsDetail = $filterParams;
+$typesDetail  = $filterTypes;
 
 if ($idKawatFilter > 0) {
     $sqlDetail .= " AND t.id_kawat = ? ";
@@ -187,12 +197,16 @@ if ($idKawatFilter > 0) {
 $sqlDetail .= "
     ORDER BY
         k.ukuran ASC,
-        t.tanggal ASC,
-        t.id_transaksi ASC
+        t.tanggal DESC,
+        t.id_transaksi DESC
 ";
 
 $stmtDetail = $koneksi->prepare($sqlDetail);
-$stmtDetail->bind_param($typesDetail, ...$paramsDetail);
+
+if ($paramsDetail) {
+    $stmtDetail->bind_param($typesDetail, ...$paramsDetail);
+}
+
 $stmtDetail->execute();
 $resultDetail = $stmtDetail->get_result();
 
@@ -202,7 +216,83 @@ while ($row = $resultDetail->fetch_assoc()) {
     $detailRows[] = $row;
 }
 
-$rowspanUkuran = [];
+/* =========================================================
+   QUERY DETAIL MUTASI BEKAS
+   Khusus kondisi BEKAS / jenis RETURN_BEKAS (Kembali dari Pabrik)
+   ========================================================= */
+
+$sqlDetailBekas = "
+    SELECT
+        t.id_transaksi,
+        t.tanggal,
+        t.id_kawat,
+        k.ukuran,
+        t.jenis_mutasi,
+        t.kondisi,
+        t.arah,
+        t.qty_asal,
+        s.nama_satuan,
+        t.qty_kg,
+        t.no_referensi,
+        t.keterangan,
+        t.created_by,
+        t.source_type,
+        t.source_id
+    FROM transaksi_kawat t
+
+    JOIN master_kawat k
+        ON k.id_kawat = t.id_kawat
+
+    LEFT JOIN master_satuan s
+        ON s.id_satuan = t.id_satuan_asal
+
+    WHERE
+        t.status_transaksi = 'AKTIF'
+        AND (
+            t.jenis_mutasi = 'RETURN_BEKAS'
+            OR t.kondisi = 'BEKAS'
+        )
+";
+
+$sqlDetailBekas .= $filterSql;
+
+$paramsDetailBekas = $filterParams;
+$typesDetailBekas  = $filterTypes;
+
+if ($idKawatFilter > 0) {
+    $sqlDetailBekas .= " AND t.id_kawat = ? ";
+    $paramsDetailBekas[] = $idKawatFilter;
+    $typesDetailBekas   .= 'i';
+}
+
+$sqlDetailBekas .= "
+    ORDER BY
+        k.ukuran ASC,
+        t.tanggal DESC,
+        t.id_transaksi DESC
+";
+
+$stmtDetailBekas = $koneksi->prepare($sqlDetailBekas);
+
+if ($paramsDetailBekas) {
+    $stmtDetailBekas->bind_param($typesDetailBekas, ...$paramsDetailBekas);
+}
+
+$stmtDetailBekas->execute();
+$resultDetailBekas = $stmtDetailBekas->get_result();
+
+$detailBekasRows = [];
+
+while ($row = $resultDetailBekas->fetch_assoc()) {
+    $detailBekasRows[] = $row;
+}
+
+/* =========================================================
+   HITUNG ROWSPAN PER UKURAN — PEMBELIAN
+   ========================================================= */
+
+$rowspanUkuran     = [];
+$ukuranSudahTampil = [];
 
 foreach ($detailRows as $row) {
     $id = (int)$row['id_kawat'];
@@ -214,7 +304,22 @@ foreach ($detailRows as $row) {
     $rowspanUkuran[$id]++;
 }
 
-$ukuranSudahTampil = [];
+/* =========================================================
+   HITUNG ROWSPAN PER UKURAN — BEKAS
+   ========================================================= */
+
+$rowspanUkuranBekas     = [];
+$ukuranBekasSudahTampil = [];
+
+foreach ($detailBekasRows as $row) {
+    $id = (int)$row['id_kawat'];
+
+    if (!isset($rowspanUkuranBekas[$id])) {
+        $rowspanUkuranBekas[$id] = 0;
+    }
+
+    $rowspanUkuranBekas[$id]++;
+}
 
 /* =========================================================
    QUERY REKAP PER UKURAN
@@ -317,6 +422,7 @@ if ($paramsRekap) {
 
 $stmtRekap->execute();
 $resultRekap = $stmtRekap->get_result();
+
 /* =========================================================
    HELPERS
    ========================================================= */
@@ -457,7 +563,8 @@ body {
 
 <div class="sub-note">
     Rekap Per Ukuran menampilkan kondisi keseluruhan saat ini (lintas bulan).
-    Detail Mutasi mengikuti periode filter.
+    Detail Mutasi menampilkan transaksi Pembelian dalam periode filter.
+    Detail Mutasi Bekas menampilkan transaksi kondisi Bekas / Kembali dari Pabrik.
 </div>
 
 <br>
@@ -563,7 +670,7 @@ while ($r = $resultRekap->fetch_assoc()):
 
 
 <!-- =====================================================
-     DETAIL MUTASI
+     DETAIL MUTASI — PEMBELIAN
      ===================================================== -->
 
 <div class="bold">
@@ -571,7 +678,9 @@ while ($r = $resultRekap->fetch_assoc()):
 </div>
 
 <div class="sub-note" style="text-align:left;margin-bottom:4px;">
-    Menampilkan transaksi dalam periode <?= h($periodeLabel) ?> saja.
+    Menampilkan transaksi <strong>Pembelian</strong> dalam periode
+    <?= h($periodeLabel) ?>, dikelompokkan per ukuran dan
+    diurutkan dari tanggal pembelian terbaru.
 </div>
 
 <table class="table-data">
@@ -581,8 +690,8 @@ while ($r = $resultRekap->fetch_assoc()):
 <tr>
 
     <th style="width:4%;">No</th>
-    <th style="width:8%;">Ukuran</th>
     <th style="width:9%;">Tanggal</th>
+    <th style="width:8%;">Ukuran</th>
     <th style="width:13%;">Jenis</th>
     <th style="width:8%;">Kondisi</th>
     <th style="width:9%;">Masuk KG</th>
@@ -602,7 +711,7 @@ while ($r = $resultRekap->fetch_assoc()):
 
 <?php
 
-$noDetail = 0;
+$noDetail    = 0;
 $lastIdKawat = null;
 
 if (count($detailRows) > 0):
@@ -610,6 +719,8 @@ if (count($detailRows) > 0):
     foreach ($detailRows as $r):
 
         $idKawat = (int)$r['id_kawat'];
+
+        // Tentukan apakah baris ini baris pertama untuk ukuran tsb
         $tampilkanUkuran = !isset($ukuranSudahTampil[$idKawat]);
 
         if ($tampilkanUkuran) {
@@ -618,16 +729,13 @@ if (count($detailRows) > 0):
 
         // Reset nomor setiap ganti ukuran
         if ($lastIdKawat !== $idKawat) {
-            $noDetail = 1;
+            $noDetail    = 1;
             $lastIdKawat = $idKawat;
         } else {
             $noDetail++;
         }
 
-        $rowClass =
-            ($noDetail % 2 === 0)
-            ? 'bg-even'
-            : 'bg-odd';
+        $rowClass = ($noDetail % 2 === 0) ? 'bg-even' : 'bg-odd';
 
 ?>
 
@@ -637,21 +745,21 @@ if (count($detailRows) > 0):
         <?= $noDetail ?>
     </td>
 
+    <td class="text-center">
+        <?= date('d/m/Y', strtotime($r['tanggal'])) ?>
+    </td>
+
     <?php if ($tampilkanUkuran): ?>
 
         <td
             class="text-center bold"
             rowspan="<?= (int)$rowspanUkuran[$idKawat] ?>"
-            style="vertical-align: top;"
+            style="vertical-align: middle;"
         >
             <?= number_format((float)$r['ukuran'], 2) ?> mm
         </td>
 
     <?php endif; ?>
-
-    <td class="text-center">
-        <?= date('d/m/Y', strtotime($r['tanggal'])) ?>
-    </td>
 
     <td>
         <?= h(labelJenis($r['jenis_mutasi'])) ?>
@@ -716,7 +824,177 @@ else:
         class="text-center"
         style="padding:20px;color:#777;font-style:italic;"
     >
-        Tidak ada transaksi untuk filter yang dipilih.
+        Tidak ada data pembelian untuk filter yang dipilih.
+    </td>
+
+</tr>
+
+<?php endif; ?>
+
+</tbody>
+
+</table>
+
+
+<br><br>
+
+
+<!-- =====================================================
+     DETAIL MUTASI BEKAS
+     ===================================================== -->
+
+<div class="bold">
+    DETAIL MUTASI BEKAS
+</div>
+
+<div class="sub-note" style="text-align:left;margin-bottom:4px;">
+    Menampilkan transaksi <strong>kondisi Bekas / Kembali dari Pabrik</strong>
+    dalam periode <?= h($periodeLabel) ?>, dikelompokkan per ukuran dan
+    diurutkan dari tanggal terbaru.
+</div>
+
+<table class="table-data">
+
+<thead>
+
+<tr>
+
+    <th style="width:4%;">No</th>
+    <th style="width:9%;">Tanggal</th>
+    <th style="width:8%;">Ukuran</th>
+    <th style="width:13%;">Jenis</th>
+    <th style="width:8%;">Kondisi</th>
+    <th style="width:9%;">Masuk KG</th>
+    <th style="width:9%;">Keluar KG</th>
+    <th style="width:9%;">Qty Asal</th>
+    <th style="width:7%;">Satuan</th>
+    <th style="width:10%;">Referensi</th>
+    <th style="width:14%;">Keterangan</th>
+    <th style="width:10%;">User</th>
+
+</tr>
+
+</thead>
+
+
+<tbody>
+
+<?php
+
+$noDetailBekas    = 0;
+$lastIdKawatBekas = null;
+
+if (count($detailBekasRows) > 0):
+
+    foreach ($detailBekasRows as $r):
+
+        $idKawat = (int)$r['id_kawat'];
+
+        // Tentukan apakah baris ini baris pertama untuk ukuran tsb
+        $tampilkanUkuranBekas = !isset($ukuranBekasSudahTampil[$idKawat]);
+
+        if ($tampilkanUkuranBekas) {
+            $ukuranBekasSudahTampil[$idKawat] = true;
+        }
+
+        // Reset nomor setiap ganti ukuran
+        if ($lastIdKawatBekas !== $idKawat) {
+            $noDetailBekas    = 1;
+            $lastIdKawatBekas = $idKawat;
+        } else {
+            $noDetailBekas++;
+        }
+
+        $rowClass = ($noDetailBekas % 2 === 0) ? 'bg-even' : 'bg-odd';
+
+?>
+
+<tr class="<?= $rowClass ?>">
+
+    <td class="text-center">
+        <?= $noDetailBekas ?>
+    </td>
+
+    <td class="text-center">
+        <?= date('d/m/Y', strtotime($r['tanggal'])) ?>
+    </td>
+
+    <?php if ($tampilkanUkuranBekas): ?>
+
+        <td
+            class="text-center bold"
+            rowspan="<?= (int)$rowspanUkuranBekas[$idKawat] ?>"
+            style="vertical-align: middle;"
+        >
+            <?= number_format((float)$r['ukuran'], 2) ?> mm
+        </td>
+
+    <?php endif; ?>
+
+    <td>
+        <?= h(labelJenis($r['jenis_mutasi'])) ?>
+    </td>
+
+    <td class="text-center">
+        <?= h($r['kondisi']) ?>
+    </td>
+
+    <td class="text-right in">
+
+        <?= $r['arah'] === 'IN'
+            ? number_format((float)$r['qty_kg'], 2, '.', '')
+            : '-'
+        ?>
+
+    </td>
+
+    <td class="text-right out">
+
+        <?= $r['arah'] === 'OUT'
+            ? number_format((float)$r['qty_kg'], 2, '.', '')
+            : '-'
+        ?>
+
+    </td>
+
+    <td class="text-right">
+        <?= number_format((float)$r['qty_asal'], 4, '.', '') ?>
+    </td>
+
+    <td class="text-center">
+        <?= h($r['nama_satuan'] ?: 'KG') ?>
+    </td>
+
+    <td>
+        <?= h($r['no_referensi'] ?: '-') ?>
+    </td>
+
+    <td>
+        <?= h($r['keterangan'] ?: '-') ?>
+    </td>
+
+    <td>
+        <?= h($r['created_by'] ?: '-') ?>
+    </td>
+
+</tr>
+
+<?php
+
+    endforeach;
+
+else:
+
+?>
+
+<tr>
+
+    <td
+        colspan="12"
+        class="text-center"
+        style="padding:20px;color:#777;font-style:italic;"
+    >
+        Tidak ada data bekas untuk filter yang dipilih.
     </td>
 
 </tr>
