@@ -1,4 +1,5 @@
 <?php
+//fund_transfer.php
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
 //require_once __DIR__ . '/../../auth/check_session.php';
@@ -564,6 +565,9 @@ require_once __DIR__ . '/../../config/koneksi.php';
                     <select id="mataUang" name="mata_uang" class="form-select" onchange="hitungTotal()">
                         <option value="IDR" selected>IDR</option>
                         <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="SGD">SGD</option>
+                        <option value="CNY">CNY</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -764,8 +768,8 @@ require_once __DIR__ . '/../../config/koneksi.php';
         return parts.reverse().join(' ').trim().replace(/\s+/g, ' ') + ' Rupiah';
     }
 
-    function terbilangEnglish(angka) {
-        if (angka === 0) return 'Zero USD';
+    function terbilangEnglish(angka, mataUang = 'USD') {
+        if (angka === 0) return 'Zero ' + mataUang;
         
         const satuan = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
         const belasan = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
@@ -801,7 +805,7 @@ require_once __DIR__ . '/../../config/koneksi.php';
         }
         
         let result = parts.reverse().join(' ').trim().replace(/\s+/g, ' ');
-        return result + ' USD';
+        return result + ' ' + mataUang;
     }
 
     function formatRupiah(n) {
@@ -843,8 +847,8 @@ require_once __DIR__ . '/../../config/koneksi.php';
 
     // ===== TERBILANG BERDASARKAN JUMLAH VALAS =====
     let t = '';
-    if (mataUang === 'USD') {
-        t = terbilangEnglish(Math.round(valas));
+    if (mataUang === 'USD' || mataUang === 'EUR' || mataUang === 'SGD' || mataUang === 'SGD' || mataUang === 'CNY') {
+        t = terbilangEnglish(Math.round(valas), mataUang);
     } else {
         t = terbilang(Math.round(valas));
     }

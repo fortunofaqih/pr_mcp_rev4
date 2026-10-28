@@ -1,4 +1,5 @@
 <?php
+//edit_fund_transfer.php
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
 //require_once __DIR__ . '/../../auth/check_session.php';
@@ -500,6 +501,9 @@ $tglTahun = date('y', strtotime($data['tanggal']));
                     <select id="mataUang" name="mata_uang" class="form-select" onchange="hitungTotal()">
                         <option value="IDR" <?= ($data['mata_uang'] === 'IDR') ? 'selected' : '' ?>>IDR</option>
                         <option value="USD" <?= ($data['mata_uang'] === 'USD') ? 'selected' : '' ?>>USD</option>
+                        <option value="EUR" <?= ($data['mata_uang'] === 'EUR') ? 'selected' : '' ?>>EUR</option>
+                        <option value="SGD" <?= ($data['mata_uang'] === 'SGD') ? 'selected' : '' ?>>SGD</option>
+                        <option value="CNY" <?= ($data['mata_uang'] === 'CNY') ? 'selected' : '' ?>>CNY</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -620,8 +624,8 @@ $tglTahun = date('y', strtotime($data['tanggal']));
         return parts.reverse().join(' ').trim().replace(/\s+/g, ' ') + ' Rupiah';
     }
 
-    function terbilangEnglish(angka) {
-        if (angka === 0) return 'Zero USD';
+    function terbilangEnglish(angka, mataUang = 'USD') {
+        if (angka === 0) return 'Zero ' + mataUang;
         const satuan = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
         const belasan = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
         const puluhan = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
@@ -652,7 +656,7 @@ $tglTahun = date('y', strtotime($data['tanggal']));
             num = Math.floor(num / 1000);
             i++;
         }
-        return parts.reverse().join(' ').trim().replace(/\s+/g, ' ') + ' USD';
+        return parts.reverse().join(' ').trim().replace(/\s+/g, ' ') + ' ' + mataUang;
     }
 
     function formatRupiah(n) {
@@ -686,7 +690,7 @@ $tglTahun = date('y', strtotime($data['tanggal']));
         }
 
         valas = isNaN(valas) ? 0 : valas;
-        let t = (mataUang === 'USD') ? terbilangEnglish(Math.round(valas)) : terbilang(Math.round(valas));
+        let t = (mataUang === 'USD' || mataUang === 'EUR' || mataUang === 'SGD' || mataUang === 'CNY') ? terbilangEnglish(Math.round(valas), mataUang) : terbilang(Math.round(valas));
         document.getElementById('terbilangDisplay').textContent = t;
         document.getElementById('terbilang').value = t;
     }
