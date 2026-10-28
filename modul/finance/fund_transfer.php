@@ -847,7 +847,7 @@ require_once __DIR__ . '/../../config/koneksi.php';
 
     // ===== TERBILANG BERDASARKAN JUMLAH VALAS =====
     let t = '';
-    if (mataUang === 'USD' || mataUang === 'EUR' || mataUang === 'SGD' || mataUang === 'SGD' || mataUang === 'CNY') {
+    if (mataUang === 'USD' || mataUang === 'EUR' || mataUang === 'SGD' || mataUang === 'CNY') {
         t = terbilangEnglish(Math.round(valas), mataUang);
     } else {
         t = terbilang(Math.round(valas));
