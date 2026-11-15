@@ -13,6 +13,13 @@ require_once __DIR__ . '/../../auth/check_session.php';
 if ($_SESSION['status'] != "login") { header("location:../../login.php?pesan=belum_login"); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header("location:tambah_request_besar.php"); exit; }
 
+// REVISI MATA UANG PRB: wajib ditetapkan di server, tidak hanya di browser.
+$mata_uang = strtoupper(trim((string)($_POST['mata_uang'] ?? '')));
+if (!in_array($mata_uang, ['IDR', 'USD'], true)) {
+    header('location:tambah_request_besar.php?pesan=gagal_mata_uang');
+    exit;
+}
+
 // ── 1. GENERATE NOMOR REQUEST ────────────────────────────────
 $bulan_romawi = ['','I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 $bln    = (int)date('n');
@@ -126,7 +133,12 @@ try {
         $satuan      = mysqli_real_escape_string($koneksi, strtoupper($satuan_arr[$i]      ?? ''));
         $harga       = (float)($harga_arr[$i]     ?? 0);
         $subtotal    = $jumlah * $harga;
-        $ket_item    = mysqli_real_escape_string($koneksi, strtoupper($ket_item_arr[$i]    ?? ''));
+        $ket_item_raw = strtoupper((string)($ket_item_arr[$i] ?? ''));
+        if ($mata_uang === 'USD' && !preg_match('/(?:^|\r?\n)USD(?:\r?\n|$)/i', $ket_item_raw)) {
+            // Pastikan report lama yang membaca kolom keterangan tetap mendeteksi USD.
+            $ket_item_raw = rtrim($ket_item_raw) . (trim($ket_item_raw) !== '' ? "\n" : '') . 'USD';
+        }
+        $ket_item    = mysqli_real_escape_string($koneksi, $ket_item_raw);
         // is_ban: 1 jika checkbox ban dicentang
         $is_ban      = (int)($is_ban_arr[$i] ?? 0) === 1 ? 1 : 0;
         // status_pasang: jika ban → BELUM_TERPASANG, jika bukan → NULL
@@ -235,6 +247,15 @@ try {
 
     if (!mysqli_query($koneksi, $sql_po)) {
         throw new Exception("Gagal simpan PO: " . mysqli_error($koneksi));
+    }
+
+    // REVISI PRB: daftarkan antrean otorisasi pembayaran, tanpa mengubah approval PR/PO.
+    // Insert masih dalam transaksi yang sama; bila gagal seluruh simpan PR/PO di-rollback.
+    $sql_bayar = "INSERT INTO tr_prb_pembayaran
+                 (id_request, total_tagihan, total_terbayar, status_bayar)
+                 VALUES ($id_request, $grand_total, 0, 'MENUNGGU_VERIFIKASI')";
+    if (!mysqli_query($koneksi, $sql_bayar)) {
+        throw new Exception('Gagal membuat antrean verifikasi pembayaran PRB: ' . mysqli_error($koneksi));
     }
 
     mysqli_commit($koneksi);

@@ -68,7 +68,7 @@ if (isset($_GET['hapus'])) {
 <nav class="navbar navbar-sup mb-4 py-2 px-4">
     <span class="text-white fw-bold"><i class="fas fa-truck me-2"></i>MASTER SUPPLIER</span>
     <div class="d-flex gap-2">
-	 <a href="../../index.php" class="btn btn-sm btn-danger"><i class="fas fa-rotate-left me-1"></i> Kembali</a>
+	 <a href="../../index.php" class="btn btn-sm btn-danger"><i class="fas fa-rotate-left me-1"></i> HOME</a>
         <button class="btn btn-sm btn-light fw-bold" onclick="openModal()">
             <i class="fas fa-plus me-1"></i> Tambah Supplier
         </button>

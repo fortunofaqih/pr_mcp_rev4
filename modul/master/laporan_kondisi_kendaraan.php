@@ -88,8 +88,8 @@ if (empty($start_date) || empty($end_date)) {
     <div class="container-fluid px-3 px-sm-4">
         <span class="navbar-brand fw-bold text-white"><i class="fas fa-chart-bar me-2"></i> LAPORAN KONDISI KENDARAAN</span>
         <div class="d-flex flex-wrap gap-1">
-            <a href="../../index.php" class="btn btn-sm btn-danger"><i class="fas fa-rotate-left"></i> KEMBALI</a>
-            <a href="kondisi_kendaraan.php" class="btn btn-sm btn-light fw-bold"><i class="fas fa-clipboard-list"></i> KONDISI</a>
+            
+            <a href="data_mobil.php" class="btn btn-sm btn-light fw-bold"><i class="fas fa-clipboard-list"></i> KEMBALI</a>
         </div>
     </div>
 </nav>
@@ -120,7 +120,12 @@ if (empty($start_date) || empty($end_date)) {
                 </div>
                 <div class="col-6 col-md-2">
                     <a href="print_laporan_kondisi.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>" class="btn btn-success w-100" target="_blank">
-                        <i class="fas fa-file-excel"></i> Excel
+                        <i class="fas fa-file-excel"></i> Export
+                    </a>
+                </div>
+                   <div class="col-6 col-md-2">
+                    <a href="print_laporan_kondisi_pdf.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>" class="btn btn-danger w-100" target="_blank">
+                        <i class="fas fa-file-pdf"></i> Cetak
                     </a>
                 </div>
             </form>

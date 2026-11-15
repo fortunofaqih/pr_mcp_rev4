@@ -83,9 +83,9 @@ $bulan_str = sprintf('%02d', $bulan);
     <div class="container-fluid px-3 px-sm-4">
         <span class="navbar-brand fw-bold text-white"><i class="fas fa-chart-bar me-2"></i> LAPORAN KONDISI MESIN</span>
         <div class="d-flex flex-wrap gap-1">
-            <a href="../../index.php" class="btn btn-sm btn-danger"><i class="fas fa-rotate-left"></i> HOME</a>
-            <a href="mesin.php" class="btn btn-sm btn-light fw-bold"><i class="fas fa-industry"></i> MESIN</a>
-            <a href="kondisi_mesin.php" class="btn btn-sm btn-warning fw-bold"><i class="fas fa-heartbeat"></i> KONDISI</a>
+           
+            <a href="mesin.php" class="btn btn-sm btn-light fw-bold"><i class="fas fa-rotate-left"></i> KEMBALI</a>
+        
         </div>
     </div>
 </nav>
@@ -117,8 +117,15 @@ $bulan_str = sprintf('%02d', $bulan);
                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter"></i> Filter</button>
                 </div>
                 <div class="col-6 col-md-2">
-                    <a href="print_laporan_kondisi_mesin.php?bulan=<?= $bulan_str ?>&tahun=<?= $tahun ?>" class="btn btn-success w-100" target="_blank">
-                        <i class="fas fa-file-excel"></i> Excel
+                    <a href="print_laporan_kondisi_mesin.php?bulan=<?= $bulan_str ?>&tahun=<?= $tahun ?>"
+                    class="btn btn-success w-100" target="_blank">
+                        <i class="fas fa-file-excel"></i> Export
+                    </a>
+                </div>
+                <div class="col-6 col-md-2">
+                    <a href="print_laporan_kondisi_mesin_pdf.php?bulan=<?= $bulan_str ?>&tahun=<?= $tahun ?>"
+                    class="btn btn-danger w-100" target="_blank">
+                        <i class="fas fa-file-pdf"></i> CETAK
                     </a>
                 </div>
             </form>

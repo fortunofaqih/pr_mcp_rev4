@@ -464,7 +464,8 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
         <span class="alur-arrow">→</span><span class="badge bg-primary">PO OPEN</span>
     </div>
     <div class="mt-1 text-muted" style="font-size:.72rem;">* Manager ke-3 opsional, ditentukan Manager ke-1</div>
-    <div class="mt-1 text-muted" style="font-size:.72rem;">* Jika dalam bentuk mata uang USD maka di "Catatan Detail" ditulis "USD"</div>
+    <div class="mt-1 text-muted" style="font-size:.72rem;">* Mata uang wajib dipilih. Jika USD, sistem otomatis menambahkan penanda USD ke setiap Catatan Detail.</div>
+    <div class="mt-1 text-muted" style="font-size:.72rem;">* PRB langsung tampil pada tab Verifikasi Pembelian → PR Besar. Verifikasi pembayaran DP/Lunas dilakukan setelah approval PR selesai; pembayaran aktual dicatat Finance.</div>
 </div>
 
 <!-- ══ HEADER FORM ════════════════════════════════════ -->
@@ -489,6 +490,19 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
                 <option value="<?= $val_u ?>"><?= $val_u ?></option>
             <?php endforeach; ?>
         </select>
+    </div>
+</div>
+
+<!-- REVISI MATA UANG PRB: wajib dipilih untuk satu PR/PO -->
+<div class="row g-2 g-md-3 mb-3">
+    <div class="col-12 col-md-3">
+        <div class="section-label">Mata Uang PR / PO <span class="text-danger">*</span></div>
+        <select name="mata_uang" id="mataUangPRB" class="form-select form-select-sm" required>
+            <option value="" selected disabled>-- Pilih Mata Uang --</option>
+            <option value="IDR">RUPIAH (Rp)</option>
+            <option value="USD">USD (US DOLLAR)</option>
+        </select>
+        <small class="text-muted">Berlaku untuk semua item dalam PR Besar ini.</small>
     </div>
 </div>
 
@@ -535,8 +549,8 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
         <th class="col-tip">Tipe</th>
         <th class="col-qty">Qty</th>
         <th class="col-sat">Satuan</th>
-        <th class="col-hrg">Harga Est. (Rp)</th>
-        <th class="col-tot">Total (Rp)</th>
+        <th class="col-hrg">Harga Est. (<span class="label-mata-uang">Rp</span>)</th>
+        <th class="col-tot">Total (<span class="label-mata-uang">Rp</span>)</th>
         <th class="col-ppn">Status PPN</th> <!-- HELPER UNTUK CATATAN -->
         <th class="col-ket">Catatan Detail</th>
         <th class="col-ban" title="Centang jika item adalah BAN kendaraan">
@@ -659,7 +673,7 @@ textarea.input-keterangan:focus { min-height: 70px; transition: .2s; }
 
     <div class="row g-3 mb-3">
         <div class="col-6 col-md-3">
-            <div class="section-label">Diskon (Rp)</div>
+            <div class="section-label">Diskon (<span class="label-mata-uang">Rp</span>)</div>
             <input type="number" name="diskon" id="inputDiskon" class="form-control form-control-sm" value="0" min="0">
         </div>
         <div class="col-6 col-md-3">
@@ -754,7 +768,36 @@ $(document).ready(function(){
     }
     initSelect2();
 
-    function rp(n){ return 'Rp ' + parseFloat(n||0).toLocaleString('id-ID'); }
+    // REVISI MATA UANG PRB: hanya ubah label/simbol, tidak mengkonversi nominal.
+    function prefixMataUang(){
+        return $('#mataUangPRB').val() === 'USD' ? 'USD' : 'Rp';
+    }
+    function rp(n){ return prefixMataUang() + ' ' + parseFloat(n||0).toLocaleString('id-ID'); }
+
+    // Penanda USD ditulis sebagai satu baris tersendiri supaya helper PPN existing
+    // tetap bekerja. Jika user mengedit catatan, sinkronkan lagi sebelum submit.
+    function sinkronUSDDetail(){
+        var usd = $('#mataUangPRB').val() === 'USD';
+        $('.item-row .input-keterangan').each(function(){
+            var $input = $(this);
+            var teks = String($input.val() || '');
+            // Hindari penanda ganda pada perubahan pilihan / penyimpanan.
+            var adaPenanda = /(?:^|\r?\n)USD(?:\r?\n|$)/i.test(teks);
+            if (usd && !adaPenanda) {
+                $input.val(teks.replace(/\s+$/, '') + (teks.trim() ? '\n' : '') + 'USD');
+                $input.attr('data-usd-otomatis', '1');
+            } else if (!usd && $input.attr('data-usd-otomatis') === '1') {
+                // Hapus hanya penanda otomatis di akhir saat kembali ke Rupiah.
+                $input.val(teks.replace(/(?:\r?\n)?USD\s*$/i, ''));
+                $input.removeAttr('data-usd-otomatis');
+            }
+        });
+    }
+    $('#mataUangPRB').on('change', function(){
+        $('.label-mata-uang').text(prefixMataUang());
+        sinkronUSDDetail();
+        hitungTotal();
+    });
 
     function hitungSubtotal(row){
         var qty = parseFloat(row.find('.input-qty').val())   || 0;
@@ -926,6 +969,7 @@ $(document).ready(function(){
         if (firstRowPPN) {
             r.find('.select-ppn-item').val(firstRowPPN).trigger('change');
         }
+        sinkronUSDDetail(); // Baris baru juga wajib memiliki penanda USD
     });
 
     // ── Hapus baris ──────────────────────────────────────
@@ -942,6 +986,14 @@ $(document).ready(function(){
     $('#formPRBesar').on('submit', function(e){
         e.preventDefault();
         var form = this, valid = true, hasBan = false;
+
+        // Wajib pilih mata uang sebelum request dikirim.
+        if (!['IDR', 'USD'].includes($('#mataUangPRB').val())) {
+            Swal.fire('Mata Uang Wajib Diisi', 'Pilih Rupiah atau USD terlebih dahulu.', 'warning');
+            $('#mataUangPRB').focus();
+            return;
+        }
+        sinkronUSDDetail();
 
         // CEK APAKAH SEMUA STATUS PPN (HELPER) SUDAH DIPILIH
         var ppnIncomplete = false;
@@ -1027,6 +1079,8 @@ $(document).ready(function(){
         Swal.fire({ icon:'success', title:'PR Berhasil Dikirim!', text:'Menunggu persetujuan Manager.', confirmButtonColor:'#dc3545' });
     } else if(pesan === 'gagal'){
         Swal.fire({ icon:'error', title:'Gagal!', text:'Terjadi kesalahan saat menyimpan data.', confirmButtonColor:'#dc3545' });
+    } else if(pesan === 'gagal_mata_uang'){
+        Swal.fire({ icon:'warning', title:'Mata Uang Wajib Diisi!', text:'Pilih Rupiah atau USD sebelum mengirim PR.', confirmButtonColor:'#dc3545' });
     }
     window.history.replaceState({}, document.title, window.location.pathname);
 });

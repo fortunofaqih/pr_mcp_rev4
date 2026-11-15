@@ -702,11 +702,11 @@ body {
                     Input Mutasi
                 </a>
 
-               <a class="btn btn-success btn-sm"
+              <!-- <a class="btn btn-success btn-sm"
                 href="laporan_kawat.php?start_date=<?= h($startDate) ?>&end_date=<?= h($endDate) ?>">
                     <i class="fas fa-file-excel me-1"></i>
                     Excel
-                </a>
+                </a>-->
 
                 <a class="btn btn-danger btn-sm"
                 href="cetak_laporan_kawat.php?start_date=<?= h($startDate) ?>&end_date=<?= h($endDate) ?>"

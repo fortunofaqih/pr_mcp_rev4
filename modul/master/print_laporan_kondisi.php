@@ -32,16 +32,14 @@ header("Pragma: no-cache");
 header("Expires: 0");
 
 // ================= KPI =================
-$total_mobil = mysqli_fetch_assoc(mysqli_query($koneksi, "SELECT COUNT(*) as total FROM master_mobil"))['total'];
-
-// Unit yang masih aktif diservice (end_date IS NULL) — kapanpun
+// Mobil yang masih aktif diservice (end_date IS NULL) — hitung mobil UNIK
 $total_aktif = mysqli_fetch_assoc(mysqli_query($koneksi,
     "SELECT COUNT(DISTINCT id_mobil) as total FROM kondisi_kendaraan WHERE end_date IS NULL"
 ))['total'];
 
-// Selesai tepat di periode filter
+// Mobil yang selesai tepat di periode filter — hitung mobil UNIK (bukan jumlah baris mutasi)
 $stmt = mysqli_prepare($koneksi,
-    "SELECT COUNT(*) as total FROM kondisi_kendaraan
+    "SELECT COUNT(DISTINCT id_mobil) as total FROM kondisi_kendaraan
      WHERE end_date IS NOT NULL AND end_date BETWEEN ? AND ?"
 );
 mysqli_stmt_bind_param($stmt, "ss", $start_date_sql, $end_date_sql);
@@ -49,20 +47,6 @@ mysqli_stmt_execute($stmt);
 mysqli_stmt_bind_result($stmt, $total_selesai);
 mysqli_stmt_fetch($stmt);
 mysqli_stmt_close($stmt);
-
-// Rata-rata durasi (khusus yang selesai di periode)
-$stmt_avg = mysqli_prepare($koneksi,
-    "SELECT AVG(DATEDIFF(end_date, start_date) + 1) as rata2
-     FROM kondisi_kendaraan
-     WHERE end_date IS NOT NULL AND start_date IS NOT NULL
-       AND end_date BETWEEN ? AND ?"
-);
-mysqli_stmt_bind_param($stmt_avg, "ss", $start_date_sql, $end_date_sql);
-mysqli_stmt_execute($stmt_avg);
-mysqli_stmt_bind_result($stmt_avg, $rata2_raw);
-mysqli_stmt_fetch($stmt_avg);
-mysqli_stmt_close($stmt_avg);
-$rata2_durasi = $rata2_raw !== null ? round($rata2_raw, 1) : 0;
 
 // ================= QUERY UTAMA (REVISI) =================
 // Logika:
@@ -75,7 +59,11 @@ $query_rekap = "
     SELECT
         k.id_kondisi,
         k.id_mobil,
-        k.plat_nomor,
+        m.plat_nomor AS plat_nomor,
+        k.plat_nomor AS plat_nomor_service,
+        hp.plat_lama AS plat_sebelumnya,
+        hp.plat_baru AS plat_hasil_perubahan,
+        hp.tanggal_perubahan AS tanggal_ganti_plat,
         k.kondisi,
         k.bengkel,
         k.keterangan,
@@ -92,14 +80,23 @@ $query_rekap = "
         END AS status_service
     FROM kondisi_kendaraan k
     JOIN master_mobil m ON k.id_mobil = m.id_mobil
+    LEFT JOIN histori_plat_mobil hp
+        ON hp.id_histori = (
+            SELECT h2.id_histori
+            FROM histori_plat_mobil h2
+            WHERE h2.id_mobil = k.id_mobil
+            ORDER BY h2.tanggal_perubahan DESC, h2.id_histori DESC
+            LIMIT 1
+        )
     WHERE
         (k.end_date IS NOT NULL AND k.end_date BETWEEN ? AND ?)
         OR
         (k.end_date IS NULL)
     ORDER BY
-        -- Kelompokkan yang masih diservice di atas (opsional), lalu plat
+        -- Pertahankan service pending di atas; urutkan menurut plat TERBARU dan identitas mobil
         (k.end_date IS NULL) DESC,
-        k.plat_nomor ASC,
+        m.plat_nomor ASC,
+        k.id_mobil ASC,
         k.start_date ASC,
         k.created_at ASC
 ";
@@ -109,9 +106,9 @@ mysqli_stmt_bind_param($stmt_rekap, "ss", $start_date_sql, $end_date_sql);
 mysqli_stmt_execute($stmt_rekap);
 $result_rekap = mysqli_stmt_get_result($stmt_rekap);
 
-// Hitung jumlah pending (untuk info di header)
+// Hitung jumlah mobil pending (unik) — untuk info di header KPI
 $row_pending = mysqli_fetch_assoc(mysqli_query($koneksi,
-    "SELECT COUNT(*) as total FROM kondisi_kendaraan WHERE end_date IS NULL"
+    "SELECT COUNT(DISTINCT id_mobil) as total FROM kondisi_kendaraan WHERE end_date IS NULL"
 ));
 $total_pending = $row_pending['total'];
 ?>
@@ -198,21 +195,17 @@ $total_pending = $row_pending['total'];
     <!-- ================= KPI ================= -->
     <table class="kpi-table">
         <tr>
-            <td colspan="4" class="header-kpi text-center">
+            <td colspan="2" class="header-kpi text-center">
                 RINGKASAN STATISTIK SERVICE PERIODE <?= strtoupper($periode_label) ?>
             </td>
         </tr>
         <tr>
-            <td class="text-bold" style="width: 20%;">Total Armada</td>
-            <td style="width: 30%;"><?= $total_mobil ?> Unit</td>
-            <td class="text-bold" style="width: 20%;">Selesai Servis (Periode)</td>
-            <td style="width: 30%;"><?= $total_selesai ?> Unit</td>
+            <td class="text-bold" style="width: 50%;">Mobil yang masih diservice</td>
+            <td style="width: 50%;"><?= $total_pending ?> Unit</td>
         </tr>
         <tr>
-            <td class="text-bold">Masih Diservice (Pending)</td>
-            <td><?= $total_pending ?> Unit</td>
-            <td class="text-bold">Rata-rata Durasi Selesai</td>
-            <td><?= $rata2_durasi ?> Hari</td>
+            <td class="text-bold">Mobil yang selesai diservice</td>
+            <td><?= $total_selesai ?> Unit</td>
         </tr>
     </table>
 
@@ -244,12 +237,42 @@ $total_pending = $row_pending['total'];
         <tbody>
             <?php
             $hasData = false;
-            $current_plat = '';
+            $current_group = null;
             $no = 0;
 
             while ($row = mysqli_fetch_assoc($result_rekap)) {
                 $hasData = true;
-                $no++;
+
+                // Kelompokkan berdasarkan ID kendaraan, bukan plat historis.
+                // Status pending/selesai tetap mengikuti prioritas urutan existing.
+                $group_key = ($row['end_date'] === null ? 'PENDING:' : 'SELESAI:') . $row['id_mobil'];
+                if ($current_group !== $group_key) {
+                    $no = 0; // reset counter per kelompok kendaraan
+                    $current_group = $group_key;
+                    ?>
+                    <tr class="plat-group">
+                        <td colspan="9">
+                            <b><?= htmlspecialchars($row['plat_nomor']) ?></b>
+                            <?php if (!empty($row['merk_tipe'])): ?>
+                                &mdash; <?= htmlspecialchars($row['merk_tipe']) ?>
+                                <?= htmlspecialchars($row['tahun_kendaraan'] ? '(' . $row['tahun_kendaraan'] . ')' : '') ?>
+                            <?php endif; ?>
+                            <?php if (!empty($row['plat_sebelumnya']) && !empty($row['plat_hasil_perubahan'])): ?>
+                                <div style="font-size: 10px; color: #795548; font-weight: normal; margin-top: 3px;">
+                                    PERNAH GANTI PLAT — sebelumnya:
+                                    <?= htmlspecialchars($row['plat_sebelumnya']) ?>
+                                    &rarr; <?= htmlspecialchars($row['plat_hasil_perubahan']) ?>
+                                    <?php if (!empty($row['tanggal_ganti_plat'])): ?>
+                                        | Tgl ganti: <?= date('d/m/Y', strtotime($row['tanggal_ganti_plat'])) ?>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php
+                }
+
+                $no++; // nomor urut per plat
 
                 $aktif = is_null($row['end_date']);
 
@@ -273,22 +296,6 @@ $total_pending = $row_pending['total'];
                 } else {
                     $status_label = 'SELESAI';
                     $status_class = 'status-selesai';
-                }
-
-                // Grouping per plat
-                if ($current_plat != $row['plat_nomor']) {
-                    $current_plat = $row['plat_nomor'];
-                    ?>
-                    <tr class="plat-group">
-                        <td colspan="9">
-                            <b><?= htmlspecialchars($row['plat_nomor']) ?></b>
-                            <?php if (!empty($row['merk_tipe'])): ?>
-                                &mdash; <?= htmlspecialchars($row['merk_tipe']) ?>
-                                <?= htmlspecialchars($row['tahun_kendaraan'] ? '(' . $row['tahun_kendaraan'] . ')' : '') ?>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                    <?php
                 }
 
                 // Warna baris

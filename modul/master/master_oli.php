@@ -37,6 +37,64 @@ $syncMaster = oli_sync_master_barang($koneksi, $user);
 $syncBeli   = oli_sync_pembelian($koneksi, $user);
 
 /* =========================================================
+   HAPUS TRANSAKSI MANUAL
+   ========================================================= */
+if (isset($_POST['delete_transaksi'])) {
+
+    $idRiwayat = (int)($_POST['id_riwayat'] ?? 0);
+
+    if ($idRiwayat <= 0) {
+        $_SESSION['error'] = 'ID transaksi tidak valid.';
+        header("Location: master_oli.php");
+        exit;
+    }
+
+    // Cek keberadaan & proteksi pembelian
+    $stmt = $koneksi->prepare("
+        SELECT id_riwayat, source_type
+        FROM riwayat_oli
+        WHERE id_riwayat = ?
+        LIMIT 1
+    ");
+    $stmt->bind_param("i", $idRiwayat);
+    $stmt->execute();
+    $existing = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$existing) {
+        $_SESSION['error'] = 'Transaksi tidak ditemukan.';
+        header("Location: master_oli.php");
+        exit;
+    }
+
+    if (($existing['source_type'] ?? '') === 'PEMBELIAN') {
+        $_SESSION['error'] =
+            'Transaksi pembelian otomatis tidak boleh dihapus dari modul oli.';
+        header("Location: master_oli.php");
+        exit;
+    }
+
+    $stmt = $koneksi->prepare("
+        DELETE FROM riwayat_oli
+        WHERE id_riwayat = ?
+          AND COALESCE(source_type, '') <> 'PEMBELIAN'
+    ");
+    $stmt->bind_param("i", $idRiwayat);
+
+    if ($stmt->execute() && $stmt->affected_rows > 0) {
+        $_SESSION['success'] = 'Transaksi oli berhasil dihapus.';
+    } else {
+        $_SESSION['error'] =
+            'Gagal menghapus: ' . $stmt->error;
+    }
+
+    $stmt->close();
+
+    header("Location: master_oli.php");
+    exit;
+}
+
+/* =========================================================
    EDIT TRANSAKSI MANUAL
    ========================================================= */
 
@@ -854,13 +912,37 @@ body {
 
                                 <?php else: ?>
 
-                                    <button
-                                        class="btn btn-warning btn-sm"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#editModal<?= (int)$r['id_riwayat'] ?>"
-                                    >
-                                        Edit
-                                    </button>
+                                    <div class="d-flex gap-1">
+
+                                        <button
+                                            class="btn btn-warning btn-sm"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#editModal<?= (int)$r['id_riwayat'] ?>"
+                                        >
+                                            Edit
+                                        </button>
+
+                                        <!-- ===== TOMBOL DELETE ===== -->
+                                        <form
+                                            method="post"
+                                            class="d-inline"
+                                            onsubmit="return confirm('Hapus transaksi ini?\n\nOli: <?= h(addslashes($r['nama_oli'])) ?>\nJumlah: <?= number_format((float)$r['jumlah'], 2) ?> L\nTanggal: <?= date('d/m/Y', strtotime($r['tanggal'])) ?>\n\nTindakan ini tidak dapat dibatalkan.');"
+                                        >
+                                            <input
+                                                type="hidden"
+                                                name="id_riwayat"
+                                                value="<?= (int)$r['id_riwayat'] ?>"
+                                            >
+                                            <button
+                                                type="submit"
+                                                name="delete_transaksi"
+                                                class="btn btn-danger btn-sm"
+                                            >
+                                                Hapus
+                                            </button>
+                                        </form>
+
+                                    </div>
 
                                 <?php endif; ?>
 

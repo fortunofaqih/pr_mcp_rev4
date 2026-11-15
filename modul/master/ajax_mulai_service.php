@@ -29,7 +29,7 @@ $created_by = $_SESSION['username'] ?? 'system';
 $kondisi_valid = ['DISERVICE']; // Hanya DISERVICE
 
 // Validasi bengkel
-$bengkel_valid = ['MISTARI', 'RUDI H.', 'EDI M.', 'M. ULUM', 'SAIFUL'];
+$bengkel_valid = ['MISTARI', 'RUDI H.', 'EDI M.', 'M. ULUM'];
 
 if (empty($id_mobil) || empty($plat_nomor) || !in_array($kondisi, $kondisi_valid, true) || empty($start_date)) {
     echo json_encode(['status' => 'error', 'message' => 'Mobil, kondisi (DISERVICE), dan tanggal masuk servis wajib diisi.']);

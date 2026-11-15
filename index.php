@@ -296,6 +296,13 @@ if ($is_finance) {
                             <?php endif; ?>
                         </a>
                     </li>
+                    <!-- Verifikasi pembelian -->
+                    <li class="nav-item">
+                        <a href="modul/transaksi/verifikasi_pembelian.php" class="nav-link">
+                            <i class="fas fa-list me-2"></i> Verifikasi Pembelian
+                            
+                        </a>
+                    </li>
                      <li class="nav-item">
                         <a href="modul/pimpinan/list_approval_pimpinan.php" class="nav-link">
                             <i class="fas fa-list me-2"></i> List Approval PR
@@ -311,7 +318,7 @@ if ($is_finance) {
                     </li>
                     <!-- Update kondisi kendaraan -->
                     <li class="nav-item">
-                        <a href="modul/master/kondisi_kendaraan.php" class="nav-link">
+                        <a href="modul/master/kondisi_kendaraan2.php" class="nav-link">
                             <i class="fas fa-car me-2"></i> Update Kondisi Kendaraan
                         </a>
                     </li>
@@ -410,13 +417,18 @@ if ($is_finance) {
                         </a>
                     </li>
                      <li class="nav-item">
-                        <a href="modul/transaksi/pr_finance.php" class="nav-link">s
+                        <a href="modul/transaksi/pr_finance.php" class="nav-link">
                             <i class="fas fa-file-invoice me-2"></i> Purchase Request (PR)
                         </a>
                     </li>
                       <li class="nav-item">
                         <a href="modul/laporan/data_pembelian_finance.php" class="nav-link">
                             <i class="fas fa-file-alt me-2"></i> Buku Pembelian
+                        </a>
+                    </li>
+                     <li class="nav-item">
+                        <a href="modul/finance/finance_prb_pembayaran.php" class="nav-link">
+                            <i class="fas fa-file-alt me-2"></i> Verifikasi
                         </a>
                     </li>
 					 <li class="nav-item">

@@ -96,12 +96,12 @@ if ($_SESSION['status'] != "login") {
                     </div>
                     <div class="col-6">
                         <a href="data_mobil.php" class="btn btn-outline-secondary w-100 fw-bold py-2">
-                            <i class="fas fa-list me-2"></i> DATA MOBIL
+                            <i class="fas fa-list me-2"></i> KEMBALI KE DATA MOBIL
                         </a>
                     </div>
                     <div class="col-6">
                         <a href="../../index.php" class="btn btn-danger w-100 py-2 fw-bold">
-                            <i class="fas fa-rotate-left me-2"></i> KEMBALI
+                            <i class="fas fa-rotate-left me-2"></i> HOME
                         </a>
                     </div>
                 </div>

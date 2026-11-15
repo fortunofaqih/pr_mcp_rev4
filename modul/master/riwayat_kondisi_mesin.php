@@ -162,9 +162,7 @@ function formatDateIndo($date) {
             <button onclick="window.print()" class="btn btn-sm btn-print">
                 <i class="fas fa-print"></i> CETAK / PDF
             </button>
-            <a href="mesin.php" class="btn btn-sm btn-secondary">
-                <i class="fas fa-arrow-left"></i> KEMBALI
-            </a>
+           
         </div>
     </div>
 </nav>

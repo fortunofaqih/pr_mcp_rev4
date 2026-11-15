@@ -1,0 +1,471 @@
+<?php
+session_start();
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
+
+if ($_SESSION['status'] != "login") {
+    header("location:../../login.php?pesan=belum_login");
+    exit;
+}
+
+// Filter rentang tanggal
+$start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
+$end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-d');
+
+// Jika tidak ada filter, default bulan berjalan
+if (empty($start_date) || empty($end_date)) {
+    $start_date = date('Y-m-01');
+    $end_date = date('Y-m-d');
+}
+?>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laporan Kondisi Kendaraan - MCP System</title>
+    <link rel="icon" type="image/png" href="/pr_mcp/assets/img/logo_mcp.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --mcp-blue: #0000FF; }
+        body { background-color: #f8f9fa; }
+        .navbar-mcp { background: var(--mcp-blue); color: white; }
+        .card { border-radius: 12px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .table thead th { background-color: #f1f4f9; vertical-align: middle; }
+
+        .stat-card {
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            color: #fff;
+            background: #495057;
+        }
+        .stat-card.total   { background: var(--mcp-blue); }
+        .stat-card.aktif   { background: #fd7e14; }
+        .stat-card.selesai { background: #28a745; }
+        .stat-card.durasi  { background: #6c757d; }
+        .stat-card i.stat-icon { font-size: 1.5rem; opacity: 0.85; }
+        .stat-number { font-size: 2rem; font-weight: bold; line-height: 1.1; }
+        .stat-label { font-size: 0.85rem; opacity: 0.95; }
+
+        .badge-baik { background-color: #28a745; color: white; }
+        .badge-diservice { background-color: #ffc107; color: black; }
+
+        .chart-box { position: relative; height: 280px; }
+
+        @media (max-width: 768px) {
+            .navbar-brand { font-size: 0.9rem; }
+            .btn-sm { font-size: 0.7rem; padding: 0.25rem 0.5rem; }
+            .table-responsive { font-size: 0.8rem; }
+            .card-body { padding: 0.75rem; }
+            .container-fluid { padding-left: 0.5rem; padding-right: 0.5rem; }
+            .stat-number { font-size: 1.5rem; }
+            .stat-label { font-size: 0.75rem; }
+            .chart-box { height: 220px; }
+        }
+        @media (max-width: 576px) {
+            .navbar-brand { font-size: 0.75rem; }
+            .btn { font-size: 0.7rem; padding: 0.2rem 0.4rem; }
+            .table td, .table th { padding: 0.3rem 0.2rem; }
+            .badge { font-size: 0.65rem; }
+            .stat-card { padding: 14px; }
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            .card { box-shadow: none !important; border: 1px solid #ddd !important; }
+            .stat-card { color: #000 !important; border: 1px solid #ddd !important; }
+            .stat-card.total, .stat-card.aktif, .stat-card.selesai, .stat-card.durasi { background: #f8f9fa !important; }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-mcp mb-4 no-print">
+    <div class="container-fluid px-3 px-sm-4">
+        <span class="navbar-brand fw-bold text-white"><i class="fas fa-chart-bar me-2"></i> LAPORAN KONDISI KENDARAAN</span>
+        <div class="d-flex flex-wrap gap-1">
+            
+            <a href="kondisi_kendaraan2.php" class="btn btn-sm btn-light fw-bold"><i class="fas fa-clipboard-list"></i> KEMBALI</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid px-3 px-sm-4">
+    <!-- Filter -->
+    <div class="card mb-4 no-print">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-6 col-md-3">
+                    <label class="form-label fw-bold">Tanggal Mulai</label>
+                    <div class="input-group date">
+                        <input type="text" class="form-control datepicker" id="start_date" name="start_date" 
+                               placeholder="DD-MM-YYYY" value="<?= date('d-m-Y', strtotime($start_date)) ?>" autocomplete="off">
+                        <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label fw-bold">Tanggal Selesai</label>
+                    <div class="input-group date">
+                        <input type="text" class="form-control datepicker" id="end_date" name="end_date" 
+                               placeholder="DD-MM-YYYY" value="<?= date('d-m-Y', strtotime($end_date)) ?>" autocomplete="off">
+                        <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter"></i> Filter</button>
+                </div>
+                <div class="col-6 col-md-2">
+                    <a href="print_laporan_kondisi.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>" class="btn btn-success w-100" target="_blank">
+                        <i class="fas fa-file-excel"></i> Export
+                    </a>
+                </div>
+                   <div class="col-6 col-md-2">
+                    <a href="print_laporan_kondisi_pdf.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>" class="btn btn-danger w-100" target="_blank">
+                        <i class="fas fa-file-pdf"></i> Cetak
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= STATISTIK ================= -->
+    <?php
+    // Konversi tanggal ke format MySQL
+    $start_date_sql = date('Y-m-d', strtotime($start_date));
+    $end_date_sql = date('Y-m-d', strtotime($end_date));
+
+    $total_mobil = mysqli_fetch_assoc(mysqli_query($koneksi, "SELECT COUNT(*) as total FROM master_mobil"))['total'];
+
+    $total_aktif = mysqli_fetch_assoc(mysqli_query($koneksi,
+        "SELECT COUNT(DISTINCT id_mobil) as total FROM kondisi_kendaraan WHERE end_date IS NULL"
+    ))['total'];
+
+    // Total selesai dalam rentang tanggal
+    $stmt = mysqli_prepare($koneksi,
+        "SELECT COUNT(*) as total FROM kondisi_kendaraan
+         WHERE end_date IS NOT NULL AND end_date BETWEEN ? AND ?"
+    );
+    mysqli_stmt_bind_param($stmt, "ss", $start_date_sql, $end_date_sql);
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_bind_result($stmt, $total_selesai);
+    mysqli_stmt_fetch($stmt);
+    mysqli_stmt_close($stmt);
+
+    // Total servis dimulai dalam rentang tanggal
+    $stmt = mysqli_prepare($koneksi,
+        "SELECT COUNT(*) as total FROM kondisi_kendaraan
+         WHERE start_date BETWEEN ? AND ?"
+    );
+    mysqli_stmt_bind_param($stmt, "ss", $start_date_sql, $end_date_sql);
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_bind_result($stmt, $total_mulai);
+    mysqli_stmt_fetch($stmt);
+    mysqli_stmt_close($stmt);
+
+    $row_durasi = mysqli_fetch_assoc(mysqli_query($koneksi,
+        "SELECT AVG(DATEDIFF(end_date, start_date) + 1) as rata2
+         FROM kondisi_kendaraan WHERE end_date IS NOT NULL AND start_date IS NOT NULL"
+    ));
+    $rata2_durasi = $row_durasi['rata2'] !== null ? round($row_durasi['rata2'], 1) : 0;
+    ?>
+
+    <div class="row mb-2">
+        <div class="col-6 col-md-3">
+            <div class="stat-card total">
+                <i class="fas fa-truck stat-icon"></i>
+                <div class="stat-number"><?= $total_mobil ?></div>
+                <div class="stat-label">Total Armada</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-card aktif">
+                <i class="fas fa-wrench stat-icon"></i>
+                <div class="stat-number"><?= $total_aktif ?></div>
+                <div class="stat-label">Sedang Diservis (Aktif Saat Ini)</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-card selesai">
+                <i class="fas fa-check-circle stat-icon"></i>
+                <div class="stat-number"><?= $total_selesai ?></div>
+                <div class="stat-label">Selesai Servis (<?= date('d-M-Y', strtotime($start_date)) ?> - <?= date('d-M-Y', strtotime($end_date)) ?>)</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-card durasi">
+                <i class="fas fa-clock stat-icon"></i>
+                <div class="stat-number"><?= $rata2_durasi ?> <small style="font-size:1rem;">hari</small></div>
+                <div class="stat-label">Rata-rata Durasi Servis</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= GRAFIK ================= -->
+    <div class="row mb-4">
+        <div class="col-12 col-md-6">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Distribusi Kondisi Armada Saat Ini</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-box"><canvas id="chartStatus"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Durasi Servis Terlama (Top 10)</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-box"><canvas id="chartDurasi"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= TABEL: MUTASI SERVIS ================= -->
+    <div class="card mt-4">
+        <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="fas fa-history me-2"></i>Mutasi Servis Kendaraan</h6>
+            <small class="text-muted">Periode: <?= date('d-M-Y', strtotime($start_date)) ?> s/d <?= date('d-M-Y', strtotime($end_date)) ?></small>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="small text-uppercase">
+                        <tr>
+                            <th style="width:36px;"></th>
+                            <th>Plat Nomor</th>
+                            <th>Driver</th>
+                            <th>Bengkel</th>
+                            <th class="text-center">Jumlah Servis</th>
+                            <th>Status Terakhir</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        $stmt_riwayat = mysqli_prepare($koneksi, "
+                            SELECT k.kondisi, k.plat_nomor, k.start_date, k.end_date, k.bengkel, m.driver_tetap
+                            FROM kondisi_kendaraan k
+                            JOIN master_mobil m ON k.id_mobil = m.id_mobil
+                            WHERE (k.start_date BETWEEN ? AND ?) OR (k.end_date BETWEEN ? AND ?)
+                            ORDER BY k.start_date DESC
+                        ");
+                        mysqli_stmt_bind_param($stmt_riwayat, "ssss", $start_date_sql, $end_date_sql, $start_date_sql, $end_date_sql);
+                        mysqli_stmt_execute($stmt_riwayat);
+                        mysqli_stmt_bind_result($stmt_riwayat, $r_kondisi, $r_plat, $r_start, $r_end, $r_bengkel, $r_driver);
+
+                        $riwayat_grouped = [];
+                        while (mysqli_stmt_fetch($stmt_riwayat)) {
+                            // Simpan semua episode untuk setiap plat
+                            if (!isset($riwayat_grouped[$r_plat])) {
+                                $riwayat_grouped[$r_plat] = [
+                                    'driver' => $r_driver,
+                                    'bengkel' => $r_bengkel,
+                                    'episodes' => []
+                                ];
+                            }
+                            // Update bengkel jika ada yang berbeda
+                            if ($r_bengkel && empty($riwayat_grouped[$r_plat]['bengkel'])) {
+                                $riwayat_grouped[$r_plat]['bengkel'] = $r_bengkel;
+                            }
+                            $riwayat_grouped[$r_plat]['episodes'][] = [
+                                'kondisi' => $r_kondisi,
+                                'start'   => $r_start,
+                                'end'     => $r_end,
+                            ];
+                        }
+                        mysqli_stmt_close($stmt_riwayat);
+
+                        $badge_map = [
+                            'DISERVICE' => 'bg-warning text-dark',
+                            'BAIK'      => 'bg-success',
+                        ];
+                        ?>
+
+                        <?php if (empty($riwayat_grouped)): ?>
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-3">Tidak ada data servis pada periode ini.</td>
+                        </tr>
+                        <?php else: foreach ($riwayat_grouped as $plat => $data):
+                            $episodes = $data['episodes'];
+                            $terakhir = $episodes[0];
+                            $aktif_terakhir = is_null($terakhir['end']);
+                            $collapse_id = 'riwayat_' . preg_replace('/[^A-Za-z0-9]/', '', $plat);
+                        ?>
+                        <tr class="riwayat-toggle" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#<?= $collapse_id ?>">
+                            <td class="text-center text-muted"><i class="fas fa-chevron-right toggle-icon"></i></td>
+                            <td class="fw-bold text-primary"><?= htmlspecialchars($plat) ?></td>
+                            <td><?= htmlspecialchars($data['driver']) ?></td>
+                            <td><?= htmlspecialchars($data['bengkel'] ?? '-') ?></td>
+                            <td class="text-center"><span class="badge bg-secondary"><?= count($episodes) ?>x</span></td>
+                            <td>
+                                <?= $aktif_terakhir
+                                    ? '<span class="badge bg-warning text-dark">AKTIF</span>'
+                                    : '<span class="badge bg-success">SELESAI</span>' ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="6" class="p-0 border-0">
+                                <div class="collapse" id="<?= $collapse_id ?>">
+                                    <div class="p-2 ps-4 bg-light">
+                                        <table class="table table-sm mb-0 bg-white">
+                                            <thead class="small text-uppercase">
+                                                <tr>
+                                                    <th>Kondisi</th>
+                                                    <th>Mulai</th>
+                                                    <th>Selesai</th>
+                                                    <th>Durasi</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($episodes as $ep):
+                                                    $aktif = is_null($ep['end']);
+                                                    $durasi = '-';
+                                                    if ($ep['start']) {
+                                                        $start = new DateTime($ep['start']);
+                                                        $sampai = $aktif ? new DateTime() : new DateTime($ep['end']);
+                                                        $durasi = ($start->diff($sampai)->days + 1) . ' hari';
+                                                    }
+                                                    $badge = $badge_map[$ep['kondisi']] ?? 'bg-secondary';
+                                                ?>
+                                                <tr>
+                                                    <td><span class="badge <?= $badge ?>"><?= htmlspecialchars($ep['kondisi']) ?></span></td>
+                                                    <td><?= $ep['start'] ? date('d-M-Y', strtotime($ep['start'])) : '-' ?></td>
+                                                    <td><?= $ep['end'] ? date('d-M-Y', strtotime($ep['end'])) : '-' ?></td>
+                                                    <td><?= $durasi ?></td>
+                                                    <td>
+                                                        <?= $aktif
+                                                            ? '<span class="badge bg-warning text-dark">AKTIF</span>'
+                                                            : '<span class="badge bg-success">SELESAI</span>' ?>
+                                                    </td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/locales/bootstrap-datepicker.id.min.js"></script>
+<script>
+$(document).ready(function() {
+    $('.datepicker').datepicker({
+        format: 'dd-mm-yyyy',
+        autoclose: true,
+        todayHighlight: true,
+        language: 'id',
+        orientation: 'bottom'
+    });
+});
+
+<?php
+$status_data = ['BAIK' => 0, 'DISERVICE' => 0];
+
+$q_mobil = mysqli_query($koneksi, "SELECT id_mobil FROM master_mobil");
+$stmt_cek = mysqli_prepare($koneksi,
+    "SELECT kondisi FROM kondisi_kendaraan WHERE id_mobil = ? AND end_date IS NULL ORDER BY start_date DESC LIMIT 1"
+);
+mysqli_stmt_bind_param($stmt_cek, "i", $id_mobil_loop);
+mysqli_stmt_bind_result($stmt_cek, $kondisi_loop);
+
+while ($m = mysqli_fetch_assoc($q_mobil)) {
+    $id_mobil_loop = $m['id_mobil'];
+    mysqli_stmt_execute($stmt_cek);
+    $k = mysqli_stmt_fetch($stmt_cek) ? $kondisi_loop : 'BAIK';
+    if (!isset($status_data[$k])) $k = 'BAIK';
+    $status_data[$k]++;
+}
+mysqli_stmt_close($stmt_cek);
+
+$query_durasi = mysqli_query($koneksi, "
+    SELECT k.plat_nomor, k.start_date, k.end_date,
+           DATEDIFF(COALESCE(k.end_date, NOW()), k.start_date) as durasi
+    FROM kondisi_kendaraan k
+    WHERE k.start_date IS NOT NULL
+    ORDER BY durasi DESC
+    LIMIT 10
+");
+$durasi_labels = [];
+$durasi_values = [];
+while ($row = mysqli_fetch_assoc($query_durasi)) {
+    $durasi_labels[] = $row['plat_nomor'];
+    $durasi_values[] = (int) $row['durasi'];
+}
+?>
+
+new Chart(document.getElementById('chartStatus').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+        labels: ['BAIK', 'DISERVICE'],
+        datasets: [{
+            data: [
+                <?= $status_data['BAIK'] ?>,
+                <?= $status_data['DISERVICE'] ?>
+            ],
+            backgroundColor: ['#28a745', '#ffc107'],
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } }
+    }
+});
+
+new Chart(document.getElementById('chartDurasi').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: <?= json_encode($durasi_labels) ?>,
+        datasets: [{
+            label: 'Durasi Servis (Hari)',
+            data: <?= json_encode($durasi_values) ?>,
+            backgroundColor: 'rgba(0, 0, 255, 0.6)',
+            borderColor: 'rgba(0, 0, 255, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, title: { display: true, text: 'Hari' } } }
+    }
+});
+
+let idleTime = 0;
+const maxIdleMinutes = 15;
+function resetTimer() { idleTime = 0; }
+window.onload = resetTimer;
+document.onmousemove = resetTimer;
+document.onkeypress = resetTimer;
+document.onmousedown = resetTimer;
+document.onclick = resetTimer;
+document.onscroll = resetTimer;
+setInterval(function () {
+    idleTime++;
+    if (idleTime >= maxIdleMinutes) {
+        window.location.href = "http://192.168.31.200/pr_mcp/auth/logout.php?pesan=timeout";
+    }
+}, 60000);
+</script>
+</body>
+</html>

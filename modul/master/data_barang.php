@@ -39,15 +39,81 @@ if ($_SESSION['status'] != "login") {
     /* Pastikan teks tetap gelap agar terbaca jelas di background warna */
     .stok-danger td, .stok-warning td { color: #333 !important; }
     .stok-danger .text-muted, .stok-warning .text-muted { color: #666 !important; }
+
+    /* LOADING HALAMAN MASTER BARANG — overlay di tengah viewport */
+    #loadingHalamanBarang {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(248, 249, 250, 0.96);
+        opacity: 1;
+        visibility: visible;
+        transition: opacity .35s ease, visibility .35s ease;
+    }
+    #loadingHalamanBarang.loading-selesai {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
+    .loading-barang-box {
+        width: min(100%, 380px);
+        padding: 30px 24px;
+        text-align: center;
+        background: #ffffff;
+        border: 1px solid #e7ecf7;
+        border-radius: 16px;
+        box-shadow: 0 12px 36px rgba(0, 35, 135, .10);
+    }
+    .loading-barang-spinner {
+        width: 52px;
+        height: 52px;
+        margin: 0 auto 18px;
+        border: 5px solid #dfe8ff;
+        border-top-color: var(--mcp-blue);
+        border-radius: 50%;
+        animation: putarLoadingBarang .8s linear infinite;
+    }
+    .loading-barang-title {
+        color: #183b91;
+        font-size: 1.06rem;
+        font-weight: 700;
+        line-height: 1.4;
+        margin-bottom: 8px;
+    }
+    .loading-barang-desc {
+        color: #64748b;
+        font-size: .85rem;
+        line-height: 1.5;
+    }
+    @keyframes putarLoadingBarang {
+        to { transform: rotate(360deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .loading-barang-spinner { animation-duration: 1.8s; }
+        #loadingHalamanBarang { transition: none; }
+    }
 </style>
 </head>
 <body>
+<!-- TAMBAHAN: Loading saat membuka halaman Master Barang -->
+<div id="loadingHalamanBarang" role="status" aria-live="polite" aria-label="Memuat data master barang">
+    <div class="loading-barang-box">
+        <div class="loading-barang-spinner" aria-hidden="true"></div>
+        <div class="loading-barang-title">Loading... Memuat Master Barang</div>
+        <div class="loading-barang-desc">Sedang menyiapkan data barang, mohon tunggu.</div>
+    </div>
+</div>
+
 
 <nav class="navbar navbar-mcp mb-4">
     <div class="container-fluid px-4">
         <span class="navbar-brand fw-bold text-white"><i class="fas fa-database me-2"></i> MASTER BARANG</span>
         <div>
-             <a href="../../index.php" class="btn btn-sm btn-danger"><i class="fas fa-rotate-left"></i> KEMBALI</a>
+             <a href="../../index.php" class="btn btn-sm btn-danger"><i class="fas fa-rotate-left"></i> HOME</a>
             <a href="barang.php" class="btn btn-sm btn-light fw-bold"><i class="fas fa-plus-circle"></i> TAMBAH BARANG BARU</a>
         </div>
     </div>
@@ -145,6 +211,24 @@ if ($_SESSION['status'] != "login") {
     </div>
 </div>
 
+
+<script>
+// TAMBAHAN: Tutup loading setelah DataTables siap.
+function selesaiLoadingBarang() {
+    const overlay = document.getElementById('loadingHalamanBarang');
+    if (!overlay || overlay.classList.contains('loading-selesai')) return;
+    overlay.classList.add('loading-selesai');
+    window.setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 400);
+}
+// Pengaman bila CDN/DataTables gagal dimuat, agar halaman tidak tertutup terus.
+window.addEventListener('load', function () {
+    if (!window.jQuery || !jQuery.fn || !jQuery.fn.DataTable) {
+        selesaiLoadingBarang();
+    }
+});
+window.setTimeout(selesaiLoadingBarang, 12000);
+</script>
+
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
@@ -156,7 +240,10 @@ $(document).ready(function() {
         "pageLength": 10,
         "language": { "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json" },
         "order": [[ 1, "asc" ]],
-        "columnDefs": [ { "orderable": false, "targets": [0, 9] } ] // Target 9 karena ada kolom baru
+        "columnDefs": [ { "orderable": false, "targets": [0, 9] } ], // Target 9 karena ada kolom baru
+        "initComplete": function () {
+            selesaiLoadingBarang();
+        }
     });
 });
 </script>

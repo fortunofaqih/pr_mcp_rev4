@@ -10,6 +10,23 @@ if (($_SESSION['status'] ?? '') !== 'login') {
 }
 
 $user = $_SESSION['username'] ?? 'system';
+$simpanKeterangan = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST';
+$csrfCatatan = $_SESSION['csrf_laporan_kawat_keterangan'] ?? '';
+
+if ($simpanKeterangan && (
+    ($_POST['aksi'] ?? '') !== 'simpan_keterangan' ||
+    $csrfCatatan === '' ||
+    !is_string($_POST['csrf'] ?? null) ||
+    !hash_equals($csrfCatatan, $_POST['csrf'])
+)) {
+    http_response_code(403);
+    exit('Permintaan tidak valid. Muat ulang laporan dan coba lagi.');
+}
+
+if ($csrfCatatan === '') {
+    $csrfCatatan = bin2hex(random_bytes(32));
+    $_SESSION['csrf_laporan_kawat_keterangan'] = $csrfCatatan;
+}
 
 kawat_sync_master_barang($koneksi, $user);
 kawat_sync_pembelian($koneksi, $user);
@@ -30,10 +47,6 @@ if ($pakaiRentang) {
     }
 }
 
-/*
- * Default bulan & tahun — selalu di-set di awal,
- * supaya terdefinisi baik di mode bulan maupun mode rentang.
- */
 $bulan = isset($_GET['bulan'])
     ? max(1, min(12, (int)$_GET['bulan']))
     : (int)date('m');
@@ -43,40 +56,26 @@ $tahun = isset($_GET['tahun'])
     : (int)date('Y');
 
 if ($pakaiRentang) {
-
     if ($startDate > $endDate) {
         $tmp       = $startDate;
         $startDate = $endDate;
         $endDate   = $tmp;
     }
-
     $periodeLabel = date('d/m/Y', strtotime($startDate))
                   . ' s/d '
                   . date('d/m/Y', strtotime($endDate));
-
 } else {
-
     $namaBulan = [
-        1  => 'Januari',
-        2  => 'Februari',
-        3  => 'Maret',
-        4  => 'April',
-        5  => 'Mei',
-        6  => 'Juni',
-        7  => 'Juli',
-        8  => 'Agustus',
-        9  => 'September',
-        10 => 'Oktober',
-        11 => 'November',
-        12 => 'Desember'
+        1  => 'Januari',   2  => 'Februari', 3  => 'Maret',
+        4  => 'April',     5  => 'Mei',      6  => 'Juni',
+        7  => 'Juli',      8  => 'Agustus',  9  => 'September',
+        10 => 'Oktober',   11 => 'November', 12 => 'Desember'
     ][$bulan];
 
     $periodeLabel = $namaBulan . ' ' . $tahun;
 }
 
-$idKawatFilter = isset($_GET['id_kawat'])
-    ? (int)$_GET['id_kawat']
-    : 0;
+$idKawatFilter = isset($_GET['id_kawat']) ? (int)$_GET['id_kawat'] : 0;
 
 /* =========================================================
    NAMA UKURAN FILTER
@@ -85,400 +84,364 @@ $idKawatFilter = isset($_GET['id_kawat'])
 $ukuranFilterText = 'Semua Ukuran';
 
 if ($idKawatFilter > 0) {
-
     $stmtUkuran = $koneksi->prepare("
-        SELECT ukuran
-        FROM master_kawat
-        WHERE id_kawat = ?
-        LIMIT 1
+        SELECT ukuran FROM master_kawat WHERE id_kawat = ? LIMIT 1
     ");
-
     $stmtUkuran->bind_param("i", $idKawatFilter);
     $stmtUkuran->execute();
-
     $rowUkuran = $stmtUkuran->get_result()->fetch_assoc();
-
     if ($rowUkuran) {
-        $ukuranFilterText =
-            number_format((float)$rowUkuran['ukuran'], 2) . ' mm';
+        $ukuranFilterText = formatUkuran($rowUkuran['ukuran']);
     }
-
     $stmtUkuran->close();
 }
 
-/* =========================================================
-   HELPER QUERY DETAIL — dipakai untuk PEMBELIAN & BEKAS
-   ========================================================= */
-
-function buildFilterPeriodeDetail($pakaiRentang, $startDate, $endDate, $bulan, $tahun)
-{
-    if ($pakaiRentang) {
-        return [
-            " AND t.tanggal BETWEEN ? AND ? ",
-            [$startDate, $endDate],
-            'ss'
-        ];
-    }
-
-    return [
-        " AND MONTH(t.tanggal) = ? AND YEAR(t.tanggal) = ? ",
-        [$bulan, $tahun],
-        'ii'
-    ];
+// Rekap dan detail menggunakan periode serta filter ukuran yang sama.
+if ($pakaiRentang) {
+    $periodeSql = 't.tanggal >= ? AND t.tanggal < DATE_ADD(?, INTERVAL 1 DAY)';
+    $params = [$startDate, $endDate];
+    $types = 'ss';
+} else {
+    $periodeSql = 'MONTH(t.tanggal) = ? AND YEAR(t.tanggal) = ?';
+    $params = [$bulan, $tahun];
+    $types = 'ii';
 }
 
-/* =========================================================
-   QUERY DETAIL MUTASI — PEMBELIAN
-   ========================================================= */
-
-$sqlDetail = "
-    SELECT
-        t.id_transaksi,
-        t.tanggal,
-        t.id_kawat,
-        k.ukuran,
-        t.jenis_mutasi,
-        t.kondisi,
-        t.arah,
-        t.qty_asal,
-        s.nama_satuan,
-        t.qty_kg,
-        t.no_referensi,
-        t.keterangan,
-        t.created_by,
-        t.source_type,
-        t.source_id
-    FROM transaksi_kawat t
-
-    JOIN master_kawat k
-        ON k.id_kawat = t.id_kawat
-
-    LEFT JOIN master_satuan s
-        ON s.id_satuan = t.id_satuan_asal
-
-    WHERE
-        t.status_transaksi = 'AKTIF'
-        AND t.jenis_mutasi = 'PEMBELIAN'
-";
-
-list($filterSql, $filterParams, $filterTypes) =
-    buildFilterPeriodeDetail($pakaiRentang, $startDate, $endDate, $bulan, $tahun);
-
-$sqlDetail .= $filterSql;
-
-$paramsDetail = $filterParams;
-$typesDetail  = $filterTypes;
-
+$ukuranSql = '';
 if ($idKawatFilter > 0) {
-    $sqlDetail .= " AND t.id_kawat = ? ";
-    $paramsDetail[] = $idKawatFilter;
-    $typesDetail   .= 'i';
+    $ukuranSql = ' AND k.id_kawat = ? ';
+    $params[] = $idKawatFilter;
+    $types .= 'i';
 }
 
-$sqlDetail .= "
-    ORDER BY
-        k.ukuran ASC,
-        t.tanggal DESC,
-        t.id_transaksi DESC
-";
-
-$stmtDetail = $koneksi->prepare($sqlDetail);
-
-if ($paramsDetail) {
-    $stmtDetail->bind_param($typesDetail, ...$paramsDetail);
-}
-
-$stmtDetail->execute();
-$resultDetail = $stmtDetail->get_result();
-
-$detailRows = [];
-
-while ($row = $resultDetail->fetch_assoc()) {
-    $detailRows[] = $row;
-}
-
-/* =========================================================
-   QUERY DETAIL MUTASI BEKAS
-   Khusus kondisi BEKAS / jenis RETURN_BEKAS (Kembali dari Pabrik)
-   ========================================================= */
-
-$sqlDetailBekas = "
-    SELECT
-        t.id_transaksi,
-        t.tanggal,
-        t.id_kawat,
-        k.ukuran,
-        t.jenis_mutasi,
-        t.kondisi,
-        t.arah,
-        t.qty_asal,
-        s.nama_satuan,
-        t.qty_kg,
-        t.no_referensi,
-        t.keterangan,
-        t.created_by,
-        t.source_type,
-        t.source_id
-    FROM transaksi_kawat t
-
-    JOIN master_kawat k
-        ON k.id_kawat = t.id_kawat
-
-    LEFT JOIN master_satuan s
-        ON s.id_satuan = t.id_satuan_asal
-
-    WHERE
-        t.status_transaksi = 'AKTIF'
-        AND (
-            t.jenis_mutasi = 'RETURN_BEKAS'
-            OR t.kondisi = 'BEKAS'
-        )
-";
-
-$sqlDetailBekas .= $filterSql;
-
-$paramsDetailBekas = $filterParams;
-$typesDetailBekas  = $filterTypes;
-
-if ($idKawatFilter > 0) {
-    $sqlDetailBekas .= " AND t.id_kawat = ? ";
-    $paramsDetailBekas[] = $idKawatFilter;
-    $typesDetailBekas   .= 'i';
-}
-
-$sqlDetailBekas .= "
-    ORDER BY
-        k.ukuran ASC,
-        t.tanggal DESC,
-        t.id_transaksi DESC
-";
-
-$stmtDetailBekas = $koneksi->prepare($sqlDetailBekas);
-
-if ($paramsDetailBekas) {
-    $stmtDetailBekas->bind_param($typesDetailBekas, ...$paramsDetailBekas);
-}
-
-$stmtDetailBekas->execute();
-$resultDetailBekas = $stmtDetailBekas->get_result();
-
-$detailBekasRows = [];
-
-while ($row = $resultDetailBekas->fetch_assoc()) {
-    $detailBekasRows[] = $row;
-}
-
-/* =========================================================
-   HITUNG ROWSPAN PER UKURAN — PEMBELIAN
-   ========================================================= */
-
-$rowspanUkuran     = [];
-$ukuranSudahTampil = [];
-
-foreach ($detailRows as $row) {
-    $id = (int)$row['id_kawat'];
-
-    if (!isset($rowspanUkuran[$id])) {
-        $rowspanUkuran[$id] = 0;
-    }
-
-    $rowspanUkuran[$id]++;
-}
-
-/* =========================================================
-   HITUNG ROWSPAN PER UKURAN — BEKAS
-   ========================================================= */
-
-$rowspanUkuranBekas     = [];
-$ukuranBekasSudahTampil = [];
-
-foreach ($detailBekasRows as $row) {
-    $id = (int)$row['id_kawat'];
-
-    if (!isset($rowspanUkuranBekas[$id])) {
-        $rowspanUkuranBekas[$id] = 0;
-    }
-
-    $rowspanUkuranBekas[$id]++;
-}
-
-/* =========================================================
-   HITUNG TOTAL MASUK KG — PEMBELIAN & BEKAS
-   (hanya yang arahnya IN)
-   ========================================================= */
-
-$totalMasukPembelian = 0.0;
-
-foreach ($detailRows as $row) {
-    if (($row['arah'] ?? '') === 'IN') {
-        $totalMasukPembelian += (float)$row['qty_kg'];
-    }
-}
-
-$totalMasukBekas = 0.0;
-
-foreach ($detailBekasRows as $row) {
-    if (($row['arah'] ?? '') === 'IN') {
-        $totalMasukBekas += (float)$row['qty_kg'];
-    }
-}
-
-/* =========================================================
-   QUERY REKAP PER UKURAN
-   — LINTAS BULAN (tidak terpengaruh filter periode)
-   — Stok Bekas = Total Return Bekas − Total Rombeng
-   ========================================================= */
-
+// Bekas pada rekap adalah pengembalian dari pabrik, bukan penjualan/rombeng.
 $sqlRekap = "
     SELECT
-        k.id_kawat,
         k.ukuran,
-
-        COALESCE(SUM(CASE
-            WHEN t.status_transaksi = 'AKTIF'
-             AND t.jenis_mutasi = 'PEMBELIAN'
-            THEN t.qty_kg ELSE 0 END), 0) AS total_beli,
-
-        COALESCE(SUM(CASE
-            WHEN t.status_transaksi = 'AKTIF'
-             AND t.jenis_mutasi = 'RETURN_BEKAS'
-            THEN t.qty_kg ELSE 0 END), 0) AS total_bekas,
-
-        COALESCE(SUM(CASE
-            WHEN t.status_transaksi = 'AKTIF'
-             AND t.jenis_mutasi = 'ROMBENG'
-            THEN t.qty_kg ELSE 0 END), 0) AS total_rombeng,
-
-        (
-            SELECT t2.tanggal
-            FROM transaksi_kawat t2
-            WHERE t2.id_kawat = k.id_kawat
-              AND t2.status_transaksi = 'AKTIF'
-              AND t2.jenis_mutasi = 'PEMBELIAN'
-            ORDER BY t2.tanggal DESC, t2.id_transaksi DESC
-            LIMIT 1
-        ) AS tgl_beli_terakhir,
-
-        (
-            SELECT t2.qty_kg
-            FROM transaksi_kawat t2
-            WHERE t2.id_kawat = k.id_kawat
-              AND t2.status_transaksi = 'AKTIF'
-              AND t2.jenis_mutasi = 'PEMBELIAN'
-            ORDER BY t2.tanggal DESC, t2.id_transaksi DESC
-            LIMIT 1
-        ) AS qty_beli_terakhir,
-
-        (
-            SELECT t3.tanggal
-            FROM transaksi_kawat t3
-            WHERE t3.id_kawat = k.id_kawat
-              AND t3.status_transaksi = 'AKTIF'
-              AND t3.jenis_mutasi = 'RETURN_BEKAS'
-            ORDER BY t3.tanggal DESC, t3.id_transaksi DESC
-            LIMIT 1
-        ) AS tgl_bekas_terakhir,
-
-        (
-            SELECT t3.qty_kg
-            FROM transaksi_kawat t3
-            WHERE t3.id_kawat = k.id_kawat
-              AND t3.status_transaksi = 'AKTIF'
-              AND t3.jenis_mutasi = 'RETURN_BEKAS'
-            ORDER BY t3.tanggal DESC, t3.id_transaksi DESC
-            LIMIT 1
-        ) AS qty_bekas_terakhir
-
-    FROM master_kawat k
-
-    LEFT JOIN transaksi_kawat t
-        ON t.id_kawat = k.id_kawat
+        COALESCE(SUM(CASE WHEN t.jenis_mutasi = 'PEMBELIAN' THEN t.qty_kg ELSE 0 END), 0) AS total_beli,
+        COALESCE(SUM(CASE WHEN t.jenis_mutasi = 'RETURN_BEKAS' THEN t.qty_kg ELSE 0 END), 0) AS total_bekas,
+        COALESCE(SUM(CASE WHEN t.jenis_mutasi = 'ROMBENG' THEN t.qty_kg ELSE 0 END), 0) AS total_rombeng
+    FROM transaksi_kawat t
+    JOIN master_kawat k ON k.id_kawat = t.id_kawat
+    WHERE t.status_transaksi = 'AKTIF'
+      AND t.jenis_mutasi IN ('PEMBELIAN', 'RETURN_BEKAS', 'ROMBENG')
+      AND ({$periodeSql})
+      {$ukuranSql}
+    GROUP BY k.ukuran
+    HAVING total_beli <> 0 OR total_bekas <> 0
+    ORDER BY k.ukuran ASC
 ";
-
-if ($idKawatFilter > 0) {
-    $sqlRekap .= " WHERE k.id_kawat = ? ";
-}
-
-$sqlRekap .= "
-    GROUP BY
-        k.id_kawat,
-        k.ukuran
-
-    ORDER BY
-        k.ukuran ASC
-";
-
-$paramsRekap = [];
-$typesRekap  = '';
-
-if ($idKawatFilter > 0) {
-    $paramsRekap[] = $idKawatFilter;
-    $typesRekap   .= 'i';
-}
 
 $stmtRekap = $koneksi->prepare($sqlRekap);
-
-if ($paramsRekap) {
-    $stmtRekap->bind_param($typesRekap, ...$paramsRekap);
-}
-
+$stmtRekap->bind_param($types, ...$params);
 $stmtRekap->execute();
 $resultRekap = $stmtRekap->get_result();
+$rekap = [];
+$kelompokPerUkuran = [];
+$ukuranBerpasangan = [];
+$mutasiPengecualian = ['hanya_beli' => [], 'hanya_bekas' => []];
+while ($r = $resultRekap->fetch_assoc()) {
+    $key = (string)$r['ukuran'];
+    $beli = (float)$r['total_beli'];
+    $bekas = (float)$r['total_bekas'];
+    $r['selisih'] = $beli - $bekas;
+    $r['mutasi'] = [];
+    $rekap[$key] = $r;
 
-/* =========================================================
-   HELPERS
-   ========================================================= */
+    $grup = $beli == 0.0 ? 'hanya_bekas' : ($bekas == 0.0 ? 'hanya_beli' : 'berpasangan');
+    $kelompokPerUkuran[$key] = $grup;
+    if ($grup === 'berpasangan') {
+        $ukuranBerpasangan[] = $key;
+    }
+}
+$stmtRekap->close();
+
+// Penyimpanan hanya untuk satu bulan kalender penuh.
+$periodeCatatan = null;
+if (!$pakaiRentang && $tahun >= 1000 && $tahun <= 9999) {
+    $periodeCatatan = sprintf('%04d-%02d-01', $tahun, $bulan);
+} elseif ($pakaiRentang) {
+    $awalBulan = DateTimeImmutable::createFromFormat('!Y-m-d', $startDate);
+    if ($awalBulan && $awalBulan->format('Y-m-d') === $startDate &&
+        (int)$awalBulan->format('Y') >= 1000 && $awalBulan->format('d') === '01' &&
+        $awalBulan->format('Y-m-t') === $endDate) {
+        $periodeCatatan = $startDate;
+    }
+}
+
+function kunciUkuranCatatanKawat($ukuran)
+{
+    // Samakan misalnya 0.2500 dari master dengan 0.25000000 dari tabel catatan.
+    $nilai = (string)$ukuran;
+    return strpos($nilai, '.') === false ? $nilai : rtrim(rtrim($nilai, '0'), '.');
+}
+
+$catatanRekap = [];
+$ukuranCatatanValid = [];
+foreach ($rekap as $r) {
+    $ukuranCatatanValid[kunciUkuranCatatanKawat($r['ukuran'])] = true;
+}
+
+$catatanBisaDisimpan = $periodeCatatan !== null;
+$pesanCatatan = '';
+$catatanGagal = false;
+$filterKembali = $pakaiRentang
+    ? ['start_date' => $startDate, 'end_date' => $endDate]
+    : ['bulan' => $bulan, 'tahun' => $tahun];
+if ($idKawatFilter > 0) {
+    $filterKembali['id_kawat'] = $idKawatFilter;
+}
+$urlKembali = '?' . http_build_query($filterKembali);
+if (!$simpanKeterangan && isset($_SESSION['flash_catatan_kawat'][$urlKembali])) {
+    $pesanCatatan = $_SESSION['flash_catatan_kawat'][$urlKembali];
+    unset($_SESSION['flash_catatan_kawat'][$urlKembali]);
+}
+
+if ($catatanBisaDisimpan) {
+    try {
+        $stmtCatatan = $koneksi->prepare(
+            'SELECT ukuran_mm, keterangan FROM laporan_kawat_keterangan WHERE periode = ?'
+        );
+        if (!$stmtCatatan || !$stmtCatatan->bind_param('s', $periodeCatatan) || !$stmtCatatan->execute()) {
+            throw new RuntimeException('Query catatan tidak dapat dijalankan.');
+        }
+        $hasilCatatan = $stmtCatatan->get_result();
+        if (!$hasilCatatan) {
+            throw new RuntimeException('Hasil catatan tidak tersedia.');
+        }
+        while ($catatan = $hasilCatatan->fetch_assoc()) {
+            $catatanRekap[kunciUkuranCatatanKawat($catatan['ukuran_mm'])] = $catatan['keterangan'];
+        }
+        $stmtCatatan->close();
+    } catch (Exception $e) {
+        error_log('Laporan kawat, baca keterangan: ' . $e->getMessage());
+        $catatanBisaDisimpan = false;
+        $catatanGagal = true;
+        $pesanCatatan = 'Catatan belum bisa dimuat. Periksa apakah tabel laporan_kawat_keterangan sudah dibuat.';
+    }
+}
+
+if ($simpanKeterangan) {
+    $masukan = $_POST['keterangan'] ?? [];
+    $perubahan = [];
+    if (!$catatanBisaDisimpan || ($_POST['periode_catatan'] ?? '') !== $periodeCatatan || !is_array($masukan)) {
+        $catatanGagal = true;
+        $pesanCatatan = 'Keterangan tidak disimpan. Muat ulang laporan dan pastikan periodenya satu bulan kalender penuh.';
+    } else {
+        foreach ($masukan as $ukuran => $isi) {
+            if (!isset($ukuranCatatanValid[$ukuran]) || !is_string($isi)) {
+                $catatanGagal = true;
+                $pesanCatatan = 'Data ukuran berubah atau tidak valid. Muat ulang laporan sebelum menyimpan.';
+                break;
+            }
+            $isi = trim(str_replace(["\r\n", "\r"], "\n", $isi));
+            if (preg_match('/\A.{0,1000}\z/us', $isi) !== 1) {
+                $catatanGagal = true;
+                $pesanCatatan = 'Keterangan harus berupa teks maksimal 1.000 karakter per ukuran.';
+                break;
+            }
+            if ($isi !== ($catatanRekap[$ukuran] ?? '')) {
+                $perubahan[$ukuran] = $isi;
+            }
+        }
+
+        if (!$catatanGagal) {
+            $dalamTransaksi = false;
+            try {
+                if ($perubahan) {
+                    if (!$koneksi->begin_transaction()) {
+                        throw new RuntimeException('Transaksi catatan tidak dapat dimulai.');
+                    }
+                    $dalamTransaksi = true;
+                    $stmtSimpan = $koneksi->prepare(
+                        'INSERT INTO laporan_kawat_keterangan (periode, ukuran_mm, keterangan, updated_by)
+                         VALUES (?, ?, ?, ?)
+                         ON DUPLICATE KEY UPDATE keterangan = ?, updated_by = ?'
+                    );
+                    $stmtHapus = $koneksi->prepare(
+                        'DELETE FROM laporan_kawat_keterangan WHERE periode = ? AND ukuran_mm = ?'
+                    );
+                    if (!$stmtSimpan || !$stmtHapus) {
+                        throw new RuntimeException('Query simpan/hapus catatan tidak siap.');
+                    }
+                    foreach ($perubahan as $ukuran => $isi) {
+                        $ukuran = (string)$ukuran;
+                        if ($isi === '') {
+                            $berhasil = $stmtHapus->bind_param('ss', $periodeCatatan, $ukuran) && $stmtHapus->execute();
+                        } else {
+                            $berhasil = $stmtSimpan->bind_param(
+                                'ssssss', $periodeCatatan, $ukuran, $isi, $user, $isi, $user
+                            ) && $stmtSimpan->execute();
+                        }
+                        if (!$berhasil) {
+                            throw new RuntimeException('Perubahan catatan gagal dijalankan.');
+                        }
+                    }
+                    $stmtSimpan->close();
+                    $stmtHapus->close();
+                    if (!$koneksi->commit()) {
+                        throw new RuntimeException('Transaksi catatan gagal disimpan.');
+                    }
+                    $dalamTransaksi = false;
+                }
+                $_SESSION['flash_catatan_kawat'] = [
+                    $urlKembali => $perubahan ? 'Keterangan berhasil disimpan.' : 'Tidak ada perubahan keterangan.',
+                ];
+                header('Location: ' . $urlKembali, true, 303);
+                exit;
+            } catch (Exception $e) {
+                if ($dalamTransaksi) {
+                    $koneksi->rollback();
+                }
+                error_log('Laporan kawat, simpan keterangan: ' . $e->getMessage());
+                $catatanGagal = true;
+                $pesanCatatan = 'Keterangan gagal disimpan. Isian masih tersedia, silakan coba lagi.';
+            }
+        }
+    }
+    // Pertahankan draf ketika validasi atau penyimpanan gagal.
+    if (is_array($masukan)) {
+        foreach ($masukan as $ukuran => $isi) {
+            if (isset($ukuranCatatanValid[$ukuran]) && is_string($isi)) {
+                $catatanRekap[$ukuran] = $isi;
+            }
+        }
+    }
+}
+
+if ($rekap) {
+    $sqlDetail = "
+        SELECT
+            k.ukuran, t.tanggal, t.jenis_mutasi, t.kondisi, t.arah,
+            t.qty_kg, t.keterangan, s.nama_satuan
+        FROM transaksi_kawat t
+        JOIN master_kawat k ON k.id_kawat = t.id_kawat
+        LEFT JOIN master_satuan s ON s.id_satuan = t.id_satuan_asal
+        WHERE t.status_transaksi = 'AKTIF'
+          AND t.jenis_mutasi IN ('PEMBELIAN', 'RETURN_BEKAS')
+          AND ({$periodeSql})
+          {$ukuranSql}
+        ORDER BY DATE(t.tanggal) ASC,
+                 CASE WHEN t.jenis_mutasi = 'RETURN_BEKAS' THEN 0 ELSE 1 END,
+                 t.tanggal ASC, t.id_transaksi ASC
+    ";
+
+    $stmtDetail = $koneksi->prepare($sqlDetail);
+    $stmtDetail->bind_param($types, ...$params);
+    $stmtDetail->execute();
+    $resultDetail = $stmtDetail->get_result();
+
+    while ($r = $resultDetail->fetch_assoc()) {
+        $key = (string)$r['ukuran'];
+        if (!isset($rekap[$key])) {
+            continue;
+        }
+        $grup = $kelompokPerUkuran[$key];
+        if ($grup === 'berpasangan') {
+            $rekap[$key]['mutasi'][] = $r;
+        } elseif (
+            ($grup === 'hanya_beli' && $r['jenis_mutasi'] === 'PEMBELIAN') ||
+            ($grup === 'hanya_bekas' && $r['jenis_mutasi'] === 'RETURN_BEKAS')
+        ) {
+            $mutasiPengecualian[$grup][$key][] = $r;
+        }
+    }
+    $stmtDetail->close();
+}
 
 function h($v)
 {
-    return htmlspecialchars(
-        (string)$v,
-        ENT_QUOTES,
-        'UTF-8'
-    );
+    return htmlspecialchars((string)$v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
-function labelJenis($j)
+function formatUkuran($ukuran)
 {
-    return [
-        'PEMBELIAN'         => 'Pembelian',
-        'PEMAKAIAN'         => 'Dipakai Pabrik',
-        'RETURN_BEKAS'      => 'Kembali dari Pabrik',
-        'ROMBENG'           => 'Rombeng / Jual Bekas',
-        'ADJUSTMENT_MASUK'  => 'Adjustment Masuk',
-        'ADJUSTMENT_KELUAR' => 'Adjustment Keluar'
-    ][$j] ?? $j;
+    return number_format((float)$ukuran, 2, ',', '.') . ' mm';
 }
 
-/**
- * Format kolom "tanggal = qty KG".
- * Contoh: 02/10/2026 = 1.00 KG
- * Kalau tanggal kosong / qty 0 → tampil 0 KG.
- */
-function formatTanggalQty($tanggal, $qtyKg)
+function formatKg($kg)
 {
-    $qty = (float)$qtyKg;
+    return number_format((float)$kg, 2, ',', '.');
+}
 
-    if (!$tanggal || $qty <= 0) {
-        return '0 KG';
+function keteranganCetakKawat(array $row)
+{
+    $catatan = trim((string)($row['keterangan'] ?? ''));
+    if ($row['jenis_mutasi'] !== 'PEMBELIAN' ||
+        !preg_match('/^\[?auto\s+dari\s+pembelian\b/iu', $catatan)) {
+        return $catatan;
     }
 
-    return date('d/m/Y', strtotime($tanggal))
-         . ' = '
-         . number_format($qty, 2, '.', '')
-         . ' KG';
+    // Format sinkronisasi: "Auto dari pembelian: ... | Supplier: ... | catatan".
+    // Batasi pemisahan agar karakter "|" di dalam catatan tidak ikut terpotong.
+    $bagian = explode('|', $catatan, 3);
+    if (isset($bagian[1]) && preg_match('/^\s*(?:supplier|pemasok)\s*:/iu', $bagian[1])) {
+        $manual = trim($bagian[2] ?? '');
+        return preg_replace('/^(?:keterangan|catatan)\s*:\s*/iu', '', $manual) ?? $manual;
+    }
+
+    // Cadangan untuk data lama yang tidak memakai format pemisah baku.
+    if (preg_match('/\b(?:supplier|pemasok)\b\s*[:=]?\s*(.*)\z/isu', $catatan, $supplier)) {
+        $sisa = $supplier[1];
+        if (preg_match('/(?:^|[\s|;)\]])(?:keterangan|catatan)\s*:\s*(.*)\z/isu', $sisa, $manual)) {
+            return trim($manual[1]);
+        }
+        if (preg_match('~(?:\r\n|\r|\n|\||;|\s+[–—/:-]\s+|\)\s+|\]\s+)(?:[|;–—/:-]\s+)?\s*(.*)\z~su', $sisa, $manual)) {
+            return trim($manual[1]);
+        }
+    } elseif (preg_match('/(?:^|[\s|;)\]])(?:keterangan|catatan)\s*:\s*(.*)\z/isu', $catatan, $manual)) {
+        return trim($manual[1]);
+    }
+
+    return '';
+}
+
+function tabelMutasiKawat(array $baris)
+{
+    ?>
+    <table class="table-data">
+        <colgroup>
+            <col style="width:14%;">
+            <col style="width:12%;">
+            <col style="width:14%;">
+            <col style="width:9%;">
+            <col style="width:51%;">
+        </colgroup>
+        <thead>
+            <tr>
+                <th>Tanggal</th>
+                <th>Kondisi</th>
+                <th>Masuk (KG)</th>
+                <th>Satuan</th>
+                <th>Keterangan</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($baris as $i => $r):
+                $catatan = keteranganCetakKawat($r);
+            ?>
+                <tr class="<?= $i % 2 ? 'bg-even' : 'bg-odd' ?>">
+                    <td class="text-center nowrap"><?= h(date('d/m/Y', strtotime($r['tanggal']))) ?></td>
+                    <td class="text-center"><?= h($r['kondisi']) ?></td>
+                    <td class="text-right in"><?= $r['arah'] === 'IN' ? h(formatKg($r['qty_kg'])) : '-' ?></td>
+                    <td class="text-center"><?= h($r['nama_satuan'] ?: 'KG') ?></td>
+                    <td><?= $catatan !== '' ? nl2br(h($catatan)) : '-' ?></td>
+                </tr>
+            <?php endforeach; ?>
+            <?php if (!$baris): ?>
+                <tr class="empty-row"><td colspan="5" class="text-center">Tidak ada transaksi untuk periode dan ukuran yang dipilih.</td></tr>
+            <?php endif; ?>
+        </tbody>
+    </table>
+    <?php
 }
 ?>
-<html>
-
+<!DOCTYPE html>
+<html lang="id">
 <head>
-
 <meta charset="utf-8">
-
 <title>Cetak Laporan Mutasi Kawat</title>
-
 <style>
-
 /* =========================================================
    LAYAR (default)
    ========================================================= */
@@ -492,27 +455,27 @@ body {
 
 .title {
     text-align: center;
-    font-size: 16px;
+    font-size: 17px;
     font-weight: bold;
 }
 
 .sub {
     text-align: center;
-    font-size: 11px;
+    font-size: 12px;
 }
 
 .sub-note {
     text-align: center;
-    font-size: 9px;
+    font-size: 11px;
     color: #555;
     font-style: italic;
 }
 
 .section-title {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: bold;
-    margin-top: 10px;
-    margin-bottom: 2px;
+    margin-top: 12px;
+    margin-bottom: 3px;
 }
 
 .table-data {
@@ -526,20 +489,20 @@ body {
     background: #244a7c;
     color: #ffffff;
     border: 1px solid #000000;
-    padding: 3px 3px;
+    padding: 4px 4px;
     text-align: center;
     vertical-align: middle;
-    font-size: 10px;
-    line-height: 1.15;
+    font-size: 11px;
+    line-height: 1.2;
     word-wrap: break-word;
 }
 
 .table-data td {
     border: 1px solid #000000;
-    padding: 2px 3px;
+    padding: 3px 4px;
     vertical-align: middle;
-    font-size: 10px;
-    line-height: 1.2;
+    font-size: 11px;
+    line-height: 1.25;
     word-wrap: break-word;
     overflow-wrap: anywhere;
 }
@@ -554,21 +517,6 @@ body {
 .bg-even { background: #f9f9f9; }
 .bg-odd  { background: #ffffff; }
 
-/* Sel ukuran (rowspan) */
-.ukuran-cell {
-    font-weight: bold;
-    text-align: center;
-    background: #eef3fa;
-    vertical-align: middle;
-}
-
-/* Baris total */
-.total-row td {
-    background: #dbe6f3 !important;
-    font-weight: bold;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-}
 
 /* Tombol aksi (tidak tercetak) */
 .action-bar {
@@ -591,27 +539,24 @@ body {
 }
 
 /* =========================================================
-   ATURAN CETAK / SIMPAN PDF — A4 POTRAIT
+   ATURAN CETAK / SIMPAN PDF — A4 PORTRAIT
    ========================================================= */
 @media print {
 
     @page {
         size: A4 portrait;
-        /* margin kanan-kiri 10mm supaya border tepi tidak terpotong */
-        margin: 10mm 10mm 10mm 10mm;
+        margin: 8mm 8mm 8mm 8mm;
     }
 
     html, body {
         margin: 0;
         padding: 0;
         width: 100%;
-        font-size: 9.5px;
+        font-size: 11px;
     }
 
-    /* Wadah konten diberi padding tipis agar tabel tidak menyentuh
-       batas printable area (mencegah border kanan hilang) */
     body {
-        padding: 0 2mm;
+        padding: 0 1mm;
         box-sizing: border-box;
     }
 
@@ -619,21 +564,14 @@ body {
         display: none !important;
     }
 
-    thead {
-        display: table-header-group;
-    }
-
-    tfoot {
-        display: table-footer-group;
-    }
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
 
     tr {
         page-break-inside: avoid;
         page-break-after: auto;
     }
 
-    /* Tabel diberi lebar 100% tapi dengan box-sizing agar border
-       tidak "keluar" dari area cetak */
     .table-data {
         width: 100%;
         table-layout: fixed;
@@ -652,15 +590,15 @@ body {
         color: #ffffff !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
-        font-size: 8.5px;
-        padding: 2px 2px;
-        line-height: 1.1;
+        font-size: 10.5px;
+        padding: 3px 3px;
+        line-height: 1.15;
     }
 
     .table-data td {
-        font-size: 8.5px;
-        padding: 1.5px 2px;
-        line-height: 1.15;
+        font-size: 10.5px;
+        padding: 2.5px 3px;
+        line-height: 1.2;
     }
 
     .in  { color: #008000 !important; }
@@ -668,24 +606,12 @@ body {
     .bg-even { background: #f2f2f2 !important; }
     .bg-odd  { background: #ffffff !important; }
 
-    .ukuran-cell {
-        background: #e6eef8 !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
-
-    .total-row td {
-        background: #dbe6f3 !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
 
     .title, .sub, .sub-note, .section-title {
         page-break-after: avoid;
     }
 
-    .block-detail,
-    .block-detail-bekas {
+    .block-detail {
         page-break-before: auto;
         page-break-inside: auto;
         margin-top: 10px;
@@ -695,473 +621,183 @@ body {
         color: #777 !important;
         font-style: italic;
     }
-
-    .ukuran-cell {
-        page-break-inside: avoid;
-    }
 }
 
+
+.size-title {
+    font-size: 13px;
+    margin: 10px 0 3px;
+    break-after: avoid;
+    page-break-after: avoid;
+}
+.nowrap { white-space: nowrap; }
+.note-input {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 2.5em;
+    resize: vertical;
+    padding: 2px 3px;
+    border: 1px solid #bbb;
+    font: inherit;
+    color: inherit;
+}
+.catatan-status { margin: 5px 0; font-weight: bold; }
+.catatan-aksi { margin-top: 6px; text-align: right; }
+.catatan-simpan {
+    background: #244a7c;
+    color: #fff;
+    border: 0;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font: inherit;
+}
+.note-print { display: none; }
+@media print {
+    .screen-only, .note-input { display: none !important; }
+    .note-print {
+        display: block;
+        min-height: 1.5em;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+}
 </style>
-
 </head>
-
-
 <body>
-
-<!-- Tombol Cetak (hanya muncul di layar) -->
 <div class="action-bar">
-    <button type="button" onclick="window.print()">
-        🖨️ Cetak / Simpan PDF (Potrait)
-    </button>
+    <button type="button" onclick="window.print()">🖨️ Cetak / Simpan PDF (Portrait)</button>
 </div>
-
-
-<div class="title">
-    LAPORAN MUTASI STOK KAWAT MCP
-</div>
-
-<div class="sub">
-    Periode <?= h($periodeLabel) ?>
-</div>
-
-<div class="sub">
-    <?= h($ukuranFilterText) ?>
-</div>
-
-<div class="sub-note">
-    Rekap Per Ukuran menampilkan kondisi keseluruhan saat ini (lintas bulan).
-    Detail Mutasi menampilkan transaksi Pembelian dalam periode filter.
-    Detail Mutasi Bekas menampilkan transaksi kondisi Bekas / Kembali dari Pabrik.
-</div>
-
+<div class="title">LAPORAN MUTASI STOK KAWAT MCP</div>
+<div class="sub">Periode <?= h($periodeLabel) ?></div>
+<div class="sub"><?= h($ukuranFilterText) ?></div>
 <br>
 
-
-<!-- =====================================================
-     REKAP PER UKURAN
-     ===================================================== -->
-
-<div class="section-title">
-    REKAP PER UKURAN (KONDISI SAAT INI)
-</div>
-
-<table class="table-data">
-
-<colgroup>
-    <col style="width:4%;">
-    <col style="width:9%;">
-    <col style="width:11%;">
-    <col style="width:11%;">
-    <col style="width:10%;">
-    <col style="width:19%;">
-    <col style="width:22%;">
-    <col style="width:14%;">
-</colgroup>
-
-<thead>
-
-<tr>
-
-    <th>No</th>
-    <th>Ukuran</th>
-    <th>Total Beli</th>
-    <th>Total Bekas</th>
-    <th>Rombeng</th>
-    <th>Tgl Beli Terakhir</th>
-    <th>Tgl Bekas Kembali Terakhir</th>
-    <th>Stok Bekas Saat Ini</th>
-
-</tr>
-
-</thead>
-
-
-<tbody>
-
-<?php
-$noRekap = 1;
-
-while ($r = $resultRekap->fetch_assoc()):
-
-    $totalBeli    = (float)$r['total_beli'];
-    $totalBekas   = (float)$r['total_bekas'];
-    $totalRombeng = (float)$r['total_rombeng'];
-
-    $stokBekas = $totalBekas - $totalRombeng;
-
-    $tglBeliTampil = formatTanggalQty(
-        $r['tgl_beli_terakhir'],
-        $r['qty_beli_terakhir']
-    );
-
-    $tglBekasTampil = formatTanggalQty(
-        $r['tgl_bekas_terakhir'],
-        $r['qty_bekas_terakhir']
-    );
-?>
-
-<tr>
-
-    <td class="text-center"><?= $noRekap++ ?></td>
-
-    <td class="text-center">
-        <?= number_format((float)$r['ukuran'], 2) ?> mm
-    </td>
-
-    <td class="text-right">
-        <?= number_format($totalBeli, 2, '.', '') ?>
-    </td>
-
-    <td class="text-right">
-        <?= number_format($totalBekas, 2, '.', '') ?>
-    </td>
-
-    <td class="text-right">
-        <?= number_format($totalRombeng, 2, '.', '') ?>
-    </td>
-
-    <td class="text-center"><?= h($tglBeliTampil) ?></td>
-
-    <td class="text-center"><?= h($tglBekasTampil) ?></td>
-
-    <td class="text-right bold">
-        <?= number_format($stokBekas, 2, '.', '') ?>
-    </td>
-
-</tr>
-
-<?php endwhile; ?>
-
-</tbody>
-
-</table>
-
-
-<!-- =====================================================
-     DETAIL MUTASI — PEMBELIAN
-     ===================================================== -->
-
-<div class="block-detail">
-
-<div class="section-title">
-    DETAIL MUTASI
-</div>
-
-<div class="sub-note" style="text-align:left;margin-bottom:3px;">
-    Menampilkan transaksi <strong>Pembelian</strong> dalam periode
-    <?= h($periodeLabel) ?>, dikelompokkan per ukuran dan
-    diurutkan dari tanggal pembelian terbaru.
-</div>
-
-<table class="table-data">
-
-<colgroup>
-    <col style="width:4%;">
-    <col style="width:10%;">
-    <col style="width:9%;">
-    <col style="width:14%;">
-    <col style="width:8%;">
-    <col style="width:10%;">
-    <col style="width:7%;">
-    <col style="width:12%;">
-    <col style="width:15%;">
-    <col style="width:11%;">
-</colgroup>
-
-<thead>
-
-<tr>
-
-    <th>No</th>
-    <th>Tanggal</th>
-    <th>Ukuran</th>
-    <th>Jenis</th>
-    <th>Kondisi</th>
-    <th>Masuk KG</th>
-    <th>Satuan</th>
-    <th>Referensi</th>
-    <th>Keterangan</th>
-    <th>User</th>
-
-</tr>
-
-</thead>
-
-
-<tbody>
-
-<?php
-
-$noDetail    = 0;
-$lastIdKawat = null;
-
-if (count($detailRows) > 0):
-
-    foreach ($detailRows as $r):
-
-        $idKawat = (int)$r['id_kawat'];
-
-        $tampilkanUkuran = !isset($ukuranSudahTampil[$idKawat]);
-
-        if ($tampilkanUkuran) {
-            $ukuranSudahTampil[$idKawat] = true;
-        }
-
-        if ($lastIdKawat !== $idKawat) {
-            $noDetail    = 1;
-            $lastIdKawat = $idKawat;
-        } else {
-            $noDetail++;
-        }
-
-        $rowClass = ($noDetail % 2 === 0) ? 'bg-even' : 'bg-odd';
-
-?>
-
-<tr class="<?= $rowClass ?>">
-
-    <td class="text-center"><?= $noDetail ?></td>
-
-    <td class="text-center">
-        <?= date('d/m/Y', strtotime($r['tanggal'])) ?>
-    </td>
-
-    <?php if ($tampilkanUkuran): ?>
-
-        <td
-            class="ukuran-cell"
-            rowspan="<?= (int)$rowspanUkuran[$idKawat] ?>"
-        >
-            <?= number_format((float)$r['ukuran'], 2) ?> mm
-        </td>
-
+<h2 class="section-title">REKAP PER UKURAN (PERIODE FILTER)</h2>
+<div class="sub-note text-left screen-only">
+    <?php if ($catatanBisaDisimpan): ?>
+        Klik Simpan Keterangan untuk membuka kembali catatan ukuran ini pada bulan yang sama.
+    <?php elseif ($periodeCatatan === null): ?>
+        Rentang ini bukan satu bulan kalender penuh. Keterangan hanya berlaku untuk cetakan ini.
+    <?php else: ?>
+        Penyimpanan keterangan tidak tersedia. Keterangan hanya berlaku untuk cetakan ini.
     <?php endif; ?>
-
-    <td><?= h(labelJenis($r['jenis_mutasi'])) ?></td>
-
-    <td class="text-center"><?= h($r['kondisi']) ?></td>
-
-    <td class="text-right in">
-        <?= $r['arah'] === 'IN'
-            ? number_format((float)$r['qty_kg'], 2, '.', '')
-            : '-'
-        ?>
-    </td>
-
-    <td class="text-center">
-        <?= h($r['nama_satuan'] ?: 'KG') ?>
-    </td>
-
-    <td><?= h($r['no_referensi'] ?: '-') ?></td>
-
-    <td><?= h($r['keterangan'] ?: '-') ?></td>
-
-    <td><?= h($r['created_by'] ?: '-') ?></td>
-
-</tr>
-
-<?php
-
-    endforeach;
-
-else:
-
-?>
-
-<tr class="empty-row">
-
-    <td
-        colspan="10"
-        class="text-center"
-        style="padding:12px;color:#777;font-style:italic;"
-    >
-        Tidak ada data pembelian untuk filter yang dipilih.
-    </td>
-
-</tr>
-
+</div>
+<?php if ($pesanCatatan !== ''): ?>
+    <p class="screen-only catatan-status" role="<?= $catatanGagal ? 'alert' : 'status' ?>"><?= h($pesanCatatan) ?></p>
 <?php endif; ?>
-
-</tbody>
-
-<!-- TOTAL PEMBELIAN: di kolom terakhir "Masuk KG" -->
-<tfoot>
-<tr class="total-row">
-    <td colspan="5" class="text-right">TOTAL MASUK KG</td>
-    <td class="text-right">
-        <?= number_format($totalMasukPembelian, 2, '.', '') ?>
-    </td>
-    <td colspan="4"></td>
-</tr>
-</tfoot>
-
-</table>
-
-</div>
-
-
-<!-- =====================================================
-     DETAIL MUTASI BEKAS
-     ===================================================== -->
-
-<div class="block-detail-bekas">
-
-<div class="section-title">
-    DETAIL MUTASI BEKAS
-</div>
-
-<div class="sub-note" style="text-align:left;margin-bottom:3px;">
-    Menampilkan transaksi <strong>kondisi Bekas / Kembali dari Pabrik</strong>
-    dalam periode <?= h($periodeLabel) ?>, dikelompokkan per ukuran dan
-    diurutkan dari tanggal terbaru.
-</div>
-
-<table class="table-data">
-
-<colgroup>
-    <col style="width:4%;">
-    <col style="width:10%;">
-    <col style="width:9%;">
-    <col style="width:14%;">
-    <col style="width:8%;">
-    <col style="width:10%;">
-    <col style="width:7%;">
-    <col style="width:12%;">
-    <col style="width:15%;">
-    <col style="width:11%;">
-</colgroup>
-
-<thead>
-
-<tr>
-
-    <th>No</th>
-    <th>Tanggal</th>
-    <th>Ukuran</th>
-    <th>Jenis</th>
-    <th>Kondisi</th>
-    <th>Masuk KG</th>
-    <th>Satuan</th>
-    <th>Referensi</th>
-    <th>Keterangan</th>
-    <th>User</th>
-
-</tr>
-
-</thead>
-
-
-<tbody>
-
-<?php
-
-$noDetailBekas    = 0;
-$lastIdKawatBekas = null;
-
-if (count($detailBekasRows) > 0):
-
-    foreach ($detailBekasRows as $r):
-
-        $idKawat = (int)$r['id_kawat'];
-
-        $tampilkanUkuranBekas = !isset($ukuranBekasSudahTampil[$idKawat]);
-
-        if ($tampilkanUkuranBekas) {
-            $ukuranBekasSudahTampil[$idKawat] = true;
-        }
-
-        if ($lastIdKawatBekas !== $idKawat) {
-            $noDetailBekas    = 1;
-            $lastIdKawatBekas = $idKawat;
-        } else {
-            $noDetailBekas++;
-        }
-
-        $rowClass = ($noDetailBekas % 2 === 0) ? 'bg-even' : 'bg-odd';
-
-?>
-
-<tr class="<?= $rowClass ?>">
-
-    <td class="text-center"><?= $noDetailBekas ?></td>
-
-    <td class="text-center">
-        <?= date('d/m/Y', strtotime($r['tanggal'])) ?>
-    </td>
-
-    <?php if ($tampilkanUkuranBekas): ?>
-
-        <td
-            class="ukuran-cell"
-            rowspan="<?= (int)$rowspanUkuranBekas[$idKawat] ?>"
-        >
-            <?= number_format((float)$r['ukuran'], 2) ?> mm
-        </td>
-
+<form method="post" action="<?= h($urlKembali) ?>" id="form-keterangan-kawat">
+    <?php if ($catatanBisaDisimpan): ?>
+        <input type="hidden" name="aksi" value="simpan_keterangan">
+        <input type="hidden" name="csrf" value="<?= h($csrfCatatan) ?>">
+        <input type="hidden" name="periode_catatan" value="<?= h($periodeCatatan) ?>">
     <?php endif; ?>
+<table class="table-data">
+    <colgroup>
+        <col style="width:5%;">
+        <col style="width:12%;">
+        <col style="width:13%;">
+        <col style="width:14%;">
+        <col style="width:13%;">
+        <col style="width:12%;">
+        <col style="width:31%;">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>No</th>
+            <th>Ukuran</th>
+            <th>Total Beli (KG)</th>
+            <th>Total Bekas (KG)</th>
+            <th>Rombeng (KG)</th>
+            <th>Selisih (KG)</th>
+            <th>Keterangan</th>
+        </tr>
+    </thead>
+    <tbody>
+        <?php if (!$rekap): ?>
+            <tr class="empty-row"><td colspan="7" class="text-center">Tidak ada total pembelian atau pengembalian bekas pada periode ini.</td></tr>
+        <?php endif; ?>
+        <?php $no = 0; foreach ($rekap as $r): ?>
+            <tr>
+                <td class="text-center"><?= ++$no ?></td>
+                <td class="text-center nowrap"><?= h(formatUkuran($r['ukuran'])) ?></td>
+                <td class="text-right"><?= h(formatKg($r['total_beli'])) ?></td>
+                <td class="text-right"><?= h(formatKg($r['total_bekas'])) ?></td>
+                <td class="text-right"><?= h(formatKg($r['total_rombeng'])) ?></td>
+                <td class="text-right bold"><?= h(formatKg($r['selisih'])) ?></td>
+                <td>
+                    <?php $kodeUkuran = kunciUkuranCatatanKawat($r['ukuran']); ?>
+                    <?php $isiCatatan = $catatanRekap[$kodeUkuran] ?? ''; ?>
+                    <textarea class="note-input" rows="1" maxlength="1000"
+                        <?php if ($catatanBisaDisimpan): ?>name="keterangan[<?= h($kodeUkuran) ?>]"<?php endif; ?>
+                        aria-label="Alasan selisih untuk ukuran <?= h(formatUkuran($r['ukuran'])) ?>"><?= h($isiCatatan) ?></textarea>
+                    <div class="note-print"><?= h($isiCatatan) ?></div>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+    </tbody>
+</table>
+<?php if ($catatanBisaDisimpan && $rekap): ?>
+    <div class="screen-only catatan-aksi">
+        <button type="submit" class="catatan-simpan">Simpan Keterangan</button>
+    </div>
+<?php endif; ?>
+</form>
 
-    <td><?= h(labelJenis($r['jenis_mutasi'])) ?></td>
+<section class="block-detail">
+    <h2 class="section-title">DETAIL MUTASI PER UKURAN</h2>
 
-    <td class="text-center"><?= h($r['kondisi']) ?></td>
-
-    <td class="text-right in">
-        <?= $r['arah'] === 'IN'
-            ? number_format((float)$r['qty_kg'], 2, '.', '')
-            : '-'
-        ?>
-    </td>
-
-    <td class="text-center">
-        <?= h($r['nama_satuan'] ?: 'KG') ?>
-    </td>
-
-    <td><?= h($r['no_referensi'] ?: '-') ?></td>
-
-    <td><?= h($r['keterangan'] ?: '-') ?></td>
-
-    <td><?= h($r['created_by'] ?: '-') ?></td>
-
-</tr>
+    <?php if (!$ukuranBerpasangan): ?>
+        <p class="sub-note text-left">Tidak ada ukuran yang memiliki pembelian sekaligus pengembalian bekas pada periode ini.</p>
+    <?php endif; ?>
+    <?php foreach ($ukuranBerpasangan as $key): ?>
+        <h3 class="size-title">UKURAN <?= h(formatUkuran($rekap[$key]['ukuran'])) ?></h3>
+        <?php tabelMutasiKawat($rekap[$key]['mutasi']); ?>
+    <?php endforeach; ?>
+</section>
 
 <?php
-
-    endforeach;
-
-else:
-
+$judulPengecualian = [
+    'hanya_beli' => 'ADA PEMBELIAN, BELUM ADA BEKAS',
+    'hanya_bekas' => 'ADA BEKAS, TIDAK ADA PEMBELIAN',
+];
+foreach ($judulPengecualian as $grup => $judul):
 ?>
+    <section class="block-detail">
+        <h2 class="section-title"><?= h($judul) ?></h2>
+        <?php if (!$mutasiPengecualian[$grup]): ?>
+            <?php tabelMutasiKawat([]); ?>
+        <?php else: ?>
+            <?php foreach ($rekap as $key => $ringkasan): ?>
+                <?php if (!isset($mutasiPengecualian[$grup][$key])) continue; ?>
+                <h3 class="size-title">UKURAN <?= h(formatUkuran($ringkasan['ukuran'])) ?></h3>
+                <?php tabelMutasiKawat($mutasiPengecualian[$grup][$key]); ?>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </section>
+<?php endforeach; ?>
 
-<tr class="empty-row">
-
-    <td
-        colspan="10"
-        class="text-center"
-        style="padding:12px;color:#777;font-style:italic;"
-    >
-        Tidak ada data bekas untuk filter yang dipilih.
-    </td>
-
-</tr>
-
-<?php endif; ?>
-
-</tbody>
-
-<!-- TOTAL BEKAS: di kolom terakhir "Masuk KG" -->
-<tfoot>
-<tr class="total-row">
-    <td colspan="5" class="text-right">TOTAL MASUK KG</td>
-    <td class="text-right">
-        <?= number_format($totalMasukBekas, 2, '.', '') ?>
-    </td>
-    <td colspan="4"></td>
-</tr>
-</tfoot>
-
-</table>
-
-</div>
-
+<script>
+function sinkronCatatanCetak(input) {
+    input.nextElementSibling.textContent = input.value;
+}
+document.querySelectorAll('.note-input').forEach(function (input) {
+    input.addEventListener('input', function () {
+        sinkronCatatanCetak(input);
+    });
+});
+document.getElementById('form-keterangan-kawat').addEventListener('formdata', function (event) {
+    // Kirim hanya sel yang diubah agar catatan pengguna lain tidak tertimpa.
+    this.querySelectorAll('.note-input[name]').forEach(function (input) {
+        if (input.value === input.defaultValue) {
+            event.formData.delete(input.name);
+        }
+    });
+});
+window.addEventListener('beforeprint', function () {
+    document.querySelectorAll('.note-input').forEach(sinkronCatatanCetak);
+});
+</script>
 </body>
-
 </html>

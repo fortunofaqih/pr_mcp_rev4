@@ -11,8 +11,12 @@ if ($_SESSION['status'] != "login" || $_SESSION['role'] != 'manager') {
     exit;
 }
 
+
 $nama_manager  = strtoupper($_SESSION['nama'] ?? $_SESSION['username'] ?? 'MANAGER');
 $username_saya = mysqli_real_escape_string($koneksi, $_SESSION['username'] ?? '');
+if (empty($_SESSION['csrf_void_pimpinan'])) {
+    $_SESSION['csrf_void_pimpinan'] = bin2hex(random_bytes(32));
+}
 
 // ============================================================
 // PARAMETER SEARCH, FILTER, PAGINATION
@@ -41,8 +45,7 @@ $offset = ($page - 1) * $per_page;
 // BUILD WHERE CLAUSE
 // ============================================================
 $where = "WHERE kategori_pr IN ('BESAR', 'IT')
-          AND status_request NOT IN ('BATAL','SELESAI')
-          AND (void_by IS NULL OR void_by = '')
+          AND status_request <> 'SELESAI'
           AND (
               status_approval IN ('APPROVED 1','APPROVED 2','APPROVED')
               OR approve1_by IS NOT NULL
@@ -278,6 +281,27 @@ function h($str) { return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); }
             transform: translateY(-1px);
         }
 
+        /* ── Penyesuaian lebar untuk 4 tombol aksi ──────────── */
+        /* Bootstrap .container semula dibatasi max-width 1320px. */
+        .container.pb-5 {
+            width: 96%;
+            max-width: 1800px;
+        }
+        /* Sisakan ruang kolom Aksi dan cegah tombol turun baris. */
+        .table-responsive td[data-label="Aksi"] {
+            min-width: 385px;
+            white-space: nowrap;
+        }
+        .table-responsive td[data-label="Aksi"] > .d-flex {
+            flex-wrap: nowrap !important;
+        }
+        .table-responsive td[data-label="Aksi"] .btn-pr,
+        .table-responsive td[data-label="Aksi"] .btn-revert,
+        .table-responsive td[data-label="Aksi"] .btn-void {
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
         /* ── Pagination ──────────────────────── */
         .pagination .page-link {
             font-size: 0.8rem;
@@ -299,6 +323,17 @@ function h($str) { return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); }
         }
 
         @media (max-width: 768px) {
+            /* Mode kartu mobile tetap mengikuti tampilan existing. */
+            .container.pb-5 { width: 100%; }
+            .table-responsive td[data-label="Aksi"] {
+                min-width: 0;
+                white-space: normal;
+            }
+            .table-responsive td[data-label="Aksi"] > .d-flex {
+                flex-wrap: wrap !important;
+                flex: 1;
+                min-width: 0;
+            }
             .table-responsive thead { display: none; }
             .table-responsive tbody tr {
                 display: block;
@@ -362,6 +397,16 @@ function h($str) { return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); }
                     <strong>Approval berhasil di-REVERT!</strong> PR kembali ke <strong>APPROVED 1</strong>, menunggu Manager ke-2.
                 <?php elseif ($pesan === 'revert_ke_approved2'): ?>
                     <strong>Approval berhasil di-REVERT!</strong> PR kembali ke <strong>APPROVED 2</strong>, menunggu Manager ke-3.
+                <?php elseif (in_array($pesan, ['sudah_ada_pembelian','ada_pembelian_staging','item_sudah_dibeli','po_sudah_close'], true)): ?>
+                    <strong>VOID ditolak.</strong> PR memiliki pembelian, pembelian staging, item terbeli, atau PO sudah CLOSE. Silakan periksa transaksi terkait.
+                <?php elseif ($pesan === 'bukan_approver'): ?>
+                    <strong>VOID ditolak.</strong> Anda bukan manager yang pernah approve PR ini.
+                <?php elseif ($pesan === 'sudah_diproses'): ?>
+                    <strong>PR sudah dibatalkan atau selesai.</strong>
+                <?php elseif ($pesan === 'token_invalid' || $pesan === 'metode_invalid'): ?>
+                    <strong>Permintaan tidak valid.</strong> Muat ulang halaman dan coba kembali.
+                <?php elseif ($pesan === 'gagal'): ?>
+                    <strong>VOID gagal diproses.</strong> Tidak ada perubahan yang disimpan.
                 <?php elseif ($pesan === 'catatan_kosong'): ?>
                     <strong>Alasan wajib diisi!</strong>
                 <?php elseif ($pesan === 'belum_di_approve'): ?>
@@ -505,7 +550,9 @@ function h($str) { return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); }
                             $is_approved2 = ($status_app === 'APPROVED 2');
                             $is_approved  = ($status_app === 'APPROVED');
 
-                            if ($is_approved) {
+                            if (($data['status_request'] ?? '') === 'BATAL') {
+                                $badge = '<span class="badge-status bg-danger text-white"><i class="fas fa-ban"></i> BATAL</span>';
+                            } elseif ($is_approved) {
                                 $badge = '<span class="badge-status badge-approved"><i class="fas fa-check-double"></i> APPROVED</span>';
                             } elseif ($is_approved2) {
                                 $badge = '<span class="badge-status badge-approved2"><i class="fas fa-check"></i> APPROVED 2</span>';
@@ -538,7 +585,13 @@ function h($str) { return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); }
                                 <?php endif; ?>
                             </td>
                             <td data-label="Kategori"><?= $badge_kat ?></td>
-                            <td data-label="Status"><?= $badge ?></td>
+                            <td data-label="Status"><?= $badge ?>
+                                <?php if (($data['status_request'] ?? '') === 'BATAL'): ?>
+                                    <div class="small text-danger fw-semibold mt-1">Dibatalkan oleh: <?= h($data['void_by'] ?: $data['updated_by']) ?></div>
+                                    <?php if (!empty($data['void_at'])): ?><small class="text-muted"><?= h($data['void_at']) ?></small><?php endif; ?>
+                                    <?php if (!empty($data['catatan_void'])): ?><div class="small text-muted" style="max-width:220px;white-space:normal;" title="<?= h($data['catatan_void']) ?>"><?= h($data['catatan_void']) ?></div><?php endif; ?>
+                                <?php endif; ?>
+                            </td>
                             <td data-label="Pemesan">
                                 <div class="text-uppercase small fw-semibold text-dark"><?= h($data['nama_pemesan']) ?></div>
                             </td>
@@ -586,10 +639,26 @@ function h($str) { return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); }
                                     <i class="fas fa-eye me-1"></i> PR
                                 </a>
 
+                                <!-- Buka PDF penawaran supplier (jika tersedia) -->
+                                <?php if (trim((string)($data['file_penawaran'] ?? '')) !== ''): ?>
+                                <a href="../../download_penawaran.php?file=<?= urlencode($data['file_penawaran']) ?>&amp;id_request=<?= (int)$data['id_request'] ?>"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   class="btn-pr"
+                                   title="Buka PDF Penawaran Supplier">
+                                    <i class="fas fa-file-pdf me-1"></i> OFFER
+                                </a>
+                                <?php endif; ?>
+
                                 <?php 
-                                $boleh_revert = in_array($status_app, ['APPROVED 1', 'APPROVED 2', 'APPROVED']) 
+                                $boleh_revert = in_array($status_app, ['APPROVED 1', 'APPROVED 2', 'APPROVED'])
+                                                && ($data['status_request'] ?? '') !== 'BATAL'
                                                 && empty($data['void_by']);
-                                $boleh_void   = empty($data['void_by']);
+                                // Semua manager yang login dapat VOID PR berstatus approved.
+                                // Pemeriksaan transaksi pembelian/PO tetap dilakukan oleh proses_void_pimpinan.php.
+                                $boleh_void   = in_array($status_app, ['APPROVED 1','APPROVED 2','APPROVED'], true)
+                                                 && !in_array(($data['status_request'] ?? ''), ['BATAL', 'SELESAI'], true)
+                                                 && empty($data['void_by']);
                                 
                                 if ($boleh_revert): 
                                 ?>
@@ -603,7 +672,7 @@ function h($str) { return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); }
                                 <?php if ($boleh_void): ?>
                                 <button type="button"
                                         class="btn-void"
-                                        onclick="voidPR(<?= $data['id_request'] ?>, '<?= h($data['no_request']) ?>')">
+                                        onclick="voidPR(<?= (int)$data['id_request'] ?>, <?= h(json_encode($data['no_request'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)) ?>)">
                                     <i class="fas fa-ban me-1"></i> VOID
                                 </button>
                                 <?php endif; ?>
@@ -777,8 +846,24 @@ function h($str) { return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8'); }
                     allowOutsideClick: false,
                     didOpen: () => { Swal.showLoading(); }
                 });
-                window.location.href = 'proses_void_pimpinan.php?action=void&id=' + id
-                                     + '&catatan=' + encodeURIComponent(result.value);
+                // Kirim POST; form konfirmasi tetap menggunakan SweetAlert.
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = 'proses_void_pimpinan.php';
+                const fields = {
+                    action: 'void', id: String(id),
+                    catatan: result.value,
+                    csrf_token: <?= json_encode($_SESSION['csrf_void_pimpinan']) ?>
+                };
+                for (const [name, value] of Object.entries(fields)) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = name;
+                    input.value = value;
+                    form.appendChild(input);
+                }
+                document.body.appendChild(form);
+                form.submit();
             }
         });
     }

@@ -75,7 +75,7 @@ if ($_SESSION['status'] != "login") {
         <span class="navbar-brand fw-bold text-white"><i class="fas fa-clipboard-list me-2"></i> KONDISI KENDARAAN</span>
         <div class="d-flex flex-wrap gap-1">
             <a href="../../index.php" class="btn btn-sm btn-danger"><i class="fas fa-rotate-left"></i> HOME</a>
-            <a href="data_mobil.php" class="btn btn-sm btn-light fw-bold"><i class="fas fa-truck"></i> ARMADA</a>
+            <!--<a href="data_mobil.php" class="btn btn-sm btn-light fw-bold"><i class="fas fa-truck"></i> ARMADA</a>-->
             <a href="laporan_kondisi_kendaraan.php" class="btn btn-sm btn-info fw-bold text-white"><i class="fas fa-chart-bar"></i> LAPORAN</a>
             <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalMulai" onclick="resetFormMulai()">
                 <i class="fas fa-plus-circle"></i> MOBIL MASUK SERVIS
@@ -224,7 +224,8 @@ if ($_SESSION['status'] != "login") {
                                 <option value="RUDI H.">RUDI H.</option>
                                 <option value="EDI M.">EDI M.</option>
                                 <option value="M. ULUM">M. ULUM</option>
-                                <option value="SAIFUL">SAIFUL</option>
+                                
+                                
                             </select>
                         </div>
                     </div>
@@ -271,7 +272,8 @@ if ($_SESSION['status'] != "login") {
                             <option value="RUDI H.">RUDI H.</option>
                             <option value="EDI M.">EDI M.</option>
                             <option value="M. ULUM">M. ULUM</option>
-                            <option value="SAIFUL">SAIFUL</option>
+                            
+                            
                         </select>
                         <small class="text-danger" id="bengkel_selesai_error" style="display:none;">Silakan pilih bengkel terlebih dahulu.</small>
                     </div>

@@ -1,157 +1,127 @@
 <?php
-// ============================================================
-// proses_void_pimpinan.php
-// Proses VOID / BATAL PR Besar & IT yang sudah di-approve
-// Hanya manager yang pernah approve yang boleh void
-// ============================================================
-
+// proses_void_pimpinan.php — Rule B: PR dan PO batal hanya jika belum ada transaksi lanjutan.
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
 require_once __DIR__ . '/../../auth/check_session.php';
 
-// ========== VALIDASI SESSION ==========
-if ($_SESSION['status'] != "login" || $_SESSION['role'] != 'manager') {
-    header("location:../../login.php?pesan=bukan_pimpinan");
+function voidRedirect($pesan) {
+    header('Location: list_approval_pimpinan.php?pesan=' . rawurlencode($pesan));
     exit;
 }
+function adaBarisVoid($db, $sql, $params, $types) {
+    $stmt = mysqli_prepare($db, $sql);
+    if (!$stmt) throw new RuntimeException('Prepare gagal');
+    if ($types !== '') mysqli_stmt_bind_param($stmt, $types, ...$params);
+    if (!mysqli_stmt_execute($stmt)) throw new RuntimeException('Pemeriksaan data gagal');
+    $result = mysqli_stmt_get_result($stmt);
+    $ada = mysqli_fetch_assoc($result) !== null;
+    mysqli_stmt_close($stmt);
+    return $ada;
+}
 
-// ========== AMBIL PARAMETER ==========
-$id          = (int)($_GET['id']      ?? 0);
-$action      = $_GET['action']        ?? '';
-$catatan_raw = $_GET['catatan']       ?? '';
-
-$username_saya = $_SESSION['username'] ?? '';
-$now           = date('Y-m-d H:i:s');
-
-// ========== VALIDASI PARAMETER ==========
-if (!$id || $action !== 'void') {
-    header("location:list_approval_pimpinan.php?pesan=parameter_invalid");
+if (($_SESSION['status'] ?? '') !== 'login' || ($_SESSION['role'] ?? '') !== 'manager') {
+    header('Location: ../../login.php?pesan=bukan_pimpinan');
     exit;
 }
-
-// Escape string untuk keamanan
-$catatan = mysqli_real_escape_string($koneksi, $catatan_raw);
-
-// Validasi: pastikan catatan tidak kosong
-if (empty($catatan)) {
-    header("location:list_approval_pimpinan.php?pesan=catatan_kosong");
-    exit;
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') voidRedirect('metode_invalid');
+if (empty($_SESSION['csrf_void_pimpinan']) ||
+    !hash_equals($_SESSION['csrf_void_pimpinan'], (string)($_POST['csrf_token'] ?? ''))) {
+    voidRedirect('token_invalid');
 }
+$id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+$action = (string)($_POST['action'] ?? '');
+$catatan = trim((string)($_POST['catatan'] ?? ''));
+$username = trim((string)($_SESSION['username'] ?? ''));
+if (!$id || $action !== 'void') voidRedirect('parameter_invalid');
+if ($catatan === '') voidRedirect('catatan_kosong');
+if ($username === '') voidRedirect('bukan_manager');
+if (mb_strlen($catatan, 'UTF-8') > 2000) voidRedirect('catatan_terlalu_panjang');
 
-// ========== AMBIL DATA PR ==========
-$query_pr = "SELECT * FROM tr_request 
-             WHERE id_request='$id' 
-             AND kategori_pr IN ('BESAR','IT')";
-
-$result_pr = mysqli_query($koneksi, $query_pr);
-if (!$result_pr) {
-    header("location:list_approval_pimpinan.php?pesan=query_error");
-    exit;
-}
-
-$pr = mysqli_fetch_assoc($result_pr);
-if (!$pr) {
-    header("location:list_approval_pimpinan.php?pesan=tidak_ditemukan");
-    exit;
-}
-
-// ========== VALIDASI STATUS ==========
-$status_app = $pr['status_approval'];
-$status_req = $pr['status_request'];
-
-// Cek apakah PR sudah BATAL / SELESAI / DITOLAK
-if (in_array($status_req, ['BATAL', 'SELESAI']) || $status_app === 'DITOLAK') {
-    header("location:list_approval_pimpinan.php?pesan=sudah_diproses");
-    exit;
-}
-
-// Validasi: hanya bisa di-void pada status yang sudah di-approve
-if (!in_array($status_app, ['APPROVED 1', 'APPROVED 2', 'APPROVED'])) {
-    header("location:list_approval_pimpinan.php?pesan=belum_di_approve");
-    exit;
-}
-
-// ========== VALIDASI USER ==========
-// Cek apakah user adalah salah satu approver PR ini
-$is_approver = (
-    $pr['approve1_by'] === $username_saya ||
-    $pr['approve2_by'] === $username_saya ||
-    $pr['approve3_by'] === $username_saya
-);
-
-// Jika user BUKAN approver, cek apakah dia manager yang berhak void
-// (opsional: bisa juga semua manager boleh void, sesuaikan kebijakan)
-if (!$is_approver) {
-    // Cek apakah user adalah manager aktif
-    $check_mgr = mysqli_query($koneksi,
-        "SELECT username FROM users 
-         WHERE username = '$username_saya' 
-         AND role = 'manager' 
-         AND status_aktif = 'AKTIF'");
-    
-    if (mysqli_num_rows($check_mgr) == 0) {
-        header("location:list_approval_pimpinan.php?pesan=bukan_manager");
-        exit;
-    }
-}
-
-// ========== PROSES TRANSACTION ==========
-mysqli_begin_transaction($koneksi);
-
+$inTransaction = false;
 try {
-    
-    // Gabungkan catatan void
-    $catatan_full = "VOID oleh $username_saya: " . $catatan;
-    $catatan_full_esc = mysqli_real_escape_string($koneksi, $catatan_full);
-    
-    // =========================================================
-    // UPDATE tr_request → BATAL
-    // =========================================================
-    $sql = "UPDATE tr_request SET
-                status_approval = 'BATAL',
-                status_request  = 'BATAL',
-                void_by         = '$username_saya',
-                void_at         = '$now',
-                catatan_void    = '$catatan_full_esc',
-                updated_by      = '$username_saya',
-                updated_at      = '$now'
-            WHERE id_request = '$id'";
-    
-    if (!mysqli_query($koneksi, $sql)) {
-        throw new Exception("Gagal update status PR: " . mysqli_error($koneksi));
+    mysqli_begin_transaction($koneksi);
+    $inTransaction = true;
+
+    // Lock baris PR. Status approval dipertahankan sebagai histori.
+    $stmt = mysqli_prepare($koneksi, "SELECT id_request, no_request, kategori_pr, status_request,
+        status_approval, approve1_by, approve2_by, approve3_by, void_by
+        FROM tr_request WHERE id_request=? AND kategori_pr IN ('BESAR','IT') FOR UPDATE");
+    mysqli_stmt_bind_param($stmt, 'i', $id);
+    mysqli_stmt_execute($stmt);
+    $pr = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+    mysqli_stmt_close($stmt);
+    if (!$pr) throw new DomainException('tidak_ditemukan');
+    if (in_array($pr['status_request'], ['BATAL','SELESAI'], true) ||
+        $pr['status_approval'] === 'DITOLAK' || !empty($pr['void_by'])) {
+        throw new DomainException('sudah_diproses');
     }
-    
-    // =========================================================
-    // UPDATE tr_purchase_order → DRAFT (jika ada)
-    // =========================================================
-    $sql_po = "UPDATE tr_purchase_order 
-               SET status_po = 'DRAFT' 
-               WHERE id_request = '$id'";
-    
-    if (!mysqli_query($koneksi, $sql_po)) {
-        throw new Exception("Gagal update status PO: " . mysqli_error($koneksi));
+    if (!in_array($pr['status_approval'], ['APPROVED 1','APPROVED 2','APPROVED'], true)) {
+        throw new DomainException('belum_di_approve');
     }
-    
-    // =========================================================
-    // LOG AKTIVITAS (opsional, jika tabel log tersedia)
-    // =========================================================
-    // $sql_log = "INSERT INTO tr_log_aktivitas 
-    //             (id_request, username, aksi, catatan, created_at)
-    //             VALUES 
-    //             ('$id', '$username_saya', 'VOID', '$catatan_full_esc', '$now')";
-    // mysqli_query($koneksi, $sql_log);
-    
+    // Session sudah diverifikasi sebagai manager. Sesuai rule awal,
+    // manager dapat VOID PR approved walaupun bukan approver pada tahap sebelumnya.
+
+    // Kunci seluruh PO terkait sebelum pemeriksaan dan pembatalan.
+    $stmt = mysqli_prepare($koneksi, 'SELECT id_po, status_po FROM tr_purchase_order WHERE id_request=? FOR UPDATE');
+    mysqli_stmt_bind_param($stmt, 'i', $id);
+    mysqli_stmt_execute($stmt);
+    $po = mysqli_stmt_get_result($stmt);
+    while ($row = mysqli_fetch_assoc($po)) {
+        // CLOSE dianggap selesai: jangan VOID tanpa rekonsiliasi manual.
+        if ($row['status_po'] === 'CLOSE') throw new DomainException('po_sudah_close');
+    }
+    mysqli_stmt_close($stmt);
+
+    // Pemeriksaan transaksi nyata, termasuk relasi lewat no_request bagi data lama.
+    // Pembelian yang telah tersimpan dianggap transaksi lanjutan walaupun detail PR belum diperbarui.
+    $sqlPembelian = "SELECT id_pembelian FROM pembelian
+        WHERE id_request=? OR (no_request IS NOT NULL AND no_request <> '' AND no_request=?) LIMIT 1";
+    if (adaBarisVoid($koneksi, $sqlPembelian, [$id, $pr['no_request']], 'is')) {
+        throw new DomainException('sudah_ada_pembelian');
+    }
+    // Staging aktif masih memuat proses pembelian yang berjalan.
+    $sqlStaging = "SELECT id_staging FROM pembelian_staging
+        WHERE (id_request=? OR (no_request IS NOT NULL AND no_request <> '' AND no_request=?))
+          AND status_staging IN ('MENUNGGU','DISETUJUI') LIMIT 1";
+    if (adaBarisVoid($koneksi, $sqlStaging, [$id, $pr['no_request']], 'is')) {
+        throw new DomainException('ada_pembelian_staging');
+    }
+    // Cek penanda item terbeli agar data migrasi/manual tetap terlindungi.
+    $sqlDetail = "SELECT id_detail FROM tr_request_detail WHERE id_request=?
+        AND (is_dibeli=1 OR status_item='TERBELI' OR tgl_dibeli IS NOT NULL) LIMIT 1";
+    if (adaBarisVoid($koneksi, $sqlDetail, [$id], 'i')) {
+        throw new DomainException('item_sudah_dibeli');
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $catatanFull = 'Dibatalkan oleh ' . $username . ': ' . $catatan;
+    // Nilai BATAL TIDAK ada di enum status_approval. Jangan menulis BATAL ke kolom tersebut.
+    $stmt = mysqli_prepare($koneksi, "UPDATE tr_request SET
+        status_request='BATAL', void_by=?, void_at=?, catatan_void=?,
+        updated_by=?, updated_at=?
+        WHERE id_request=? AND status_request NOT IN ('BATAL','SELESAI')
+          AND (void_by IS NULL OR void_by='')");
+    mysqli_stmt_bind_param($stmt, 'sssssi', $username, $now, $catatanFull, $username, $now, $id);
+    mysqli_stmt_execute($stmt);
+    $changed = mysqli_stmt_affected_rows($stmt);
+    mysqli_stmt_close($stmt);
+    if ($changed !== 1) throw new DomainException('sudah_diproses');
+
+    // Batalkan SEMUA PO terkait; jangan mengubahnya menjadi DRAFT.
+    $stmt = mysqli_prepare($koneksi, "UPDATE tr_purchase_order SET status_po='BATAL'
+        WHERE id_request=? AND status_po<>'BATAL'");
+    mysqli_stmt_bind_param($stmt, 'i', $id);
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_close($stmt);
+
     mysqli_commit($koneksi);
-    header("location:list_approval_pimpinan.php?pesan=void_berhasil");
-    exit;
-    
-} catch (Exception $e) {
-    // Rollback transaction jika ada error
-    mysqli_rollback($koneksi);
-    
-    // Redirect dengan pesan error
-    $error_message = urlencode($e->getMessage());
-    header("location:list_approval_pimpinan.php?pesan=gagal&error=$error_message");
-    exit;
+    $inTransaction = false;
+    voidRedirect('void_berhasil');
+} catch (DomainException $e) {
+    if ($inTransaction) mysqli_rollback($koneksi);
+    voidRedirect($e->getMessage());
+} catch (Throwable $e) {
+    if ($inTransaction) mysqli_rollback($koneksi);
+    error_log('VOID PR error id=' . (int)$id . ': ' . $e->getMessage());
+    voidRedirect('gagal');
 }
-?>

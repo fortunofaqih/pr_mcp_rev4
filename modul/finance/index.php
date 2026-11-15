@@ -34,7 +34,7 @@ $result_po_open = mysqli_query($koneksi,
      JOIN tr_request r ON p.id_request = r.id_request
      LEFT JOIN master_supplier s ON p.id_supplier = s.id_supplier
      WHERE p.status_po = 'OPEN'
-     AND r.status_request NOT IN ('BATAL')  -- ✅ BATAL tidak ditampilkan
+     AND r.status_request NOT IN ('BATAL')
      $where_search_open
      ORDER BY p.tgl_approve DESC");
 
@@ -52,7 +52,7 @@ $result_po_close = mysqli_query($koneksi,
      JOIN tr_request r ON p.id_request = r.id_request
      LEFT JOIN master_supplier s ON p.id_supplier = s.id_supplier
      WHERE p.status_po = 'CLOSE'
-     AND r.status_request NOT IN ('BATAL')  -- ✅ BATAL tidak ditampilkan
+     AND r.status_request NOT IN ('BATAL')
      $where_search_close
      ORDER BY r.updated_at DESC");
 
@@ -74,10 +74,10 @@ $po_detail        = null;
 $detail_items     = null;
 $id_request_sel   = 0;
 $total_nota_aktual = 0.0;
-$is_usd = false; // Flag untuk menentukan mata uang
+$is_usd = false;
 
 if ($id_po_filter) {
-    $id_po_safe = (int)$id_po_filter; // sudah int, aman
+    $id_po_safe = (int)$id_po_filter;
     $po_detail  = mysqli_fetch_assoc(mysqli_query($koneksi,
         "SELECT p.*, r.no_request, r.nama_pemesan, r.keterangan AS tujuan,
                 r.status_request, r.kategori_pr, r.status_approval,
@@ -91,13 +91,12 @@ if ($id_po_filter) {
          JOIN tr_request r ON p.id_request = r.id_request
          LEFT JOIN master_supplier s ON p.id_supplier = s.id_supplier
          WHERE p.id_po = $id_po_safe
-         AND r.status_request NOT IN ('BATAL')  -- ✅ BATAL tidak ditampilkan
+         AND r.status_request NOT IN ('BATAL')
          LIMIT 1"));
 
     if ($po_detail) {
         $id_request_sel = (int)$po_detail['id_request'];
 
-        // Cek apakah ada item dengan keterangan USD
         $cek_usd = mysqli_query($koneksi,
             "SELECT COUNT(*) AS total_usd 
              FROM tr_request_detail 
@@ -106,7 +105,6 @@ if ($id_po_filter) {
         $data_usd = mysqli_fetch_assoc($cek_usd);
         $is_usd = ($data_usd['total_usd'] > 0);
 
-        // Total realisasi dari nota pembelian (qty × harga)
         $q_realisasi       = mysqli_query($koneksi,
             "SELECT SUM(pb.qty * pb.harga) AS total_nota
              FROM pembelian pb
@@ -115,22 +113,22 @@ if ($id_po_filter) {
         $data_realisasi    = mysqli_fetch_assoc($q_realisasi);
         $total_nota_aktual = (float)($data_realisasi['total_nota'] ?? 0);
 
-		   $detail_items = mysqli_query($koneksi,
-		"SELECT d.*,
-				d.tgl_pasang   AS tgl_pasang,    
-				d.pasang_oleh  AS pasang_oleh,  
-				b.nama_barang AS nama_master,
-				m.plat_nomor,
-				pb.tgl_beli_barang,
-				pb.id_user_beli,
-				u.nama_lengkap AS nama_petugas_beli
-		 FROM tr_request_detail d
-		 LEFT JOIN master_barang b  ON d.id_barang  = b.id_barang
-		 LEFT JOIN master_mobil  m  ON d.id_mobil   = m.id_mobil
-		 LEFT JOIN pembelian     pb ON d.id_detail  = pb.id_request_detail
-		 LEFT JOIN users         u  ON pb.id_user_beli = u.id_user
-		 WHERE d.id_request = $id_request_sel
-		 ORDER BY d.id_detail ASC");
+        $detail_items = mysqli_query($koneksi,
+        "SELECT d.*,
+                d.tgl_pasang   AS tgl_pasang,    
+                d.pasang_oleh  AS pasang_oleh,  
+                b.nama_barang AS nama_master,
+                m.plat_nomor,
+                pb.tgl_beli_barang,
+                pb.id_user_beli,
+                u.nama_lengkap AS nama_petugas_beli
+         FROM tr_request_detail d
+         LEFT JOIN master_barang b  ON d.id_barang  = b.id_barang
+         LEFT JOIN master_mobil  m  ON d.id_mobil   = m.id_mobil
+         LEFT JOIN pembelian     pb ON d.id_detail  = pb.id_request_detail
+         LEFT JOIN users         u  ON pb.id_user_beli = u.id_user
+         WHERE d.id_request = $id_request_sel
+         ORDER BY d.id_detail ASC");
     }
 }
 
@@ -161,7 +159,7 @@ $r = mysqli_fetch_assoc(mysqli_query($koneksi,
      FROM tr_purchase_order p
      JOIN tr_request r ON p.id_request = r.id_request
      WHERE p.status_po = 'OPEN'
-     AND r.status_request NOT IN ('BATAL')"));  // ✅ BATAL tidak dihitung
+     AND r.status_request NOT IN ('BATAL')"));
 $nilai_open = (float)$r['total'];
 
 $r = mysqli_fetch_assoc(mysqli_query($koneksi,
@@ -169,14 +167,14 @@ $r = mysqli_fetch_assoc(mysqli_query($koneksi,
      FROM tr_purchase_order p
      JOIN tr_request r ON p.id_request = r.id_request
      WHERE p.status_po = 'CLOSE'
-     AND r.status_request NOT IN ('BATAL')  -- ✅ BATAL tidak dihitung
+     AND r.status_request NOT IN ('BATAL')
        AND DATE(r.updated_at) BETWEEN '$bln_awal' AND '$bln_akhir'"));
 $po_close_bulan = (int)$r['c'];
 
 $r = mysqli_fetch_assoc(mysqli_query($koneksi,
     "SELECT COUNT(*) AS c FROM tr_request
      WHERE kategori_pr = 'BESAR'
-       AND status_request NOT IN ('SELESAI','REJECTED','BATAL')  -- ✅ BATAL tidak dihitung
+       AND status_request NOT IN ('SELESAI','REJECTED','BATAL')
        AND status_approval NOT IN ('APPROVED','DISETUJUI')"));
 $pr_tunggu_appr = (int)$r['c'];
 
@@ -368,7 +366,6 @@ body {
     border: 1px solid var(--border);
     overflow: hidden;
     animation: fadeUp .35s ease both;
-    /* Sticky sidebar */
     position: sticky;
     top: 70px;
 }
@@ -444,7 +441,6 @@ body {
 .po-item-amt  { font-family: 'JetBrains Mono', monospace; font-size: .72rem; font-weight: 700; color: var(--red); margin-top: 2px; }
 .po-item-date { font-size: .65rem; color: var(--slate); }
 
-/* Empty state untuk hasil search */
 .search-empty {
     padding: 24px 16px;
     text-align: center;
@@ -467,7 +463,7 @@ body {
 .bdg-tunggu  { background: var(--amber-lt); color: #92400e; }
 .bdg-proses  { background: var(--blue-lt);  color: var(--navy-mid); }
 .bdg-selesai { background: var(--green-lt); color: #065f46; }
-.bdg-batal   { background: var(--red-lt);   color: #991b1b; }  /* ✅ Badge untuk status BATAL */
+.bdg-batal   { background: var(--red-lt);   color: #991b1b; }
 
 /* ── DETAIL PANEL ─────────────────────── */
 .detail-card {
@@ -527,6 +523,19 @@ body {
 .info-val { font-size: .82rem; font-weight: 700; color: var(--text); }
 .info-val.text-money { font-family: 'JetBrains Mono', monospace; }
 
+/* ── REVISI: sub-info pemesan (pembeli + tanggal) ── */
+.pemesan-sub {
+    font-size: .68rem;
+    color: var(--slate);
+    font-weight: 600;
+    margin-top: 2px;
+    line-height: 1.3;
+}
+.pemesan-sub i {
+    color: var(--teal-dk);
+    margin-right: 3px;
+}
+
 .prog-bar-bg {
     height: 7px;
     background: var(--border);
@@ -550,7 +559,6 @@ body {
     border-collapse: collapse;
     font-size: .78rem;
 }
-/* Sticky thead */
 .item-table thead { position: sticky; top: 0; z-index: 2; }
 .item-table th {
     background: #1e3a8a;
@@ -738,15 +746,16 @@ body {
                 Daftar Purchase Order
             </div>
 
-            <!-- Search / Filter -->
+            <!-- ── REVISI: Search dengan debounce, tidak submit per karakter ── -->
             <div class="sidebar-search">
-                <form method="GET" action="">
+                <form method="GET" action="" id="formSearchPO">
                     <input type="hidden" name="tab" value="<?= htmlspecialchars($tab_aktif) ?>">
                     <input type="text"
+                           id="inputCariPO"
                            name="cari"
                            placeholder="Cari no. PO, no. request, supplier…"
                            value="<?= htmlspecialchars($search_po) ?>"
-                           oninput="this.form.submit()">
+                           autocomplete="off">
                 </form>
             </div>
 
@@ -784,7 +793,6 @@ body {
                     $is_sel = ($id_po_filter === (int)$po_row['id_po']);
                     $cls    = $is_sel ? ($tab_aktif === 'open' ? 'active-open' : 'active-close') : '';
 
-                    // Cek apakah ada nota untuk PO ini
                     $id_req_row = (int)$po_row['id_request'];
                     $cek_nota   = mysqli_query($koneksi,
                         "SELECT 1 FROM pembelian pb
@@ -835,7 +843,6 @@ body {
         <div class="detail-head">
             <div class="detail-head-top">
                 <div style="flex:1; min-width:0;">
-                    <!-- Nomor PO + badges -->
                     <div class="po-number"><?= htmlspecialchars($po_detail['no_po']) ?></div>
                     <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;">
                         <?php if ($is_batal): ?>
@@ -857,7 +864,6 @@ body {
                         <?php endif; ?>
                     </div>
 
-                    <!-- Info Approval -->
                     <div class="approval-strip">
                         <?php foreach ([1, 2, 3] as $n): ?>
                         <div class="approval-item">
@@ -873,7 +879,6 @@ body {
                     </div>
                 </div>
 
-                <!-- Tombol Aksi -->
                 <div class="d-flex gap-2 flex-wrap no-print align-items-start">
                     <a href="../transaksi/cetak_pr_besar.php?id=<?= $id_request_sel ?>"
                        target="_blank"
@@ -892,7 +897,6 @@ body {
                 </div>
             </div>
 
-            <!-- Banner penawaran -->
             <?php if (!empty($po_detail['file_penawaran'])): ?>
             <div class="banner-penawaran no-print">
                 <div class="icon-pdf"><i class="fas fa-file-pdf"></i></div>
@@ -908,7 +912,7 @@ body {
             </div>
             <?php endif; ?>
 
-            <!-- Info grid — FIXED: semua kolom dalam grid yang benar -->
+            <!-- ── REVISI: Info grid — Pemesan kini berisi sub-info pembeli & tgl ── -->
             <div class="info-grid mb-3 mt-3">
                 <div>
                     <div class="info-lbl">No. Request</div>
@@ -921,20 +925,40 @@ body {
                 <div>
                     <div class="info-lbl">Pemesan</div>
                     <div class="info-val"><?= htmlspecialchars(strtoupper($po_detail['nama_pemesan'])) ?></div>
+                    <?php
+                    // ── REVISI: Ambil data pembeli & tanggal beli untuk sub-info Pemesan ──
+                    // Prioritas: petugas & tanggal dari pembelian pertama pada request ini
+                    $info_beli = mysqli_fetch_assoc(mysqli_query($koneksi,
+                        "SELECT u.nama_lengkap AS petugas, pb.tgl_beli_barang
+                         FROM pembelian pb
+                         JOIN tr_request_detail d ON pb.id_request_detail = d.id_detail
+                         LEFT JOIN users u ON pb.id_user_beli = u.id_user
+                         WHERE d.id_request = $id_request_sel
+                           AND pb.tgl_beli_barang IS NOT NULL
+                         ORDER BY pb.tgl_beli_barang ASC
+                         LIMIT 1"));
+                    if ($info_beli && !empty($info_beli['tgl_beli_barang'])):
+                    ?>
+                        
+                        <div class="pemesan-sub">
+                            <i class="far fa-calendar-alt"></i>
+                            <?= date('d/m/Y', strtotime($info_beli['tgl_beli_barang'])) ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
                <div>
-					<div class="info-lbl">Grand Total (Sesuai Nota)</div>
-					<div class="info-val text-money <?= $total_nota_aktual > 0 ? 'text-success' : 'text-danger' ?>">
-						<?= $is_usd ? '$' : 'Rp' ?> <?= number_format($total_nota_aktual > 0 ? $total_nota_aktual : (float)$po_detail['grand_total'], 0, ',', '.') ?>
-						<div style="font-size:.65rem;font-weight:normal;margin-top:2px;color:#666;">
-							<?php if ($total_nota_aktual > 0): ?>
-								<i class="fas fa-info-circle me-1"></i> Terupdate dari nota pembelian
-							<?php else: ?>
-								<i class="fas fa-exclamation-triangle me-1" style="color:#f39c12;"></i> Masih harga estimasi PO
-							<?php endif; ?>
-						</div>
-					</div>
-				</div>
+                    <div class="info-lbl">Grand Total (Sesuai Nota)</div>
+                    <div class="info-val text-money <?= $total_nota_aktual > 0 ? 'text-success' : 'text-danger' ?>">
+                        <?= $is_usd ? '$' : 'Rp' ?> <?= number_format($total_nota_aktual > 0 ? $total_nota_aktual : (float)$po_detail['grand_total'], 0, ',', '.') ?>
+                        <div style="font-size:.65rem;font-weight:normal;margin-top:2px;color:#666;">
+                            <?php if ($total_nota_aktual > 0): ?>
+                                <i class="fas fa-info-circle me-1"></i> Terupdate dari nota pembelian
+                            <?php else: ?>
+                                <i class="fas fa-exclamation-triangle me-1" style="color:#f39c12;"></i> Masih harga estimasi PO
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
                 <div>
                     <div class="info-lbl">Keperluan</div>
                     <div class="info-val" style="font-weight:500;"><?= htmlspecialchars($po_detail['tujuan'] ?? '-') ?></div>
@@ -956,7 +980,6 @@ body {
                 <?php endif; ?>
             </div>
 
-            <!-- Progress bar -->
             <div style="display:flex;align-items:center;gap:10px;">
                 <div class="prog-bar-bg">
                     <div class="prog-bar-fill" style="width:<?= $pct_selesai ?>%;"></div>
@@ -977,7 +1000,7 @@ body {
             </div>
         </div><!-- /detail-head -->
 
-        <!-- Tabel item -->
+        <!-- ── REVISI: Tabel item — kolom "Dibeli Oleh" dihapus ── -->
         <div class="detail-body">
             <table class="item-table">
                 <thead>
@@ -988,13 +1011,12 @@ body {
                         <th width="70">Qty</th>
                         <th width="130">Status Beli</th>
                         <th width="130">Status Ban</th>
-                        <th width="130">Dibeli Oleh</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if (empty($rows_item)): ?>
                     <tr>
-                        <td colspan="7" style="text-align:center;padding:30px;color:var(--slate);">
+                        <td colspan="6" style="text-align:center;padding:30px;color:var(--slate);">
                             <i class="fas fa-minus" style="opacity:.3;"></i>
                             Tidak ada item.
                         </td>
@@ -1042,38 +1064,24 @@ body {
                         </td>
                         <td style="text-align:center;">
                            <?php if ($is_ban): ?>
-									<?php if ($status_pasang === 'TERPASANG'): ?>
-										<span class="bdg st-terpasang">
-											<i class="fas fa-check me-1"></i>TERPASANG
-										</span>
-										<div style="font-size:.65rem;color:var(--slate);">
-											Dipasang tanggal
-											<i class="far fa-calendar-alt me-1"></i>
-											<?php 
-											// Perbaikan untuk menangani null atau empty date
-											if (!empty($d['tgl_pasang']) && $d['tgl_pasang'] !== null):
-												echo date('d/m/Y', strtotime($d['tgl_pasang']));
-											else:
-												echo '-';
-											endif;
-											?>
-										</div>
+                                    <?php if ($status_pasang === 'TERPASANG'): ?>
+                                        <span class="bdg st-terpasang">
+                                            <i class="fas fa-check me-1"></i>TERPASANG
+                                        </span>
+                                        <div style="font-size:.65rem;color:var(--slate);">
+                                            Dipasang tanggal
+                                            <i class="far fa-calendar-alt me-1"></i>
+                                            <?php 
+                                            if (!empty($d['tgl_pasang']) && $d['tgl_pasang'] !== null):
+                                                echo date('d/m/Y', strtotime($d['tgl_pasang']));
+                                            else:
+                                                echo '-';
+                                            endif;
+                                            ?>
+                                        </div>
                                 <?php else: ?>
                                     <span class="bdg st-belum-pasang"><i class="fas fa-clock me-1"></i>BELUM PASANG</span>
                                 <?php endif; ?>
-                            <?php else: ?>
-                                <span style="color:var(--slate);">—</span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <?php if ($is_terbeli): ?>
-                                <div style="font-weight:700;color:var(--teal-dk);font-size:.75rem;">
-                                    <?= htmlspecialchars($d['nama_petugas_beli'] ?? '-') ?>
-                                </div>
-                                <div style="font-size:.65rem;color:var(--slate);">
-                                    <i class="far fa-calendar-alt me-1"></i>
-                                    <?= date('d/m/Y', strtotime($d['tgl_beli_barang'])) ?>
-                                </div>
                             <?php else: ?>
                                 <span style="color:var(--slate);">—</span>
                             <?php endif; ?>
@@ -1103,23 +1111,49 @@ body {
 function goTab(tab) {
     const url = new URL(window.location.href);
     url.searchParams.set('tab', tab);
-    url.searchParams.delete('id_po');  // reset pilihan PO saat ganti tab
-    url.searchParams.delete('cari');   // reset search saat ganti tab
+    url.searchParams.delete('id_po');
+    url.searchParams.delete('cari');
     window.location.href = url.toString();
 }
 </script>
 <script>
+    // ── REVISI: Search debounce — tidak submit per karakter ───
+    (function () {
+        const input = document.getElementById('inputCariPO');
+        const form  = document.getElementById('formSearchPO');
+        if (!input || !form) return;
+
+        // Fokus + kembalikan posisi kursor ke akhir teks setelah reload
+        input.focus();
+        const val = input.value;
+        if (val.length > 0) {
+            const len = val.length;
+            try {
+                input.setSelectionRange(len, len);
+            } catch (e) {}
+        }
+
+        let timer = null;
+        input.addEventListener('input', function () {
+            clearTimeout(timer);
+            // Simpan posisi kursor agar setelah reload tetap di akhir
+            const pos = this.value.length;
+            sessionStorage.setItem('cari_cursor', pos);
+            timer = setTimeout(function () {
+                form.submit();
+            }, 400); // tunggu user berhenti mengetik 400ms
+        });
+    })();
+</script>
+<script>
     let idleTime = 0;
-    const maxIdleMinutes = 15; // Samakan dengan server
+    const maxIdleMinutes = 15;
     let lastServerUpdate = Date.now();
     let sessionValid = true;
 
-    // Fungsi reset timer saat ada gerakan
     function resetTimer() {
         idleTime = 0;
         let now = Date.now();
-
-        // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
         if (now - lastServerUpdate > 300000) {
             fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
                 .then(response => response.json())
@@ -1136,14 +1170,11 @@ function goTab(tab) {
         }
     }
 
-    // Fungsi paksa logout
     function forceLogout() {
         alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
-        // Redirect ke logout.php agar session server juga dihancurkan
-        window.location.href = "http://192.168.31.200/pr_mcp/auth/logout.php?pesan=timeout";
+        window.location.href = "http://192.168.31.200/pr_mcp/auth/keep_alive.php?pesan=timeout";
     }
 
-    // Pantau aktivitas user
     window.onload = resetTimer;
     document.onmousemove = resetTimer;
     document.onkeypress = resetTimer;
@@ -1151,10 +1182,8 @@ function goTab(tab) {
     document.onclick = resetTimer;
     document.onscroll = resetTimer;
 
-    // Cek status idle setiap 1 menit
     setInterval(function() {
         idleTime++;
-        // Cek session ke server juga
         fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
             .then(response => response.json())
             .then(data => {
@@ -1163,9 +1192,7 @@ function goTab(tab) {
                     forceLogout();
                 }
             })
-            .catch(err => {
-                // Jika error koneksi, biarkan user tetap di halaman
-            });
+            .catch(err => {});
         if (idleTime >= maxIdleMinutes && sessionValid) {
             forceLogout();
         }

@@ -1,7 +1,7 @@
 <?php
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 if ($_SESSION['status'] != "login") {
     header("location:../../login.php");
@@ -193,13 +193,62 @@ function formatAngka($angka) {
         @media (max-width: 768px) {
             .item-barang-row .col-md-2, .item-barang-row .col-md-3 { width: 100%; margin-bottom: 8px; }
         }
+
+        /* LOADING HALAMAN PENGAMBILAN - hanya tampilan */
+        #loadingPengambilan {
+            position: fixed;
+            inset: 0;
+            z-index: 20000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(248, 249, 250, 0.97);
+            opacity: 1;
+            visibility: visible;
+            transition: opacity .3s ease, visibility .3s ease;
+        }
+        #loadingPengambilan.loading-selesai {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        #loadingPengambilan .loading-panel {
+            width: min(90vw, 370px);
+            padding: 30px 25px;
+            background: #fff;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, .09);
+        }
+        #loadingPengambilan .loading-spinner {
+            width: 52px;
+            height: 52px;
+            margin: 0 auto 18px;
+            border: 5px solid #dce9ff;
+            border-top-color: #0000FF;
+            border-radius: 50%;
+            animation: spinPengambilan .8s linear infinite;
+        }
+        @keyframes spinPengambilan { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) {
+            #loadingPengambilan .loading-spinner { animation-duration: 1.5s; }
+        }
     </style>
 </head>
 <body class="py-4">
 
+<!-- Loading overlay: tampil saat halaman dibuka, tidak mengubah proses pengambilan -->
+<div id="loadingPengambilan" role="status" aria-live="polite" aria-label="Memuat halaman pengambilan barang">
+    <div class="loading-panel">
+        <div class="loading-spinner" aria-hidden="true"></div>
+        <div class="fw-bold fs-5 mb-2" style="color:#0000FF;">Loading... Memuat Pengambilan Barang</div>
+        <div class="small text-muted">Sedang menyiapkan data pengambilan, mohon tunggu.</div>
+    </div>
+</div>
+
 <div class="container-fluid">
     
-    <!-- Statistik -->
+    <!-- Statistik 
     <div class="row mb-4">
         <?php
             $sql_top_barang = "SELECT m.nama_barang, COUNT(b.id_barang) as total_transaksi 
@@ -239,7 +288,7 @@ function formatAngka($angka) {
                 </div>
             </div>
         </div>
-    </div>
+    </div>-->
 
     <!-- Tabel Histori -->
     <div class="card shadow-sm">
@@ -478,6 +527,18 @@ function formatAngka($angka) {
 </div>
 </div>
 
+<script>
+// Loading hanya untuk tampilan halaman; tidak mengubah submit, edit, maupun cetak.
+function sembunyikanLoadingPengambilan() {
+    var overlay = document.getElementById('loadingPengambilan');
+    if (overlay) overlay.classList.add('loading-selesai');
+}
+// Pengaman jika inisialisasi tabel atau library eksternal gagal.
+window.addEventListener('load', function () {
+    setTimeout(sembunyikanLoadingPengambilan, 500);
+});
+setTimeout(sembunyikanLoadingPengambilan, 12000);
+</script>
 <!-- Scripts -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -493,6 +554,10 @@ function formatAngka($angka) {
     $(document).ready(function() {
         // DataTables
         $('#tabelHistori').DataTable({ "order": [[0, "desc"]] });
+        // Tutup overlay setelah DataTables siap ditampilkan.
+        requestAnimationFrame(function () {
+            requestAnimationFrame(sembunyikanLoadingPengambilan);
+        });
 
         // --- INISIALISASI MODAL TAMBAH ---
         // Panggil init saat modal akan ditampilkan
@@ -731,6 +796,69 @@ $(document).ready(function() {
         }
     });
 });
+</script>
+<script>
+    let idleTime = 0;
+    const maxIdleMinutes = 15; // Samakan dengan server
+    let lastServerUpdate = Date.now();
+    let sessionValid = true;
+
+    // Fungsi reset timer saat ada gerakan
+    function resetTimer() {
+        idleTime = 0;
+        let now = Date.now();
+
+        // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
+        if (now - lastServerUpdate > 300000) {
+            fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status !== 'success') {
+                        sessionValid = false;
+                        forceLogout();
+                    }
+                })
+                .catch(err => {
+                    console.error("Koneksi ke server terputus");
+                });
+            lastServerUpdate = now;
+        }
+    }
+
+    // Fungsi paksa logout
+    function forceLogout() {
+        alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
+        // Redirect ke logout.php agar session server juga dihancurkan
+        window.location.href = "http://192.168.31.200/pr_mcp/auth/logout.php?pesan=timeout";
+    }
+
+    // Pantau aktivitas user
+    window.onload = resetTimer;
+    document.onmousemove = resetTimer;
+    document.onkeypress = resetTimer;
+    document.onmousedown = resetTimer;
+    document.onclick = resetTimer;
+    document.onscroll = resetTimer;
+
+    // Cek status idle setiap 1 menit
+    setInterval(function() {
+        idleTime++;
+        // Cek session ke server juga
+        fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status !== 'success') {
+                    sessionValid = false;
+                    forceLogout();
+                }
+            })
+            .catch(err => {
+                // Jika error koneksi, biarkan user tetap di halaman
+            });
+        if (idleTime >= maxIdleMinutes && sessionValid) {
+            forceLogout();
+        }
+    }, 60000);
 </script>
 </body>
 </html>

@@ -1,19 +1,22 @@
 <?php
+// EDIT MOBIL
 session_start();
 require_once __DIR__ . '/../../config/koneksi.php';
 require_once __DIR__ . '/../../auth/check_session.php';
 
-
-if ($_SESSION['status'] != "login") {
-    header("location:../../login.php?pesan=belum_login");
+if (!isset($_SESSION['status']) || $_SESSION['status'] != 'login') {
+    header('location:../../login.php?pesan=belum_login');
     exit;
 }
-
-$id = mysqli_real_escape_string($koneksi, $_GET['id']);
-$edit = mysqli_query($koneksi, "SELECT * FROM master_mobil WHERE id_mobil='$id'");
-$d = mysqli_fetch_array($edit);
-
-if (!$d) { echo "Data tidak ditemukan"; exit; }
+$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+if (!$id) { echo 'Data tidak ditemukan'; exit; }
+$stmt = mysqli_prepare($koneksi, 'SELECT * FROM master_mobil WHERE id_mobil = ?');
+mysqli_stmt_bind_param($stmt, 'i', $id);
+mysqli_stmt_execute($stmt);
+$d = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+mysqli_stmt_close($stmt);
+if (!$d) { echo 'Data tidak ditemukan'; exit; }
+function eMobil($value) { return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8'); }
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -32,20 +35,18 @@ if (!$d) { echo "Data tidak ditemukan"; exit; }
     </style>
 </head>
 <body>
-
 <div class="container">
     <div class="card card-edit shadow-lg">
         <div class="card-header bg-mcp py-3 text-center">
             <h5 class="m-0 fw-bold text-uppercase"><i class="fas fa-edit me-2"></i> Edit Data Armada</h5>
         </div>
         <div class="card-body p-4">
-            <form action="update_mobil.php" method="POST">
-                <input type="hidden" name="id_mobil" value="<?= $d['id_mobil'] ?>">
-                
+            <form action="update_mobil.php" method="POST" id="form-edit-mobil">
+                <input type="hidden" name="id_mobil" value="<?= (int)$d['id_mobil'] ?>">
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label class="form-label small fw-bold">PLAT NOMOR</label>
-                        <input type="text" name="plat_nomor" class="form-control fw-bold text-primary" value="<?= $d['plat_nomor'] ?>" required>
+                        <input type="text" id="plat_nomor" name="plat_nomor" class="form-control fw-bold text-primary" value="<?= eMobil($d['plat_nomor']) ?>" maxlength="20" required>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label small fw-bold">STATUS AKTIF</label>
@@ -55,16 +56,14 @@ if (!$d) { echo "Data tidak ditemukan"; exit; }
                         </select>
                     </div>
                 </div>
-
                 <div class="mb-3">
                     <label class="form-label small fw-bold">NAMA DRIVER</label>
-                    <input type="text" name="driver_tetap" class="form-control" value="<?= $d['driver_tetap'] ?>" required>
+                    <input type="text" name="driver_tetap" class="form-control" value="<?= eMobil($d['driver_tetap']) ?>" required>
                 </div>
-
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label class="form-label small fw-bold">JENIS KENDARAAN</label>
-                        <input type="text" name="jenis_kendaraan" class="form-control" value="<?= $d['jenis_kendaraan'] ?>" required>
+                        <input type="text" name="jenis_kendaraan" class="form-control" value="<?= eMobil($d['jenis_kendaraan']) ?>" required>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label small fw-bold">KATEGORI</label>
@@ -74,34 +73,31 @@ if (!$d) { echo "Data tidak ditemukan"; exit; }
                         </select>
                     </div>
                 </div>
-
                 <div class="row mb-3">
                     <div class="col-md-8 mb-3">
                         <label class="form-label small fw-bold">MERK / TIPE</label>
-                        <input type="text" name="merk_tipe" class="form-control" value="<?= $d['merk_tipe'] ?>" required>
+                        <input type="text" name="merk_tipe" class="form-control" value="<?= eMobil($d['merk_tipe']) ?>" required>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="form-label small fw-bold">TAHUN</label>
-                        <input type="number" name="tahun_kendaraan" class="form-control" value="<?= $d['tahun_kendaraan'] ?>" required>
+                        <input type="number" name="tahun_kendaraan" class="form-control" value="<?= eMobil($d['tahun_kendaraan']) ?>" required>
                     </div>
                 </div>
-
                 <div class="p-3 mb-4 rounded audit-section">
                     <h6 class="fw-bold small mb-2 text-info text-uppercase"><i class="fas fa-fingerprint me-2"></i> Histori Data</h6>
                     <div class="row">
                         <div class="col-6 border-end">
                             <small class="text-muted d-block text-uppercase">Didaftarkan Oleh:</small>
-                            <span class="fw-bold"><?= $d['created_by'] ?: '-'; ?></span><br>
-                            <small class="text-muted"><?= ($d['created_at']) ? date('d/m/Y H:i', strtotime($d['created_at'])) : '-'; ?></small>
+                            <span class="fw-bold"><?= eMobil($d['created_by'] ?: '-') ?></span><br>
+                            <small class="text-muted"><?= ($d['created_at']) ? date('d/m/Y H:i', strtotime($d['created_at'])) : '-' ?></small>
                         </div>
                         <div class="col-6 ps-3">
                             <small class="text-muted d-block text-uppercase">Update Terakhir:</small>
-                            <span class="fw-bold"><?= $d['updated_by'] ?: '-'; ?></span><br>
-                            <small class="text-muted"><?= ($d['updated_at']) ? date('d/m/Y H:i', strtotime($d['updated_at'])) : '-'; ?></small>
+                            <span class="fw-bold"><?= eMobil($d['updated_by'] ?: '-') ?></span><br>
+                            <small class="text-muted"><?= ($d['updated_at']) ? date('d/m/Y H:i', strtotime($d['updated_at'])) : '-' ?></small>
                         </div>
                     </div>
                 </div>
-
                 <div class="row g-2">
                     <div class="col-8">
                         <button type="submit" class="btn btn-primary w-100 fw-bold py-2">
@@ -117,66 +113,48 @@ if (!$d) { echo "Data tidak ditemukan"; exit; }
     </div>
 </div>
 <script>
+    // Konfirmasi hanya untuk perubahan nomor plat (bukan edit data lainnya).
+    const platSemula = <?= json_encode($d['plat_nomor']) ?>;
+    const normalPlat = p => p.trim().toUpperCase().replace(/\s+/g, '');
+    document.getElementById('form-edit-mobil').addEventListener('submit', function(ev) {
+        const platBaru = document.getElementById('plat_nomor').value;
+        if (normalPlat(platBaru) !== normalPlat(platSemula)) {
+            if (!confirm('Plat nomor akan berubah dari ' + platSemula + ' menjadi ' + platBaru.toUpperCase() + '. Riwayat transaksi kendaraan tetap mengikuti ID Mobil. Lanjutkan?')) ev.preventDefault();
+        }
+    });
+
     let idleTime = 0;
-    const maxIdleMinutes = 15; // Samakan dengan server
+    const maxIdleMinutes = 15;
     let lastServerUpdate = Date.now();
     let sessionValid = true;
-
-    // Fungsi reset timer saat ada gerakan
     function resetTimer() {
         idleTime = 0;
         let now = Date.now();
-
-        // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
         if (now - lastServerUpdate > 300000) {
             fetch('/pr_mcp_rev4/auth/keep_alive.php')
                 .then(response => response.json())
-                .then(data => {
-                    if (data.status !== 'success') {
-                        sessionValid = false;
-                        forceLogout();
-                    }
-                })
-                .catch(err => {
-                    console.error("Koneksi ke server terputus");
-                });
+                .then(data => { if (data.status !== 'success') { sessionValid = false; forceLogout(); } })
+                .catch(err => { console.error('Koneksi ke server terputus'); });
             lastServerUpdate = now;
         }
     }
-
-    // Fungsi paksa logout
     function forceLogout() {
-        alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
-        // Redirect ke logout.php agar session server juga dihancurkan
-        window.location.href = "/pr_mcp_rev4/auth/logout.php?pesan=timeout";
+        alert('Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.');
+        window.location.href = '/pr_mcp_rev4/auth/logout.php?pesan=timeout';
     }
-
-    // Pantau aktivitas user
     window.onload = resetTimer;
     document.onmousemove = resetTimer;
     document.onkeypress = resetTimer;
     document.onmousedown = resetTimer;
     document.onclick = resetTimer;
     document.onscroll = resetTimer;
-
-    // Cek status idle setiap 1 menit
     setInterval(function() {
         idleTime++;
-        // Cek session ke server juga
         fetch('/pr_mcp_rev4/auth/keep_alive.php')
             .then(response => response.json())
-            .then(data => {
-                if (data.status !== 'success') {
-                    sessionValid = false;
-                    forceLogout();
-                }
-            })
-            .catch(err => {
-                // Jika error koneksi, biarkan user tetap di halaman
-            });
-        if (idleTime >= maxIdleMinutes && sessionValid) {
-            forceLogout();
-        }
+            .then(data => { if (data.status !== 'success') { sessionValid = false; forceLogout(); } })
+            .catch(err => {});
+        if (idleTime >= maxIdleMinutes && sessionValid) forceLogout();
     }, 60000);
 </script>
 </body>

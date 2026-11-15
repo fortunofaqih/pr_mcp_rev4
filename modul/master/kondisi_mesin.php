@@ -32,7 +32,6 @@ if ($_SESSION['status'] != "login") {
         .badge-spei { background-color: #20c997; color: white; }
         .badge-stell { background-color: #e83e8c; color: white; }
         .badge-gulung-dinamo { background-color: #6c757d; color: white; }
-        
         .btn-kondisi {
             background: #ffc107;
             color: #000;
@@ -50,18 +49,41 @@ if ($_SESSION['status'] != "login") {
         .modal-header-success .btn-close {
             filter: brightness(0) invert(1);
         }
+
+        /* ===== FILTER PANEL ===== */
+        .filter-panel {
+            background: #f1f4f9;
+            border: 1px solid #dbe2ea;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+        }
+        .filter-panel label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 2px;
+            color: #444;
+        }
+        .filter-panel .form-select,
+        .filter-panel .form-control {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+            height: 32px;
+        }
+        .filter-panel .btn {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.7rem;
+            height: 32px;
+        }
     </style>
 </head>
 <body>
 
 <nav class="navbar navbar-mcp mb-3">
     <div class="container-fluid px-3 px-sm-4">
-        <span class="navbar-brand fw-bold text-white"><i class="fas fa-heartbeat me-2"></i> KONDISI MESIN</span>
+        <span class="navbar-brand fw-bold text-white"><i class="fas fa-heartbeat me-2"></i> STATUS MESIN</span>
         <div class="d-flex flex-wrap gap-1">
             <a href="mesin.php" class="btn btn-sm btn-danger"><i class="fas fa-rotate-left"></i> KEMBALI</a>
-            <button class="btn btn-sm btn-kondisi" data-bs-toggle="modal" data-bs-target="#modalTambahKondisi" onclick="resetFormTambah()">
-                <i class="fas fa-plus-circle"></i> TAMBAH KONDISI
-            </button>
         </div>
     </div>
 </nav>
@@ -69,6 +91,49 @@ if ($_SESSION['status'] != "login") {
 <div class="container-fluid px-3 px-sm-4">
     <div class="card">
         <div class="card-body">
+
+            <!-- ================= FILTER PANEL ================= -->
+            <div class="filter-panel">
+                <div class="row g-2 align-items-end">
+                    <div class="col-6 col-md-2">
+                        <label><i class="fas fa-tools me-1"></i> Kondisi</label>
+                        <select id="filterKondisi" class="form-select">
+                            <option value="">Semua</option>
+                            <option value="BAIK">BAIK</option>
+                            <option value="DISERVICE">DISERVICE</option>
+                            <option value="DIBONGKAR">DIBONGKAR</option>
+                            <option value="DIPOLES">DIPOLES</option>
+                            <option value="DI POPOK">DI POPOK</option>
+                            <option value="DI BUBUT">DI BUBUT</option>
+                            <option value="SPEI">SPEI</option>
+                            <option value="STELL">STELL</option>
+                            <option value="DI COR">DI COR</option>
+                            <option value="SELEP">SELEP</option>
+                            <option value="DI GANTI">DI GANTI</option>
+                            <option value="GULUNG DINAMO">GULUNG DINAMO</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label><i class="fas fa-info-circle me-1"></i> Status</label>
+                        <select id="filterStatus" class="form-select">
+                            <option value="">Semua</option>
+                            <option value="AKTIF">AKTIF</option>
+                            
+                            <option value="SELESAI SERVICE & BAIK">SELESAI SERVICE & BAIK</option>
+                            
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                       
+                        <button type="button" id="btnResetFilter" class="btn btn-secondary btn-sm w-100 badge rounded-pill">
+                            <i class="fas fa-eraser"></i> Reset Filter
+                        </button>
+                    </div>
+                   
+                </div>
+            </div>
+            <!-- ================= END FILTER PANEL ================= -->
+
             <div class="table-responsive">
                 <table id="tabelKondisi" class="table table-hover table-striped align-middle w-100">
                     <thead class="small text-uppercase">
@@ -85,7 +150,6 @@ if ($_SESSION['status'] != "login") {
                     </thead>
                     <tbody>
                         <?php
-                        // Ambil HANYA 1 record terbaru per mesin
                         $query = mysqli_query($koneksi, "
                             SELECT km.*, mm.id_mesin, mm.name 
                             FROM kondisi_mesin km
@@ -98,34 +162,26 @@ if ($_SESSION['status'] != "login") {
                             ORDER BY km.start_date DESC
                         ");
                         while ($d = mysqli_fetch_array($query)) {
-                            // ====== LOGIKA STATUS GABUNGAN ======
                             $aktif = is_null($d['end_date']);
                             $kondisi_upper = strtoupper($d['kondisi_mesin']);
                             $kondisi_baik = ($kondisi_upper === 'BAIK');
-                            
+
                             if (!$aktif && $kondisi_baik) {
-                                // Sudah selesai + kondisi BAIK
                                 $status_text = 'SELESAI SERVICE & BAIK';
                                 $status_class = 'bg-success text-white';
                             } elseif ($aktif && $kondisi_baik) {
-                                // Aktif tapi kondisi BAIK (kasus khusus)
                                 $status_text = 'BAIK';
                                 $status_class = 'bg-success text-white';
                             } elseif ($aktif) {
-                                // Masih dalam service
                                 $status_text = 'AKTIF';
                                 $status_class = 'bg-warning text-dark';
                             } else {
-                                // Selesai tapi kondisi bukan BAIK
                                 $status_text = 'SELESAI';
                                 $status_class = 'bg-success text-white';
                             }
-                            
-                            // Tombol "Selesaikan" hanya muncul jika AKTIF dan kondisi BUKAN BAIK
+
                             $perlu_selesai = $aktif && !$kondisi_baik;
-                            // ===================================
-                            
-                            // Mapping kondisi ke badge
+
                             $badge_map = [
                                 'BAIK' => '<span class="badge badge-baik"><i class="fas fa-check-circle me-1"></i>BAIK</span>',
                                 'DISERVICE' => '<span class="badge badge-diservice"><i class="fas fa-tools me-1"></i>DISERVICE</span>',
@@ -140,12 +196,19 @@ if ($_SESSION['status'] != "login") {
                                 'DI GANTI' => '<span class="badge badge-dibongkar"><i class="fas fa-wrench me-1"></i>DI GANTI</span>',
                                 'GULUNG DINAMO' => '<span class="badge badge-gulung-dinamo"><i class="fas fa-bolt me-1"></i>GULUNG DINAMO</span>'
                             ];
-                            
-                            $badge_kondisi = isset($badge_map[$kondisi_upper]) 
-                                ? $badge_map[$kondisi_upper] 
+
+                            $badge_kondisi = isset($badge_map[$kondisi_upper])
+                                ? $badge_map[$kondisi_upper]
                                 : '<span class="badge bg-secondary">' . htmlspecialchars($d['kondisi_mesin']) . '</span>';
+
+                            // Simpan data untuk filter (hidden sebagai data-attribute)
+                            $start_date_val = $d['start_date'] ? date('Y-m-d', strtotime($d['start_date'])) : '';
+                            $end_date_val   = $d['end_date']   ? date('Y-m-d', strtotime($d['end_date']))   : '';
                         ?>
-                        <tr>
+                        <tr data-kondisi="<?= htmlspecialchars($kondisi_upper) ?>"
+                            data-status="<?= htmlspecialchars($status_text) ?>"
+                            data-start-date="<?= $start_date_val ?>"
+                            data-end-date="<?= $end_date_val ?>">
                             <td class="fw-bold text-primary"><?= htmlspecialchars($d['id_mesin']) ?></td>
                             <td class="fw-bold"><?= htmlspecialchars($d['name']) ?></td>
                             <td><?= $badge_kondisi ?></td>
@@ -183,28 +246,20 @@ if ($_SESSION['status'] != "login") {
     </div>
 </div>
 
-<!-- Modal: Tambah Kondisi -->
-<div class="modal fade" id="modalTambahKondisi" tabindex="-1" aria-hidden="true">
+<!-- Modal: Edit Kondisi (versi minimal — hanya untuk edit) -->
+<div class="modal fade" id="modalEditKondisi" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="modalTambahTitle"><i class="fas fa-plus-circle me-2"></i> Tambah Kondisi Mesin</h5>
+                <h5 class="modal-title" id="modalEditKondisiTitle"><i class="fas fa-edit me-2"></i> Edit Kondisi Mesin</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="formKondisi">
+            <form id="formEditKondisi">
                 <input type="hidden" id="id_edit_kondisi" name="id_edit_kondisi" value="0">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Pilih Mesin <span class="text-danger">*</span></label>
-                        <select class="form-select" id="id_mesin_kondisi" name="id_mesin" required>
-                            <option value="">-- Pilih Mesin --</option>
-                            <?php
-                            $query_mesin = mysqli_query($koneksi, "SELECT id, id_mesin, name FROM master_mesin WHERE active = 1 ORDER BY name ASC");
-                            while ($m = mysqli_fetch_array($query_mesin)) {
-                                echo '<option value="' . (int)$m['id'] . '">' . htmlspecialchars($m['id_mesin']) . ' - ' . htmlspecialchars($m['name']) . '</option>';
-                            }
-                            ?>
-                        </select>
+                        <label class="form-label fw-bold">Mesin</label>
+                        <input type="text" class="form-control" id="edit_nama_mesin_display" disabled>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Kondisi <span class="text-danger">*</span></label>
@@ -225,7 +280,7 @@ if ($_SESSION['status'] != "login") {
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Keterangan Service</label>
-                        <textarea class="form-control" id="keterangan_service_mesin" name="keterangan_service_mesin" rows="3" placeholder="Deskripsi kondisi atau service"></textarea>
+                        <textarea class="form-control" id="keterangan_service_mesin" name="keterangan_service_mesin" rows="3"></textarea>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Tanggal Mulai <span class="text-danger">*</span></label>
@@ -241,7 +296,7 @@ if ($_SESSION['status'] != "login") {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan Perubahan</button>
                 </div>
             </form>
         </div>
@@ -302,31 +357,104 @@ if ($_SESSION['status'] != "login") {
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
 
 <script>
+/* =====================================================================
+   CUSTOM FILTER UNTUK DATATABLES
+   Filter membaca data-attribute di setiap <tr>:
+   - data-kondisi
+   - data-status
+   - data-start-date (Y-m-d)
+   - data-end-date   (Y-m-d, kosong kalau masih aktif)
+   ===================================================================== */
+$.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+    if (settings.nTable.id !== 'tabelKondisi') return true;
+
+    var row = settings.aoData[dataIndex].nTr;
+    if (!row) return true;
+
+    var kondisi    = ($('#filterKondisi').val() || '').toUpperCase();
+    var status     = ($('#filterStatus').val() || '').toUpperCase();
+    var startFrom  = $('#filterStartFrom').val();
+    var startTo    = $('#filterStartTo').val();
+    var endFrom    = $('#filterEndFrom').val();
+    var endTo      = $('#filterEndTo').val();
+
+    var rowKondisi = (row.getAttribute('data-kondisi') || '').toUpperCase();
+    var rowStatus  = (row.getAttribute('data-status') || '').toUpperCase();
+    var rowStart   = row.getAttribute('data-start-date') || '';
+    var rowEnd     = row.getAttribute('data-end-date') || '';
+
+    // Filter Kondisi (exact match)
+    if (kondisi && rowKondisi !== kondisi) return false;
+
+    // Filter Status (exact match)
+    if (status && rowStatus !== status) return false;
+
+    // Filter Start Date range
+    if (startFrom && (!rowStart || rowStart < startFrom)) return false;
+    if (startTo   && (!rowStart || rowStart > startTo))   return false;
+
+    // Filter End Date range
+    // Jika user mengisi End Date range, hanya baris yang punya end_date yang lolos
+    if (endFrom || endTo) {
+        if (!rowEnd) return false;                       // masih aktif → tidak lolos
+        if (endFrom && rowEnd < endFrom) return false;
+        if (endTo   && rowEnd > endTo)   return false;
+    }
+
+    return true;
+});
+
 $(document).ready(function () {
-    $('#tabelKondisi').DataTable({
-        pageLength: 10,
-        language: { url: "//cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json" },
-        columnDefs: [{ orderable: false, targets: 7 }],
-        responsive: true,
-        order: [[4, 'desc']]
-    });
-    
+    if (!$.fn.DataTable.isDataTable('#tabelKondisi')) {
+        var table = $('#tabelKondisi').DataTable({
+            pageLength: 10,
+            language: { url: "//cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json" },
+            columnDefs: [{ orderable: false, targets: 7 }],
+            responsive: true,
+            order: [[4, 'desc']],
+            autoWidth: false
+        });
+
+        /* Helper: update info jumlah baris setelah filter */
+        function updateFilterInfo() {
+            var info = table.page.info();
+            $('#filterInfo').text(
+                'Menampilkan ' + info.recordsDisplay + ' dari ' + info.recordsTotal + ' baris'
+            );
+        }
+        updateFilterInfo();
+
+        /* Event listener filter */
+        $('#filterKondisi, #filterStatus, #filterStartFrom, #filterStartTo, #filterEndFrom, #filterEndTo')
+            .on('change', function () {
+                table.draw();
+                updateFilterInfo();
+            });
+
+        /* Reset filter */
+        $('#btnResetFilter').on('click', function () {
+            $('#filterKondisi').val('');
+            $('#filterStatus').val('');
+            $('#filterStartFrom').val('');
+            $('#filterStartTo').val('');
+            $('#filterEndFrom').val('');
+            $('#filterEndTo').val('');
+            table.search('').columns().search('').draw();
+            updateFilterInfo();
+        });
+
+        /* Update info setiap kali tabel di-draw (termasuk karena search box DataTables) */
+        table.on('draw', updateFilterInfo);
+    }
+
     $('#end_date_selesai').val(new Date().toISOString().split('T')[0]);
 });
 
-function resetFormTambah() {
-    document.getElementById('formKondisi').reset();
-    document.getElementById('id_edit_kondisi').value = '0';
-    document.getElementById('start_date_kondisi').value = new Date().toISOString().split('T')[0];
-    document.getElementById('end_date_kondisi').value = '';
-    document.getElementById('modalTambahTitle').innerHTML = '<i class="fas fa-plus-circle me-2"></i> Tambah Kondisi Mesin';
-    document.getElementById('id_mesin_kondisi').disabled = false;
-}
-
+/* ============ EDIT KONDISI ============ */
 function editKondisi(id) {
-    $('#modalTambahKondisi').modal('show');
-    document.getElementById('modalTambahTitle').innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Memuat data...';
-    
+    $('#modalEditKondisi').modal('show');
+    document.getElementById('modalEditKondisiTitle').innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Memuat data...';
+
     $.ajax({
         url: 'ajax_get_kondisi_mesin.php',
         type: 'POST',
@@ -337,26 +465,28 @@ function editKondisi(id) {
             if (response.status === 'success') {
                 const data = response.data;
                 document.getElementById('id_edit_kondisi').value = data.id_kondisi_mesin;
-                document.getElementById('id_mesin_kondisi').value = data.id_mesin;
-                document.getElementById('id_mesin_kondisi').disabled = true;
+                document.getElementById('edit_nama_mesin_display').value = data.id_mesin;
                 document.getElementById('kondisi_mesin').value = data.kondisi_mesin;
                 document.getElementById('keterangan_service_mesin').value = data.keterangan_service_mesin || '';
                 document.getElementById('start_date_kondisi').value = data.start_date;
-                document.getElementById('end_date_kondisi').value = data.end_date || '';
-                document.getElementById('modalTambahTitle').innerHTML = '<i class="fas fa-edit me-2"></i> Edit Kondisi Mesin';
+                if (document.getElementById('end_date_kondisi')) {
+                    document.getElementById('end_date_kondisi').value = data.end_date || '';
+                }
+                document.getElementById('modalEditKondisiTitle').innerHTML = '<i class="fas fa-edit me-2"></i> Edit Kondisi Mesin';
             } else {
                 alert('Gagal mengambil data kondisi: ' + response.message);
-                $('#modalTambahKondisi').modal('hide');
+                $('#modalEditKondisi').modal('hide');
             }
         },
         error: function(xhr, status, error) {
             console.error('AJAX Error:', error);
             alert('Error saat mengambil data kondisi! Silahkan cek console untuk detail.');
-            $('#modalTambahKondisi').modal('hide');
+            $('#modalEditKondisi').modal('hide');
         }
     });
 }
 
+/* ============ SELESAI SERVICE ============ */
 function openSelesaiModal(id, nama_mesin) {
     document.getElementById('id_kondisi_selesai').value = id;
     document.getElementById('nama_mesin_selesai').textContent = nama_mesin;
@@ -367,19 +497,19 @@ function openSelesaiModal(id, nama_mesin) {
 
 $('#formSelesaiKondisi').on('submit', function (e) {
     e.preventDefault();
-    
+
     const end_date = document.getElementById('end_date_selesai').value;
     if (!end_date) {
         alert('Tanggal selesai wajib diisi!');
         return;
     }
-    
+
     const formData = new FormData(this);
     const submitBtn = $(this).find('button[type="submit"]');
     const originalText = submitBtn.html();
     submitBtn.html('<i class="fas fa-spinner fa-spin"></i> Menyimpan...');
     submitBtn.prop('disabled', true);
-    
+
     $.ajax({
         url: 'ajax_selesai_kondisi_mesin.php',
         type: 'POST',
@@ -407,28 +537,26 @@ $('#formSelesaiKondisi').on('submit', function (e) {
     });
 });
 
-$('#formKondisi').on('submit', function (e) {
+/* ============ SUBMIT EDIT KONDISI ============ */
+$('#formEditKondisi').on('submit', function (e) {
     e.preventDefault();
-    
-    const id_edit = document.getElementById('id_edit_kondisi').value;
-    const id_mesin = document.getElementById('id_mesin_kondisi').value;
+
+    const id_edit    = document.getElementById('id_edit_kondisi').value;
     const start_date = document.getElementById('start_date_kondisi').value;
-    
-    if (!id_mesin || !start_date) {
-        alert('Pilih mesin dan tanggal mulai wajib diisi!');
+
+    if (!id_edit || id_edit === '0' || !start_date) {
+        alert('Data tidak valid!');
         return;
     }
-    
+
     const formData = new FormData(this);
-    const action = id_edit === '0' ? 'ajax_simpan_kondisi_mesin.php' : 'ajax_update_kondisi_mesin.php';
-    
     const submitBtn = $(this).find('button[type="submit"]');
     const originalText = submitBtn.html();
     submitBtn.html('<i class="fas fa-spinner fa-spin"></i> Menyimpan...');
     submitBtn.prop('disabled', true);
-    
+
     $.ajax({
-        url: action,
+        url: 'ajax_update_kondisi_mesin.php',
         type: 'POST',
         data: formData,
         processData: false,
@@ -438,7 +566,7 @@ $('#formKondisi').on('submit', function (e) {
         success: function(response) {
             if (response.status === 'success') {
                 alert(response.message);
-                $('#modalTambahKondisi').modal('hide');
+                $('#modalEditKondisi').modal('hide');
                 location.reload();
             } else {
                 alert('Error: ' + response.message);
@@ -455,9 +583,10 @@ $('#formKondisi').on('submit', function (e) {
     });
 });
 
+/* ============ HAPUS ============ */
 function hapusKondisi(id, name) {
     if (!confirm(`Apakah Anda yakin ingin menghapus riwayat kondisi mesin "${name}" ini?`)) return;
-    
+
     $.ajax({
         url: 'ajax_hapus_kondisi_mesin.php',
         type: 'POST',
@@ -465,13 +594,9 @@ function hapusKondisi(id, name) {
         dataType: 'json',
         success: function(response) {
             alert(response.message);
-            if (response.status === 'success') {
-                location.reload();
-            }
+            if (response.status === 'success') location.reload();
         },
-        error: function() {
-            alert('Gagal menghapus data kondisi!');
-        }
+        error: function() { alert('Gagal menghapus data kondisi!'); }
     });
 }
 </script>

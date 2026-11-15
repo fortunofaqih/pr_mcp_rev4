@@ -31,7 +31,7 @@ if ($_SESSION['status'] != "login") {
         <div class="card-header bg-mcp py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <h5 class="m-0 fw-bold"><i class="fas fa-layer-group me-2"></i> DATA MASTER SATUAN</h5>
             <div class="d-flex gap-2">
-                <a href="barang.php" class="btn btn-danger fw-bold"><i class="fas fa-arrow-left"></i> KEMBALI</a>
+                <a href="../../index.php" class="btn btn-sm btn-danger"><i class="fas fa-rotate-left me-1"></i> HOME</a>
                 <a href="satuan.php" class="btn btn-light btn-sm fw-bold"><i class="fas fa-plus"></i> TAMBAH SATUAN</a>
             </div>
         </div>

@@ -217,24 +217,22 @@ $result_rekap = mysqli_stmt_get_result($stmt_rekap);
 
     <br>
 
-    <!-- Ringkasan Statistik -->
-    <table class="kpi-table">
-        <tr>
-            <td colspan="4" class="header-kpi text-center">RINGKASAN STATISTIK SERVICE MESIN BULAN <?= strtoupper($nama_bulan) ?> <?= $tahun ?></td>
-        </tr>
-        <tr>
-            <td class="text-bold" style="width: 20%;">Total Mesin Aktif</td>
-            <td style="width: 30%;"><?= $total_mesin ?> Unit</td>
-            <td class="text-bold" style="width: 20%;">Selesai Service Bulan Ini</td>
-            <td style="width: 30%;"><?= $total_selesai ?> Unit</td>
-        </tr>
-        <tr>
-            <td class="text-bold">Masih Diservice</td>
-            <td><?= $total_aktif ?> Unit</td>
-            <td class="text-bold">Rata-rata Durasi Service</td>
-            <td><?= $rata2_durasi ?> Hari</td>
-        </tr>
-    </table>
+<!-- Ringkasan Statistik -->
+<table class="kpi-table">
+    <tr>
+        <td colspan="2" class="header-kpi text-center">
+            RINGKASAN STATISTIK SERVICE MESIN BULAN <?= strtoupper($nama_bulan) ?> <?= $tahun ?>
+        </td>
+    </tr>
+    <tr>
+        <td class="text-bold" style="width: 50%;">Mesin yang masih diservice</td>
+        <td style="width: 50%;"><?= (int)$total_aktif ?> Unit</td>
+    </tr>
+    <tr>
+        <td class="text-bold">Mesin yang selesai diservice</td>
+        <td><?= (int)$total_selesai ?> Unit</td>
+    </tr>
+</table>
 
     <br>
 
@@ -252,7 +250,7 @@ $result_rekap = mysqli_stmt_get_result($stmt_rekap);
                 <th style="width: 10%;">Tgl Mulai</th>
                 <th style="width: 32%;">Keterangan Service</th>
                 <th style="width: 10%;">Tgl Selesai</th>
-                <th style="width: 8%;">Durasi</th>
+                <th style="width: 8%;">Durasi (Hari)</th>
                 <th style="width: 12%;">Status</th>
             </tr>
         </thead>

@@ -1,11 +1,49 @@
 <?php
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 if ($_SESSION['status'] != "login") {
     header("location:../../login.php?pesan=belum_login");
     exit;
+}
+
+// ================= HITUNG PROGRES PER TIPE PR =================
+// Query agregat: jumlah PR per tipe × per status
+$q_progress = mysqli_query($koneksi, "
+    SELECT
+        CASE
+            WHEN no_request LIKE 'PRB%' THEN 'PR BESAR'
+            WHEN no_request LIKE 'PRI%' THEN 'PR IT'
+            ELSE 'PR KECIL'
+        END AS tipe_pr,
+        status_request,
+        COUNT(*) AS jumlah
+    FROM tr_request
+    GROUP BY tipe_pr, status_request
+");
+
+$progress = [
+    'PR KECIL' => ['PENDING'=>0, 'PROSES'=>0, 'SELESAI'=>0, 'BATAL'=>0, 'DITOLAK'=>0, 'TOTAL'=>0],
+    'PR BESAR' => ['PENDING'=>0, 'PROSES'=>0, 'SELESAI'=>0, 'BATAL'=>0, 'DITOLAK'=>0, 'TOTAL'=>0],
+    'PR IT'    => ['PENDING'=>0, 'PROSES'=>0, 'SELESAI'=>0, 'BATAL'=>0, 'DITOLAK'=>0, 'TOTAL'=>0],
+];
+
+while ($p = mysqli_fetch_assoc($q_progress)) {
+    $t = $p['tipe_pr'];
+    $s = $p['status_request'];
+    if (!isset($progress[$t])) continue;
+    if (!isset($progress[$t][$s])) $progress[$t][$s] = 0;
+    $progress[$t][$s] = (int) $p['jumlah'];
+    $progress[$t]['TOTAL'] += (int) $p['jumlah'];
+}
+
+// Grand total semua tipe
+$grand = ['PENDING'=>0,'PROSES'=>0,'SELESAI'=>0,'BATAL'=>0,'DITOLAK'=>0,'TOTAL'=>0];
+foreach ($progress as $row) {
+    foreach ($grand as $k => $v) {
+        $grand[$k] += $row[$k] ?? 0;
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -26,8 +64,6 @@ if ($_SESSION['status'] != "login") {
         .btn-mcp { background: var(--mcp-blue); color: white; border-radius: 8px; font-weight: bold; }
         .btn-mcp:hover { background: var(--mcp-dark); color: white; }
         .status-badge { font-size: 0.75rem; font-weight: 700; padding: 6px 15px; border-radius: 20px; text-transform: uppercase; }
-        .card-stats { border: none; border-radius: 10px; transition: transform 0.2s; }
-        .card-stats:hover { transform: translateY(-5px); }
 
         /* ── Filter Dropdown di Header Tabel ── */
         .filter-select {
@@ -46,20 +82,99 @@ if ($_SESSION['status'] != "login") {
             border-color: #0000FF;
             box-shadow: 0 0 0 2px rgba(0,0,255,0.15);
         }
+
+        /* ── KARTU PROGRES PER TIPE PR ── */
+        .progress-card {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+            overflow: hidden;
+            height: 100%;
+        }
+        .progress-card .card-header {
+            padding: 10px 15px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .progress-card.tipe-kecil .card-header { background: #0d6efd; }
+        .progress-card.tipe-besar .card-header { background: #6f42c1; }
+        .progress-card.tipe-it    .card-header { background: #0dcaf0; color: #003; }
+
+        .progress-card .card-body { padding: 12px 15px; }
+
+        .mini-stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            font-size: 0.8rem;
+            border-bottom: 1px dashed #e5e7eb;
+        }
+        .mini-stat:last-child { border-bottom: none; }
+        .mini-stat .label { color: #6b7280; font-weight: 600; }
+        .mini-stat .value {
+            font-weight: 700;
+            font-size: 0.95rem;
+            min-width: 32px;
+            text-align: right;
+        }
+        .value-pending { color: #d97706; }
+        .value-proses  { color: #0d6efd; }
+        .value-selesai { color: #16a34a; }
+        .value-batal   { color: #dc2626; }
+        .value-ditolak { color: #7c2d12; }
+
+        .total-row {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 2px solid #e5e7eb;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: flex;
+            justify-content: space-between;
+            color: #111;
+        }
+
+        .btn-cetak-status {
+            font-size: 0.7rem;
+            padding: 3px 8px;
+            font-weight: 700;
+        }
+
+        /* Tab kategori hanya mengatur tampilan; seluruh aksi dan query existing tetap digunakan. */
+        .pr-tabs { gap: 8px; border-bottom: 1px solid #dee2e6; }
+        .pr-tabs .nav-link {
+            border: 1px solid #dee2e6;
+            border-bottom: 0;
+            border-radius: 10px 10px 0 0;
+            color: #475569;
+            background: #f8fafc;
+            font-weight: 700;
+            padding: 11px 18px;
+        }
+        .pr-tabs .nav-link:hover { color: #0000FF; background: #eff6ff; }
+        .pr-tabs .nav-link.active {
+            color: #0000FF;
+            background: #fff;
+            border-color: #dee2e6;
+            box-shadow: inset 0 3px 0 #0000FF;
+        }
+        .pr-tabs .badge { font-size: .7rem; }
+        .pr-table-caption { font-size: .85rem; color: #64748b; }
     </style>
 </head>
 <body class="pb-5">
 
 <nav class="navbar navbar-mcp mb-4">
     <div class="container-fluid px-4">
-        <span class="navbar-brand fw-bold text-white"><i class="fas fa-file-invoice me-2"></i> PURCHASE REQUEST SYSTEM</span>
+        <span class="navbar-brand fw-bold text-white"><i class="fas fa-file-invoice me-2"></i> PURCHASE REQUEST</span>
         <div>
             <a href="../../index.php" class="btn btn-danger"><i class="fas fa-rotate-left"></i> KEMBALI</a>
-            
-            <?php 
-            // Cek jika role BUKAN pemesan_pr_besar, maka tampilkan tombol
-            if ($_SESSION['role'] !== 'pemesan_pr_besar'): 
-            ?>
+
+            <?php if ($_SESSION['role'] !== 'pemesan_pr_besar'): ?>
                 <a href="tambah_request.php" class="btn btn-sm btn-warning fw-bold">
                     <i class="fas fa-plus-circle"></i> BUAT REQUEST BARU (BARANG KECIL)
                 </a>
@@ -73,78 +188,122 @@ if ($_SESSION['status'] != "login") {
 </nav>
 
 <div class="container-fluid px-4 mt-4">
-    <div class="row g-3"> <?php
-        $count_pending = mysqli_num_rows(mysqli_query($koneksi, "SELECT id_request FROM tr_request WHERE status_request='PENDING'"));
-        $count_proses  = mysqli_num_rows(mysqli_query($koneksi, "SELECT id_request FROM tr_request WHERE status_request='PROSES'"));
-        $count_selesai = mysqli_num_rows(mysqli_query($koneksi, "SELECT id_request FROM tr_request WHERE status_request='SELESAI'"));
-        $count_total   = mysqli_num_rows(mysqli_query($koneksi, "SELECT id_request FROM tr_request"));
-        $persen_selesai = ($count_total > 0) ? round(($count_selesai / $count_total) * 100, 1) : 0;
+
+    <!-- ================= KARTU PROGRES PER TIPE PR ================= -->
+    <div class="row g-3 mb-3">
+        <?php
+        $config_tipe = [
+            'PR KECIL' => ['css'=>'tipe-kecil', 'icon'=>'fa-file-alt'],
+            'PR BESAR' => ['css'=>'tipe-besar', 'icon'=>'fa-file-invoice-dollar'],
+            'PR IT'    => ['css'=>'tipe-it',    'icon'=>'fa-laptop-code'],
+        ];
+        foreach ($config_tipe as $tipe => $cfg):
+            $d = $progress[$tipe];
         ?>
-
-        <div class="col-xl-3 col-md-6">
-            <div class="card border-0 border-start border-warning border-4 shadow-sm h-100 py-2">
+        <div class="col-xl-4 col-md-6">
+            <div class="progress-card <?= $cfg['css'] ?>">
+                <div class="card-header">
+                    <i class="fas <?= $cfg['icon'] ?> me-2"></i> <?= $tipe ?>
+                </div>
                 <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending</div>
-                            <div class="h4 mb-0 font-weight-bold text-gray-800"><?= $count_pending ?> <small class="text-muted fs-6">PR</small></div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-clock fa-2x text-gray-300" style="opacity: 0.3;"></i>
-                        </div>
+                    <div class="mini-stat">
+                        <span class="label"><i class="fas fa-clock me-1"></i> Blm approval</span>
+                        <span class="value value-pending"><?= $d['PENDING'] ?></span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="label"><i class="fas fa-sync-alt me-1"></i> Proses</span>
+                        <span class="value value-proses"><?= $d['PROSES'] ?></span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="label"><i class="fas fa-check-circle me-1"></i> Selesai</span>
+                        <span class="value value-selesai"><?= $d['SELESAI'] ?></span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="label"><i class="fas fa-ban me-1"></i> Batal</span>
+                        <span class="value value-batal"><?= $d['BATAL'] ?></span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="label"><i class="fas fa-times-circle me-1"></i> Ditolak</span>
+                        <span class="value value-ditolak"><?= $d['DITOLAK'] ?></span>
+                    </div>
+
+                    <div class="total-row">
+                        <span><i class="fas fa-layer-group me-1"></i> TOTAL</span>
+                        <span><?= $d['TOTAL'] ?> PR</span>
+                    </div>
+
+                    <!-- Tombol cetak per status untuk tipe ini -->
+                    <div class="mt-2 d-flex flex-wrap gap-1">
+                        <a href="cetak_progress_pr_pdf.php?tipe=<?= urlencode($tipe) ?>&status=PENDING" target="_blank"
+                           class="btn btn-outline-warning btn-cetak-status">
+                            <i class="fas fa-print"></i> Blm approval
+                        </a>
+                        <a href="cetak_progress_pr_pdf.php?tipe=<?= urlencode($tipe) ?>&status=PROSES" target="_blank"
+                           class="btn btn-outline-primary btn-cetak-status">
+                            <i class="fas fa-print"></i> Proses
+                        </a>
+                        <a href="cetak_progress_pr_pdf.php?tipe=<?= urlencode($tipe) ?>&status=SELESAI" target="_blank"
+                           class="btn btn-outline-success btn-cetak-status">
+                            <i class="fas fa-print"></i> Selesai
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
+        <?php endforeach; ?>
 
-        <div class="col-xl-3 col-md-6">
-            <div class="card border-0 border-start border-primary border-4 shadow-sm h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Proses</div>
-                            <div class="h4 mb-0 font-weight-bold text-gray-800"><?= $count_proses ?> <small class="text-muted fs-6">PR</small></div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-sync-alt fa-2x text-gray-300" style="opacity: 0.3;"></i>
-                        </div>
-                    </div>
+        <!-- Grand Total -->
+        <div class="col-xl-4 col-md-6">
+            <div class="progress-card" style="border: 2px solid #111;">
+                <div class="card-header" style="background: #111;">
+                    <i class="fas fa-chart-line me-2"></i> GRAND TOTAL (SEMUA TIPE)
                 </div>
-            </div>
-        </div>
-
-        <div class="col-xl-3 col-md-6">
-            <div class="card border-0 border-start border-success border-4 shadow-sm h-100 py-2">
                 <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Selesai</div>
-                            <div class="h4 mb-0 font-weight-bold text-gray-800"><?= $count_selesai ?> <small class="text-muted fs-6">PR</small></div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-check-circle fa-2x text-gray-300" style="opacity: 0.3;"></i>
-                        </div>
+                    <div class="mini-stat">
+                        <span class="label"><i class="fas fa-clock me-1"></i> Blm Approval</span>
+                        <span class="value value-pending"><?= $grand['PENDING'] ?></span>
                     </div>
-                </div>
-            </div>
-        </div>
+                    <div class="mini-stat">
+                        <span class="label"><i class="fas fa-sync-alt me-1"></i> Proses</span>
+                        <span class="value value-proses"><?= $grand['PROSES'] ?></span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="label"><i class="fas fa-check-circle me-1"></i> Selesai</span>
+                        <span class="value value-selesai"><?= $grand['SELESAI'] ?></span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="label"><i class="fas fa-ban me-1"></i> Batal</span>
+                        <span class="value value-batal"><?= $grand['BATAL'] ?></span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="label"><i class="fas fa-times-circle me-1"></i> Ditolak</span>
+                        <span class="value value-ditolak"><?= $grand['DITOLAK'] ?></span>
+                    </div>
+                    <div class="total-row">
+                        <span><i class="fas fa-layer-group me-1"></i> TOTAL KESELURUHAN</span>
+                        <span><?= $grand['TOTAL'] ?> PR</span>
+                    </div>
 
-        <div class="col-xl-3 col-md-6">
-            <div class="card border-0 shadow-sm h-100 bg-light">
-                <div class="card-body d-flex align-items-center py-2">
-                    <div style="width: 60px; height: 60px;" class="me-3 flex-shrink-0">
-                        <canvas id="chartProgres"></canvas>
-                    </div>
-                    <div>
-                        <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">Total Progress</div>
-                        <div class="h4 mb-0 font-weight-bold text-primary"><?= $persen_selesai ?>%</div>
-                        <div class="text-muted" style="font-size: 0.7rem;">Dari <?= $count_total ?> pengajuan</div>
+                    <!-- Cetak semua tipe per status -->
+                    <div class="mt-2 d-flex flex-wrap gap-1">
+                        <a href="cetak_progress_pr_pdf.php?tipe=ALL&status=PENDING" target="_blank"
+                           class="btn btn-outline-warning btn-cetak-status">
+                            <i class="fas fa-print"></i> Blm approval
+                        </a>
+                        <a href="cetak_progress_pr_pdf.php?tipe=ALL&status=PROSES" target="_blank"
+                           class="btn btn-outline-primary btn-cetak-status">
+                            <i class="fas fa-print"></i> Proses
+                        </a>
+                        <a href="cetak_progress_pr_pdf.php?tipe=ALL&status=SELESAI" target="_blank"
+                           class="btn btn-outline-success btn-cetak-status">
+                            <i class="fas fa-print"></i> Selesai
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+    <!-- ================= END KARTU PROGRES ================= -->
 
     <?php if(isset($_GET['pesan']) && $_GET['pesan'] == 'hapus_sukses'): ?>
     <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -153,7 +312,34 @@ if ($_SESSION['status'] != "login") {
     </div>
     <?php endif; ?>
 
-    <div class="table-container mt-4">
+    <!-- Tab kategori PR: hanya memfilter baris tabel pada sisi tampilan. -->
+    <div class="mt-4">
+        <ul class="nav pr-tabs" id="tabKategoriPR" role="tablist" aria-label="Kategori purchase request">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" type="button" data-tipe="PR" role="tab" aria-selected="true">
+                    <i class="fas fa-file-alt me-1"></i> PR
+                    <span class="badge bg-secondary ms-1"><?= $progress['PR KECIL']['TOTAL'] ?></span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" type="button" data-tipe="PRB" role="tab" aria-selected="false">
+                    <i class="fas fa-file-invoice-dollar me-1"></i> PRB
+                    <span class="badge bg-secondary ms-1"><?= $progress['PR BESAR']['TOTAL'] ?></span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" type="button" data-tipe="PRI" role="tab" aria-selected="false">
+                    <i class="fas fa-laptop-code me-1"></i> PRI
+                    <span class="badge bg-secondary ms-1"><?= $progress['PR IT']['TOTAL'] ?></span>
+                </button>
+            </li>
+        </ul>
+    </div>
+    <div class="table-container" style="border-radius:0 12px 12px 12px;">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+            <div class="fw-bold" id="judulTabelPR">DAFTAR REQUEST PR</div>
+            <div class="pr-table-caption">Pilih kategori melalui tab untuk melihat request terkait.</div>
+        </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle w-100" id="tablePR">
                 <thead class="bg-light">
@@ -165,19 +351,14 @@ if ($_SESSION['status'] != "login") {
                         <th class="text-center">Total Item</th>
                         <th class="text-center" id="th-status">
                             Status
-                            <!-- ══════════════════════════════════════════
-                                 FILTER DROPDOWN — kolom index 5
-                                 DataTable akan filter kolom ini saat
-                                 user memilih opsi dari dropdown ini.
-                            ════════════════════════════════════════════ -->
-                           <select id="filterStatus" class="filter-select">
-                            <option value="">-- Semua --</option>
-                            <option value="PENDING">⏳ PENDING</option>
-                            <option value="PROSES">🔄 PROSES</option>
-                            <option value="SELESAI">✅ SELESAI</option>
-                            <option value="BATAL">❌ BATAL</option>
-                            <option value="DITOLAK">🚫 DITOLAK</option>
-                        </select>
+                            <select id="filterStatus" class="filter-select">
+                                <option value="">-- Semua --</option>
+                                <option value="PENDING">⏳ BELUM APPROVE</option>
+                                <option value="PROSES">🔄 PROSES</option>
+                                <option value="SELESAI">✅ SELESAI</option>
+                                <option value="BATAL">❌ BATAL</option>
+                                <option value="DITOLAK">🚫 DITOLAK</option>
+                            </select>
                         </th>
                         <th class="text-center">Aksi</th>
                     </tr>
@@ -185,7 +366,7 @@ if ($_SESSION['status'] != "login") {
                 <tbody class="small">
                     <?php
                     $no = 1;
-                   
+
                     $sql = "SELECT r.*,
                                 p.id_po, p.no_po, p.status_po
                             FROM tr_request r
@@ -196,11 +377,10 @@ if ($_SESSION['status'] != "login") {
                         $id_req   = $row['id_request'];
                         $jml_item = mysqli_num_rows(mysqli_query($koneksi,
                             "SELECT id_detail FROM tr_request_detail WHERE id_request='$id_req'"));
-                    
-                        // Status PO (hanya relevan untuk barang besar)
+
                         $status_po   = $row['status_po'] ?? null;
                         $no_po       = $row['no_po']     ?? null;
-                    
+
                         switch ($row['status_request']) {
                             case 'PENDING' : $badge_color = 'bg-warning text-dark'; break;
                             case 'PROSES'  : $badge_color = 'bg-primary';           break;
@@ -209,40 +389,44 @@ if ($_SESSION['status'] != "login") {
                             case 'DITOLAK' : $badge_color = 'bg-danger';            break;
                             default        : $badge_color = 'bg-secondary';
                         }
-                    
-                        // Helper badge warna status PO
+
                         if ($status_po === 'OPEN') {
-                            $po_badge_bg  = '#dcfce7';
-                            $po_badge_col = '#166534';
-                            $po_badge_bdr = '#86efac';
-                            $po_badge_ico = 'fa-circle';
+                            $po_badge_bg  = '#dcfce7'; $po_badge_col = '#166534';
+                            $po_badge_bdr = '#86efac'; $po_badge_ico = 'fa-circle';
                             $po_badge_txt = 'OPEN';
                         } elseif ($status_po === 'CLOSE') {
-                            $po_badge_bg  = '#f1f5f9';
-                            $po_badge_col = '#475569';
-                            $po_badge_bdr = '#cbd5e1';
-                            $po_badge_ico = 'fa-check-double';
+                            $po_badge_bg  = '#f1f5f9'; $po_badge_col = '#475569';
+                            $po_badge_bdr = '#cbd5e1'; $po_badge_ico = 'fa-check-double';
                             $po_badge_txt = 'CLOSE';
                         } else {
-                            $status_po = null; // DRAFT atau belum ada PO = tidak ditampilkan
+                            $status_po = null;
                         }
+
+                        // Tipe PR (untuk label)
+                        $tipe_row = 'KECIL';
+                        if (strpos($row['no_request'], 'PRB') === 0) $tipe_row = 'BESAR';
+                        elseif (strpos($row['no_request'], 'PRI') === 0) $tipe_row = 'IT';
                     ?>
-                    <!-- data-status dipakai custom search JS, bukan teks dalam <td> -->
-                    <tr data-status="<?= $row['status_request'] ?>">
+                    <tr data-status="<?= $row['status_request'] ?>" data-tipe="<?= $tipe_row === 'BESAR' ? 'PRB' : ($tipe_row === 'IT' ? 'PRI' : 'PR') ?>">
                         <td class="text-center text-muted"><?= $no++ ?></td>
-                        <td class="fw-bold text-primary"><?= $row['no_request'] ?></td>
+                        <td class="fw-bold text-primary">
+                            <?= htmlspecialchars($row['no_request']) ?>
+                            <?php if ($tipe_row === 'BESAR'): ?>
+                                <span class="badge bg-secondary ms-1" style="font-size:.6rem;">BESAR</span>
+                            <?php elseif ($tipe_row === 'IT'): ?>
+                                <span class="badge bg-info text-dark ms-1" style="font-size:.6rem;">IT</span>
+                            <?php endif; ?>
+                        </td>
                         <td><?= date('d/m/Y', strtotime($row['tgl_request'])) ?></td>
-                        <td class="text-uppercase"><?= $row['nama_pemesan'] ?></td>
+                        <td class="text-uppercase"><?= htmlspecialchars($row['nama_pemesan']) ?></td>
                         <td class="text-center">
                             <span class="badge bg-light text-dark border px-3"><?= $jml_item ?> Item</span>
                         </td>
-                       <td class="text-center">
-                            <!-- Badge status PR -->
+                        <td class="text-center">
                             <span class="badge status-badge <?= $badge_color ?> d-block mb-1">
                                 <?= $row['status_request'] ?>
                             </span>
-                        
-                            <!-- Badge status PO — hanya untuk PR Besar yang sudah punya PO aktif -->
+
                             <?php if ($row['kategori_pr'] === 'BESAR' && $status_po): ?>
                             <span style="
                                 display:inline-block;
@@ -259,8 +443,7 @@ if ($_SESSION['status'] != "login") {
                                 PO: <?= $po_badge_txt ?>
                             </span>
                             <?php endif; ?>
-                        
-                            <!-- Badge nama pembeli (existing) -->
+
                             <?php if (!empty($row['nama_pembeli'])):
                                 $p = strtoupper($row['nama_pembeli']);
                                 $c = "bg-info";
@@ -276,17 +459,14 @@ if ($_SESSION['status'] != "login") {
                                 </div>
                             <?php endif; ?>
                         </td>
-                     <td class="text-center">
+                        <td class="text-center">
                             <div class="btn-group">
-                        
-                                <!-- Lihat Detail (semua PR) -->
                                 <button type="button" class="btn btn-sm btn-dark text-white btn-view-detail"
                                         data-id="<?= $row['id_request'] ?>"
                                         title="Lihat Detail">
                                     <i class="fas fa-eye"></i>
                                 </button>
-                        
-                                <!-- Cetak PO — barang besar yang sudah melewati tahap approval -->
+
                                 <?php if ($row['kategori_pr'] == 'BESAR' && !in_array($row['status_approval'], ['MENUNGGU APPROVAL', 'APPROVED 1', 'APPROVED 2', 'DITOLAK', ''])): ?>
                                     <a href="cetak_po.php?id_request=<?= $row['id_request'] ?>"
                                     target="_blank"
@@ -294,7 +474,6 @@ if ($_SESSION['status'] != "login") {
                                     style="background-color:#4f46e5;color:white;"
                                     title="Cetak PO<?= $no_po ? ' · '.$no_po : '' ?> | Status: <?= $po_badge_txt ?? 'DRAFT' ?>">
                                         <i class="fas fa-file-invoice"></i>
-                                        <!-- Dot indikator warna status PO di dalam tombol -->
                                         <?php if ($status_po === 'OPEN'): ?>
                                             <span style="display:inline-block;width:6px;height:6px;background:#4ade80;border-radius:50%;margin-left:2px;vertical-align:middle;" title="PO OPEN"></span>
                                         <?php elseif ($status_po === 'CLOSE'): ?>
@@ -302,63 +481,48 @@ if ($_SESSION['status'] != "login") {
                                         <?php endif; ?>
                                     </a>
                                 <?php endif; ?>
-                        
-                                <!-- Cetak PR (semua PR) -->
-                                <!--<a href="cetak_pr.php?id=<?= $row['id_request'] ?>"
+
+                                <?php
+                                $is_pr_besar = (
+                                    $row['kategori_pr'] === 'BESAR' ||
+                                    strpos($row['no_request'] ?? '', 'PRB') === 0 ||
+                                    strpos($row['no_request'] ?? '', 'PRI') === 0
+                                );
+                                $file_cetak = $is_pr_besar ? 'cetak_pr_besar.php' : 'cetak_pr.php';
+
+                                $is_besar_or_it = in_array($row['kategori_pr'] ?? '', ['BESAR', 'IT'], true);
+                                $btn_class   = $is_besar_or_it ? 'btn-danger' : 'btn-info text-white';
+                                $btn_title   = $is_besar_or_it ? 'Cetak PR Besar (QR)' : 'Cetak PR Kecil';
+                                $show_qr     = $is_besar_or_it;
+                                ?>
+
+                                <a href="<?= htmlspecialchars($file_cetak) ?>?id=<?= urlencode($row['id_request'] ?? '') ?>"
                                 target="_blank"
-                                class="btn btn-sm btn-info text-white"
-                                title="Cetak PR">
+                                class="btn btn-sm <?= $btn_class ?>"
+                                title="<?= htmlspecialchars($btn_title) ?>">
                                     <i class="fas fa-print"></i>
-                                </a>-->
-								<?php
-                                        // 1. Logika penentuan file cetak
-                                        $is_pr_besar = (
-                                            $row['kategori_pr'] === 'BESAR' || 
-                                            strpos($row['no_request'] ?? '', 'PRB') === 0 || 
-                                            strpos($row['no_request'] ?? '', 'PRI') === 0
-                                        );
-                                        $file_cetak = $is_pr_besar ? 'cetak_pr_besar.php' : 'cetak_pr.php';
+                                    <?php if ($show_qr): ?>
+                                        <i class="fas fa-qrcode ms-1" style="font-size:.6rem;opacity:.8;"></i>
+                                    <?php endif; ?>
+                                </a>
 
-                                        // 2. Logika styling & label (BESAR atau IT)
-                                        $is_besar_or_it = in_array($row['kategori_pr'] ?? '', ['BESAR', 'IT'], true);
+                                <?php
+                                $link_edit = ($row['kategori_pr'] == 'BESAR') ? 'edit_request_besar.php' : 'edit_request.php';
+                                $status_bisa_edit = in_array($row['status_request'], ['PENDING', 'PROSES']) || $row['status_approval'] == 'DITOLAK';
 
-                                        $btn_class   = $is_besar_or_it ? 'btn-danger' : 'btn-info text-white';
-                                        $btn_title   = $is_besar_or_it ? 'Cetak PR Besar (QR)' : 'Cetak PR Kecil';
-                                        $show_qr     = $is_besar_or_it;
-                                        ?>
+                                if ($status_bisa_edit):
+                                ?>
+                                    <a href="<?= $link_edit ?>?id=<?= $row['id_request'] ?>"
+                                       class="btn btn-sm btn-warning"
+                                       title="<?= ($row['status_approval'] == 'DITOLAK') ? 'Revisi PR' : 'Edit PR' ?>">
+                                        <?php if ($row['status_approval'] == 'DITOLAK'): ?>
+                                            <i class="fas fa-redo me-1"></i> Revisi
+                                        <?php else: ?>
+                                            <i class="fas fa-edit"></i> Edit
+                                        <?php endif; ?>
+                                    </a>
+                                <?php endif; ?>
 
-                                        <a href="<?= htmlspecialchars($file_cetak) ?>?id=<?= urlencode($row['id_request'] ?? '') ?>"
-                                        target="_blank"
-                                        class="btn btn-sm <?= $btn_class ?>"
-                                        title="<?= htmlspecialchars($btn_title) ?>">
-                                            <i class="fas fa-print"></i>
-                                            <?php if ($show_qr): ?>
-                                                <i class="fas fa-qrcode ms-1" style="font-size:.6rem;opacity:.8;"></i>
-                                            <?php endif; ?>
-                                        </a>
-                        
-                             <?php 
-								// 1. Tentukan tujuan file berdasarkan kategori barang
-								$link_edit = ($row['kategori_pr'] == 'BESAR') ? 'edit_request_besar.php' : 'edit_request.php';
-
-								// 2. Tentukan syarat tombol muncul (Bisa edit jika belum selesai/batal, atau jika ditolak)
-								$status_bisa_edit = in_array($row['status_request'], ['PENDING', 'PROSES']) || $row['status_approval'] == 'DITOLAK';
-
-								if ($status_bisa_edit): 
-								?>
-									<a href="<?= $link_edit ?>?id=<?= $row['id_request'] ?>" 
-									   class="btn btn-sm btn-warning" 
-									   title="<?= ($row['status_approval'] == 'DITOLAK') ? 'Revisi PR' : 'Edit PR' ?>">
-										
-										<?php if ($row['status_approval'] == 'DITOLAK'): ?>
-											<i class="fas fa-redo me-1"></i> Revisi
-										<?php else: ?>
-											<i class="fas fa-edit"></i> Edit
-										<?php endif; ?>
-									</a>
-								<?php endif; ?>
-                        
-                                <!-- Hapus: hanya barang KECIL PENDING -->
                                 <?php if ($row['status_request'] == 'PENDING' && $row['kategori_pr'] != 'BESAR'): ?>
                                     <a href="hapus_request.php?id=<?= $row['id_request'] ?>"
                                     class="btn btn-sm btn-outline-danger"
@@ -367,7 +531,6 @@ if ($_SESSION['status'] != "login") {
                                         <i class="fas fa-trash"></i>
                                     </a>
                                 <?php endif; ?>
-                        
                             </div>
                         </td>
                     </tr>
@@ -416,14 +579,14 @@ if ($_SESSION['status'] != "login") {
                     <div class="mb-3">
                         <label class="small fw-bold">STATUS REQUEST</label>
                         <select name="status" class="form-select">
-                            <option value="PENDING">PENDING (Menunggu)</option>
+                            <option value="PENDING">MENUNGGU APPROVAL</option>
                             <option value="SELESAI">SELESAI (Sudah Dibelikan)</option>
                         </select>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="submit" class="btn btn-success w-100 fw-bold">PROSES & CETAK</button>
-                </div>
+                </div>S
             </form>
         </div>
     </div>
@@ -433,42 +596,45 @@ if ($_SESSION['status'] != "login") {
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 $(document).ready(function () {
-
-    // ── 1. Inisialisasi DataTable ────────────────────────────────
     const table = $('#tablePR').DataTable({
         destroy     : true,
         pageLength  : 10,
         order       : [[0, 'asc']],
         language    : { url: '//cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json' },
-        columnDefs  : [
-            { orderable: false, targets: [4, 5, 6] }
-        ]
+        columnDefs  : [ { orderable: false, targets: [4, 5, 6] } ]
     });
 
-    // ── 2. Filter Dropdown Status ────────────────────────────────
-    // Pakai custom search function berdasarkan data-status di <tr>.
-    // Ini lebih andal karena tidak terpengaruh oleh teks badge lain
-    // (nama pembeli, "BELUM DISET", dll) yang ada dalam <td> yang sama.
+    // Tab hanya menyaring baris yang sudah dimuat oleh query existing.
+    let tipeAktif = 'PR';
     $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+        // Jangan sampai filter halaman ini memengaruhi DataTable lain.
+        if (settings.nTable.id !== 'tablePR') return true;
+
+        const rowNode = table.row(dataIndex).node();
+        const tipeRow = $(rowNode).attr('data-tipe') || '';
+        const statusRow = $(rowNode).attr('data-status') || '';
         const pilihan = $('#filterStatus').val();
-        if (!pilihan) return true; // Kosong = tampilkan semua
-        const statusRow = $(table.row(dataIndex).node()).data('status') || '';
-        return statusRow === pilihan;
+
+        return tipeRow === tipeAktif && (!pilihan || statusRow === pilihan);
     });
 
-    $('#filterStatus').on('click', function (e) {
-        e.stopPropagation(); // Cegah klik dropdown memicu sort kolom
+    $('#tabKategoriPR button[data-tipe]').on('click', function () {
+        tipeAktif = $(this).attr('data-tipe');
+        $('#tabKategoriPR button[data-tipe]')
+            .removeClass('active')
+            .attr('aria-selected', 'false');
+        $(this).addClass('active').attr('aria-selected', 'true');
+        $('#judulTabelPR').text('DAFTAR REQUEST ' + tipeAktif);
+        table.page('first').draw();
     });
 
-    $('#filterStatus').on('change', function () {
-        table.draw(); // Cukup redraw, custom search di atas yang menyaring
-    });
+    $('#filterStatus').on('click', function (e) { e.stopPropagation(); });
+    $('#filterStatus').on('change', function () { table.draw(); });
+    table.draw(); // Saat pertama dibuka, tampilkan hanya PR biasa.
 
-    // ── 3. Event Delegation untuk tombol detail ──────────────────
     $(document).on('click', '.btn-view-detail', function () {
         const id = $(this).data('id');
         $('#modalDetailPR').modal('show');
@@ -490,7 +656,6 @@ $(document).ready(function () {
 </script>
 
 <script>
-    // ── SweetAlert pesan berhasil/gagal ──────────────────────────
     const urlParams = new URLSearchParams(window.location.search);
     const pesan     = urlParams.get('pesan');
     const no_pr     = urlParams.get('no');
@@ -504,8 +669,7 @@ $(document).ready(function () {
         Swal.fire({ icon: 'error', title: 'GAGAL!', text: 'Terjadi kesalahan sistem saat menyimpan data.', confirmButtonColor: '#d33' });
     } else if (pesan === 'update_sukses') {
         Swal.fire({ icon: 'success', title: 'BERHASIL!', text: 'Data request berhasil diperbarui.', confirmButtonColor: '#0000FF' });
-    
-     } else if (pesan === 'revisi_berhasil') {
+    } else if (pesan === 'revisi_berhasil') {
         Swal.fire({
             icon: 'success',
             title: 'Revisi Berhasil!',
@@ -518,61 +682,28 @@ $(document).ready(function () {
 </script>
 
 <script>
-    // ── Donut Chart Progress ─────────────────────────────────────
-    const ctx = document.getElementById('chartProgres').getContext('2d');
-    new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            datasets: [{
-                data            : [<?= $count_proses ?>, <?= $count_pending ?>],
-                backgroundColor : ['#0d6efd', '#ffc107'],
-                borderWidth     : 0,
-                cutout          : '70%'
-            }]
-        },
-        options: {
-            responsive          : true,
-            maintainAspectRatio : false,
-            plugins             : { tooltip: { enabled: false } }
-        }
-    });
-</script>
-<script>
     let idleTime = 0;
-    const maxIdleMinutes = 15; // Samakan dengan server
+    const maxIdleMinutes = 15;
     let lastServerUpdate = Date.now();
     let sessionValid = true;
 
-    // Fungsi reset timer saat ada gerakan
     function resetTimer() {
         idleTime = 0;
         let now = Date.now();
-
-        // Kirim sinyal ke server setiap 5 menit agar session PHP tidak expired
         if (now - lastServerUpdate > 300000) {
-            fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
+            fetch('../../auth/keep_alive.php')
                 .then(response => response.json())
-                .then(data => {
-                    if (data.status !== 'success') {
-                        sessionValid = false;
-                        forceLogout();
-                    }
-                })
-                .catch(err => {
-                    console.error("Koneksi ke server terputus");
-                });
+                .then(data => { if (data.status !== 'success') { sessionValid = false; forceLogout(); } })
+                .catch(err => { console.error("Koneksi ke server terputus"); });
             lastServerUpdate = now;
         }
     }
 
-    // Fungsi paksa logout
     function forceLogout() {
         alert("Sesi Anda telah berakhir karena tidak ada aktivitas selama 15 menit.");
-        // Redirect ke logout.php agar session server juga dihancurkan
-        window.location.href = "http://192.168.31.200/pr_mcp/auth/logout.php?pesan=timeout";
+        window.location.href = "../../auth/logout.php?pesan=timeout";
     }
 
-    // Pantau aktivitas user
     window.onload = resetTimer;
     document.onmousemove = resetTimer;
     document.onkeypress = resetTimer;
@@ -580,24 +711,13 @@ $(document).ready(function () {
     document.onclick = resetTimer;
     document.onscroll = resetTimer;
 
-    // Cek status idle setiap 1 menit
     setInterval(function() {
         idleTime++;
-        // Cek session ke server juga
-        fetch('http://192.168.31.200/pr_mcp/auth/keep_alive.php')
+        fetch('../../auth/keep_alive.php')
             .then(response => response.json())
-            .then(data => {
-                if (data.status !== 'success') {
-                    sessionValid = false;
-                    forceLogout();
-                }
-            })
-            .catch(err => {
-                // Jika error koneksi, biarkan user tetap di halaman
-            });
-        if (idleTime >= maxIdleMinutes && sessionValid) {
-            forceLogout();
-        }
+            .then(data => { if (data.status !== 'success') { sessionValid = false; forceLogout(); } })
+            .catch(err => {});
+        if (idleTime >= maxIdleMinutes && sessionValid) { forceLogout(); }
     }, 60000);
 </script>
 </body>

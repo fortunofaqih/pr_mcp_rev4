@@ -8,8 +8,8 @@
  * - Antrean PR dengan info status lengkap
  */
 session_start();
-include '../../config/koneksi.php';
-include '../../auth/check_session.php';
+require_once __DIR__ . '/../../config/koneksi.php';
+require_once __DIR__ . '/../../auth/check_session.php';
 
 
 if ($_SESSION['status'] !== 'login') {
@@ -31,15 +31,26 @@ $r = mysqli_fetch_assoc(mysqli_query($koneksi, "
 "));
 $stat['pending'] = (int)$r['c'];
 
-// PR Sedang Diproses (PROSES, masih ada item pending)
+// Kategori PRB konsisten untuk penghitung, pembagian tab, dan tombol aksi.
+$sql_is_prb = "(COALESCE(r.kategori_pr, '') = 'BESAR' OR UPPER(TRIM(COALESCE(r.no_request, ''))) LIKE 'PRB%')";
+
+// PR Sedang Diproses (selain PRB dan bukan antrean Menunggu Verifikasi)
 $r = mysqli_fetch_assoc(mysqli_query($koneksi, "
     SELECT COUNT(DISTINCT r.id_request) AS c
     FROM tr_request r
     WHERE r.status_request = 'PROSES'
-      AND EXISTS (
-          SELECT 1 FROM tr_request_detail d
-          WHERE d.id_request = r.id_request
-            AND d.status_item NOT IN ('TERBELI','MENUNGGU VERIFIKASI','REJECTED')
+      AND NOT $sql_is_prb
+      AND (
+          EXISTS (
+              SELECT 1 FROM tr_request_detail d
+              WHERE d.id_request = r.id_request
+                AND d.status_item NOT IN ('TERBELI','MENUNGGU VERIFIKASI','REJECTED')
+          )
+          OR NOT EXISTS (
+              SELECT 1 FROM tr_request_detail d
+              WHERE d.id_request = r.id_request
+                AND d.status_item = 'MENUNGGU VERIFIKASI'
+          )
       )
 "));
 $stat['proses'] = (int)$r['c'];
@@ -633,7 +644,7 @@ $periode_label = $bulan_id[(int)date('m')] . ' ' . date('Y');
                     // Query semua PR aktif dengan stat item
                     $q_all_pr = mysqli_query($koneksi, "
                         SELECT
-                            r.*,
+                            r.*, $sql_is_prb AS is_prb_dashboard,
                             (SELECT COUNT(*) FROM tr_request_detail d
                              WHERE d.id_request=r.id_request AND d.status_item NOT IN ('REJECTED')
                             ) AS item_total,
@@ -655,15 +666,12 @@ $periode_label = $bulan_id[(int)date('m')] . ' ' . date('Y');
                     // Pisahkan ke bucket
                     $bucket = ['menunggu'=>[], 'proses'=>[], 'verif'=>[]];
                     while ($pr = mysqli_fetch_assoc($q_all_pr)) {
-                        $is_besar    = $pr['kategori_pr'] === 'BESAR';
-                        $is_approved = in_array($pr['status_approval'],['APPROVED','DISETUJUI']);
-                        $pr['boleh_beli'] = !$is_besar || $is_approved;
 
                         if ($pr['status_request'] === 'PENDING') {
                             $bucket['menunggu'][] = $pr;
                         } elseif ($pr['item_pending'] == 0 && $pr['item_verif'] > 0) {
                             $bucket['verif'][] = $pr;
-                        } else {
+                        } elseif (!(int)$pr['is_prb_dashboard']) {
                             $bucket['proses'][] = $pr;
                         }
                     }
@@ -687,6 +695,7 @@ $periode_label = $bulan_id[(int)date('m')] . ' ' . date('Y');
 
                         foreach ($rows as $pr) {
                             $is_besar    = $pr['kategori_pr'] === 'BESAR';
+                            $is_prb = (bool)$pr['is_prb_dashboard'];
                             $is_approved = in_array($pr['status_approval'],['APPROVED','DISETUJUI']);
                             $item_total  = max((int)$pr['item_total'], 1);
                             $pct_terbeli = round($pr['item_terbeli'] / $item_total * 100);
@@ -753,10 +762,18 @@ $periode_label = $bulan_id[(int)date('m')] . ' ' . date('Y');
                                 // --------------------------------
 
                                 $harus_lock = ($pr['item_pending'] == 0 && $pr['item_verif'] > 0);
-                                if ($harus_lock) {
+                                // PRB mengikuti alur verifikasi pembayaran oleh manager, bukan input Beli.
+                                if ($is_prb) {
+                                    $siap_verifikasi_prb = in_array($pr['status_approval'], ['APPROVED 2', 'APPROVED'], true)
+                                        && trim((string)($pr['approve1_by'] ?? '')) !== ''
+                                        && trim((string)($pr['approve2_by'] ?? '')) !== '';
+                                    if ($siap_verifikasi_prb) {
+                                        echo '<span class="btn-aksi btn-lock-verif" title="Pembayaran PRB ditangani di Verifikasi Pembelian oleh manager"><i class="fas fa-user-check" aria-hidden="true"></i> Verifikasi oleh Manager</span>';
+                                    } else {
+                                        echo '<span class="btn-aksi btn-lock-appr" title="Verifikasi pembayaran PRB tersedia setelah dua approval manager"><i class="fas fa-lock" aria-hidden="true"></i> Menunggu Approval</span>';
+                                    }
+                                } elseif ($harus_lock) {
                                     echo '<button class="btn-aksi btn-lock-verif" disabled title="Semua item menunggu verifikasi"><i class="fas fa-hourglass-half"></i><span class="d-none d-md-inline">Verifikasi</span></button>';
-                                } elseif (!$pr['boleh_beli']) {
-                                    echo '<button class="btn-aksi btn-lock-appr" disabled title="Menunggu approval manager"><i class="fas fa-lock"></i><span class="d-none d-md-inline">Approval</span></button>';
                                 } else {
                                     echo '<button onclick="prosesBeli('.$pr['id_request'].')" class="btn-aksi btn-beli"><i class="fas fa-shopping-cart"></i><span class="d-none d-md-inline">Beli</span>';
                                     if ($pr['item_verif'] > 0 && $pr['item_pending'] > 0)
@@ -845,16 +862,16 @@ $periode_label = $bulan_id[(int)date('m')] . ' ' . date('Y');
                     foreach ($data_staf as $index => $s): 
                         $rank_class = ($index == 0) ? 'rank-1' : (($index == 1) ? 'rank-2' : (($index == 2) ? 'rank-3' : 'rank-n'));
                         $persen_bar = ($s['total_nilai'] / $max_nilai_staf) * 100;
-                        
+
                         // Avatar gratis dari internet (UI Faces / DiceBear)
                         $avatar_url = "https://ui-avatars.com/api/?name=" . urlencode($s['nama_staf']) . "&background=random&color=fff";
                 ?>
                     <div class="staf-row">
                         <div class="d-flex align-items-center gap-3 w-100">
                             <div class="staf-rank <?= $rank_class ?>"><?= $index + 1 ?></div>
-                            
+
                             <img src="<?= $avatar_url ?>" alt="Avatar" style="width:40px; height:40px; border-radius:50%; border:2px solid var(--border);">
-                            
+
                             <div class="flex-grow-1">
                                 <div class="staf-name" style="font-size: 0.8rem;"><?= htmlspecialchars($s['nama_staf']) ?></div>
                                 <div class="staf-bar-wrap">
