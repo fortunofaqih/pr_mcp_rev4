@@ -175,6 +175,88 @@ try {
             WHERE r.id_request=$id AND COALESCE(d.status_item, '') <> 'REJECTED'
               AND p.id_pembelian IS NULL");
         $jumlahBarisBaru = mysqli_affected_rows($koneksi);
+
+        // ── REVISI: Tutup PO saat lunas ──────────────────────────
+        // Semua PO pada request ini yang masih OPEN ditutup (termasuk PO lama
+        // jika ada revisi). Guard status_po='OPEN' agar tidak menimpa
+        // CLOSE/BATAL/DRAFT yang sudah ada.
+        prbFinanceQuery($koneksi, "UPDATE tr_purchase_order
+            SET status_po='CLOSE'
+            WHERE id_request=$id AND status_po='OPEN'");
+
+        // Pastikan tidak ada lagi PO OPEN tersisa untuk request ini.
+        $cekClose = mysqli_fetch_assoc(prbFinanceQuery($koneksi,
+            "SELECT COUNT(*) AS sisa FROM tr_purchase_order
+             WHERE id_request=$id AND status_po='OPEN'"));
+        if ((int)$cekClose['sisa'] > 0) {
+            throw new DomainException('PO gagal ditutup otomatis. Periksa status PO sebelum melanjutkan.');
+        }
+
+        // ── Sinkronisasi status PRB ketika LUNAS ─────────────────
+        // Jangan tandai item sebagai TERBELI bila belum ada pembelian final.
+        // Semua validasi dan perubahan berada dalam transaksi yang sama.
+        $qBelum = prbFinanceQuery($koneksi, "
+            SELECT COUNT(*) AS jumlah
+            FROM tr_request_detail d
+            WHERE d.id_request = $id
+              AND COALESCE(d.status_item, '') <> 'REJECTED'
+              AND NOT EXISTS (
+                  SELECT 1 FROM pembelian p
+                  WHERE p.id_request_detail = d.id_detail
+                    AND p.id_request = d.id_request
+              )
+        ");
+        $belum = mysqli_fetch_assoc($qBelum);
+        if ((int)$belum['jumlah'] > 0) {
+            throw new DomainException('Masih ada item PRB yang belum tercatat di Buku Realisasi.');
+        }
+
+        // PO yang dipakai untuk Buku Realisasi harus sudah tertutup.
+        $qPoFinal = prbFinanceQuery($koneksi, "
+            SELECT status_po FROM tr_purchase_order
+            WHERE id_po = $idPo AND id_request = $id
+        ");
+        $poFinal = mysqli_fetch_assoc($qPoFinal);
+        if (!$poFinal || $poFinal['status_po'] !== 'CLOSE') {
+            throw new DomainException('PO belum CLOSE. PRB tidak dapat diselesaikan.');
+        }
+
+        // Hanya detail aktif; item REJECTED tidak disentuh.
+        prbFinanceQuery($koneksi, "
+            UPDATE tr_request_detail
+            SET status_item = 'TERBELI', is_dibeli = 1
+            WHERE id_request = $id
+              AND COALESCE(status_item, '') <> 'REJECTED'
+        ");
+
+        $qSisa = prbFinanceQuery($koneksi, "
+            SELECT COUNT(*) AS jumlah
+            FROM tr_request_detail
+            WHERE id_request = $id
+              AND COALESCE(status_item, '') <> 'REJECTED'
+              AND (
+                  COALESCE(status_item, '') <> 'TERBELI'
+                  OR COALESCE(is_dibeli, 0) <> 1
+              )
+        ");
+        $sisa = mysqli_fetch_assoc($qSisa);
+        if ((int)$sisa['jumlah'] > 0) {
+            throw new DomainException('Sinkronisasi status item PRB gagal.');
+        }
+
+        // Header PRB diselesaikan hanya setelah seluruh item aktif
+        // memiliki realisasi final dan PO telah CLOSE.
+        prbFinanceQuery($koneksi, "
+            UPDATE tr_request
+            SET status_request = 'SELESAI', updated_at = NOW()
+            WHERE id_request = $id
+              AND kategori_pr = 'BESAR'
+              AND status_request = 'PROSES'
+        ");
+        if (mysqli_affected_rows($koneksi) !== 1) {
+            throw new DomainException('Status header PRB tidak dapat diselesaikan. Periksa status request.');
+        }
+        // ── /REVISI ──────────────────────────────────────────────
     }
 
     $newpaid = number_format(($paid + $jumlah) / 100, 2, '.', '');

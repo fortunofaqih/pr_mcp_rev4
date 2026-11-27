@@ -39,8 +39,12 @@ $rows=[]; if($q)while($r=mysqli_fetch_assoc($q))$rows[]=$r;
 <div class="d-flex justify-content-between flex-wrap gap-2"><h6 class="fw-bold text-primary"><?= $esc($r['no_request']) ?></h6><span class="badge bg-warning text-dark">MENUNGGU FINANCE</span></div>
 <div class="row g-2 small mb-3">
 <div class="col-6"><b>Supplier:</b> <?= $esc($r['nama_supplier']) ?></div><div class="col-6"><b>No. PO:</b> <?= $esc($r['no_po']) ?></div>
-<div class="col-6"><b>Jenis:</b> <?= $esc($r['jenis_disetujui']) ?></div><div class="col-6"><b>Diverifikasi Manager:</b> <?= $esc($r['verified_by']) ?></div>
+<div class="col-6"><b>Diverifikasi Manager:</b> <?= $esc($r['verified_by']) ?></div>
+<?php if (!empty($r['catatan_verifikasi'])): ?>
+<div class="col-12"><b>Catatan Manager:</b> <?= nl2br($esc($r['catatan_verifikasi'])) ?></div>
+<?php endif; ?>
 <div class="col-12"><b>Waktu verifikasi:</b> <?= $r['verified_at'] ? date('d/m/Y H:i',strtotime($r['verified_at'])) : '-' ?></div>
+
 <div class="col-6"><b>Total tagihan:</b> <?= $mata_uang_prb ?> <?=  number_format((float)$r['total_tagihan'],2,',','.') ?></div>
 <div class="col-6"><b>Sudah terbayar:</b> <?= $mata_uang_prb ?> <?=  number_format((float)$r['total_terbayar'],2,',','.') ?></div>
 <div class="col-12"><b>Nominal siap dibayar:</b> <strong class="text-danger"><?= $mata_uang_prb ?> <?=  number_format((float)$r['nominal_disetujui'],2,',','.') ?></strong></div>
